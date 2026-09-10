@@ -59,6 +59,14 @@ class _HostPageState extends State<HostPage> {
   bool _autoStarted = false;
   int _appCount = 0;
 
+  /// App name -> bundle path, filled when the catalogue is built so an icon
+  /// request does not have to rescan the disk.
+  final _appPaths = <String, String>{};
+
+  /// Serialises the multi-notification transfers. Two of them running at once
+  /// would interleave their frames on one characteristic and stall both.
+  Future<void> _transfers = Future<void>.value();
+
   /// Value served on the notify characteristic until real data flows.
   final _notifyCharacteristic = GATTCharacteristic.mutable(
     uuid: BtLink.notifyCharacteristicUuid,
@@ -252,15 +260,18 @@ class _HostPageState extends State<HostPage> {
     switch (message) {
       case ListApps():
         _touch(central, 'requested the app list');
-        await _sendCatalogue(central);
+        await _queueTransfer(() => _sendCatalogue(central));
       case OpenApp(:final name):
         _touch(central, 'open $name');
         final result = await AppLauncher.open(name);
         if (mounted) setState(() => _addLog(result.message));
         await _send(central, Ack(ok: result.ok, message: result.message));
+      case RequestIcon(:final name):
+        _touch(central, 'icon for $name');
+        await _queueTransfer(() => _sendIcon(central, name));
       case DebugText(:final text):
         _touch(central, 'said: $text');
-      case Ack() || AppEntry() || ListEnd():
+      case Ack() || AppEntry() || ListEnd() || IconUnavailable():
         // Host-to-client shapes; a client has no business sending them.
         _touch(central, 'ignored a ${message.runtimeType}');
     }
@@ -269,8 +280,33 @@ class _HostPageState extends State<HostPage> {
   /// Streams the installed apps one message at a time. There is no
   /// reassembly on this link, so the catalogue is many small notifications
   /// rather than one large payload.
+  /// Runs [work] after every transfer already queued, so a catalogue in
+  /// flight finishes before an icon starts.
+  Future<void> _queueTransfer(Future<void> Function() work) {
+    final completer = Completer<void>();
+    _transfers = _transfers.then((_) async {
+      try {
+        await work();
+        completer.complete();
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
+  }
+
+  Future<void> _ensureAppPaths() async {
+    if (_appPaths.isNotEmpty) return;
+    final apps = await AppLauncher.list();
+    _appPaths.addEntries(apps.map((app) => MapEntry(app.name, app.path)));
+    if (mounted) setState(() => _appCount = apps.length);
+  }
+
   Future<void> _sendCatalogue(Central central) async {
     final apps = await AppLauncher.list();
+    _appPaths
+      ..clear()
+      ..addEntries(apps.map((app) => MapEntry(app.name, app.path)));
     if (mounted) setState(() => _appCount = apps.length);
     for (final app in apps) {
       await _send(central, AppEntry(name: app.name, category: app.category));
@@ -283,6 +319,67 @@ class _HostPageState extends State<HostPage> {
       setState(() => _addLog('sent ${apps.length} apps to ${_short(
         central.uuid.toString(),
       )}'));
+    }
+  }
+
+  /// Renders an app's icon and streams it as binary frames sized to the
+  /// link's MTU.
+  Future<void> _sendIcon(Central central, String appName) async {
+    final peripheral = _peripheral;
+    if (peripheral == null) return;
+
+    // The client restores its deck from local storage and can ask for an
+    // icon before it has asked for the catalogue.
+    await _ensureAppPaths();
+    final path = _appPaths[appName];
+    final png = path == null ? null : await AppLauncher.icon(path);
+    if (png == null) {
+      await _send(central, IconUnavailable(name: appName));
+      return;
+    }
+
+    final int maximum;
+    try {
+      maximum = await peripheral.getMaximumNotifyLength(central);
+    } catch (error) {
+      if (mounted) setState(() => _addLog('icon aborted: $error'));
+      return;
+    }
+
+    final capacity = IconFrame.payloadCapacity(maximum, appName);
+    if (capacity <= 0) {
+      // A name long enough to fill the MTU on its own leaves nowhere to put
+      // the image.
+      await _send(central, IconUnavailable(name: appName));
+      return;
+    }
+
+    final total = (png.length / capacity).ceil();
+    for (var index = 0; index < total; index++) {
+      final start = index * capacity;
+      final end = start + capacity < png.length ? start + capacity : png.length;
+      try {
+        await peripheral.notifyCharacteristic(
+          central,
+          _notifyCharacteristic,
+          value: IconFrame.encode(
+            name: appName,
+            index: index,
+            total: total,
+            payload: png.sublist(start, end),
+          ),
+        );
+      } catch (error) {
+        if (mounted) setState(() => _addLog('icon frame failed: $error'));
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+
+    if (mounted) {
+      setState(() {
+        _addLog('sent $appName icon (${png.length}B in $total frames)');
+      });
     }
   }
 

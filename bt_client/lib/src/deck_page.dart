@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/material.dart';
 
@@ -158,18 +161,30 @@ class _DeckPageState extends State<DeckPage> {
         childAspectRatio: 1,
       ),
       itemCount: selected.length,
-      itemBuilder: (context, index) => _DeckButton(
-        appName: selected[index],
-        onPressed: () => _press(selected[index]),
-      ),
+      itemBuilder: (context, index) {
+        final appName = selected[index];
+        // Fills from the disk cache, or the host for anything new. Safe to
+        // call on every build: the session ignores repeats.
+        unawaited(_session.ensureIcon(appName));
+        return _DeckButton(
+          appName: appName,
+          icon: _session.iconFor(appName),
+          onPressed: () => _press(appName),
+        );
+      },
     );
   }
 }
 
 class _DeckButton extends StatelessWidget {
-  const _DeckButton({required this.appName, required this.onPressed});
+  const _DeckButton({
+    required this.appName,
+    required this.icon,
+    required this.onPressed,
+  });
 
   final String appName;
+  final Uint8List? icon;
   final VoidCallback onPressed;
 
   @override
@@ -196,16 +211,27 @@ class _DeckButton extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: theme.colorScheme.surface.withValues(
-                  alpha: 0.75,
+              // The real icon when it has arrived; the initial is the
+              // placeholder that keeps the button usable until then.
+              if (icon != null)
+                Image.memory(
+                  icon!,
+                  width: 44,
+                  height: 44,
+                  filterQuality: FilterQuality.medium,
+                  gaplessPlayback: true,
+                )
+              else
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: theme.colorScheme.surface.withValues(
+                    alpha: 0.75,
+                  ),
+                  child: Text(
+                    appName.characters.first.toUpperCase(),
+                    style: theme.textTheme.titleLarge,
+                  ),
                 ),
-                child: Text(
-                  appName.characters.first.toUpperCase(),
-                  style: theme.textTheme.titleLarge,
-                ),
-              ),
               const SizedBox(height: 8),
               Text(
                 appName,

@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
 
+import 'dart:typed_data';
+
 import 'deck_store.dart';
+import 'icon_cache.dart';
 import 'protocol.dart';
 
 /// Where the link is in the connect -> discover -> subscribe sequence.
@@ -59,6 +62,18 @@ class BtLinkSession extends ChangeNotifier {
   /// screens read it, and it belongs to this host like the catalogue does.
   var _selected = <String>[];
   final _apps = <DeckApp>[];
+
+  /// Decoded icons, keyed by app name. Populated from the disk cache first
+  /// and from the host only for what is missing.
+  final _icons = <String, Uint8List>{};
+
+  /// Frames arriving for an icon that is not complete yet.
+  final _partialIcons = <String, List<Uint8List?>>{};
+
+  /// Names already asked for, so a rebuild does not re-request.
+  final _requestedIcons = <String>{};
+  final _iconQueue = <String>[];
+  bool _fetchingIcon = false;
   bool _loadingApps = false;
   final _log = <LinkMessage>[];
   int? _mtu;
@@ -69,6 +84,7 @@ class BtLinkSession extends ChangeNotifier {
   bool get ready => _stage == LinkStage.ready;
   List<DeckApp> get apps => List.unmodifiable(_apps);
   List<String> get selected => List.unmodifiable(_selected);
+  Uint8List? iconFor(String appName) => _icons[appName];
   bool isSelected(String appName) => _selected.contains(appName);
 
   /// Identifies this host's layout in storage.
@@ -106,6 +122,10 @@ class BtLinkSession extends ChangeNotifier {
   }
 
   void _receive(List<int> bytes) {
+    if (IconFrame.looksLikeFrame(bytes)) {
+      _receiveIconFrame(bytes);
+      return;
+    }
     final message = BtMessage.decode(bytes);
     if (message == null) {
       _append('unparsed (${bytes.length} bytes)', inbound: true);
@@ -117,16 +137,97 @@ class BtLinkSession extends ChangeNotifier {
       case ListEnd(:final count):
         _loadingApps = false;
         _append('catalogue complete: $count apps', inbound: true);
+        // Now that the names are in, start filling in the pictures.
+        unawaited(_drainIconQueue());
       case Ack(:final ok, :final message):
         _lastAck = message;
         _append('${ok ? 'ok' : 'error'}: $message', inbound: true);
       case DebugText(:final text):
         _append(text, inbound: true);
-      case ListApps() || OpenApp():
+      case IconUnavailable(:final name):
+        _append('no icon for $name', inbound: true);
+        _finishIconFetch(name);
+      case ListApps() || OpenApp() || RequestIcon():
         // Client-to-host shapes; a host has no business sending them.
         _append('ignored a ${message.runtimeType}', inbound: true);
     }
     notifyListeners();
+  }
+
+  void _receiveIconFrame(List<int> bytes) {
+    final frame = IconFrame.decode(bytes);
+    if (frame == null) {
+      _append('malformed icon frame (${bytes.length} bytes)', inbound: true);
+      return;
+    }
+
+    final slots = _partialIcons.putIfAbsent(
+      frame.name,
+      () => List<Uint8List?>.filled(frame.total, null),
+    );
+    if (slots.length != frame.total) {
+      // The host restarted the transfer with a different chunk count.
+      _partialIcons[frame.name] = List<Uint8List?>.filled(frame.total, null);
+    }
+    _partialIcons[frame.name]![frame.index] = frame.payload;
+
+    if (_partialIcons[frame.name]!.any((slot) => slot == null)) return;
+
+    final builder = BytesBuilder();
+    for (final slot in _partialIcons.remove(frame.name)!) {
+      builder.add(slot!);
+    }
+    final icon = builder.toBytes();
+    _icons[frame.name] = icon;
+    unawaited(IconCache.write(hostId, frame.name, icon));
+    _append('icon for ${frame.name} (${icon.length} bytes)', inbound: true);
+    _finishIconFetch(frame.name);
+    notifyListeners();
+  }
+
+  /// Fetches [appName]'s icon if it is not already known, preferring the disk
+  /// cache. Requests are queued one at a time so a deck full of new buttons
+  /// does not flood the notification queue.
+  Future<void> ensureIcon(String appName) async {
+    if (_icons.containsKey(appName)) return;
+    if (!_requestedIcons.add(appName)) return;
+
+    // Reading the disk cache costs nothing on the link, so it is not held
+    // back by the catalogue.
+    final cached = await IconCache.read(hostId, appName);
+    if (cached != null) {
+      _icons[appName] = cached;
+      notifyListeners();
+      return;
+    }
+
+    _iconQueue.add(appName);
+    unawaited(_drainIconQueue());
+  }
+
+  Future<void> _drainIconQueue() async {
+    // The catalogue comes first. Icons are large and many; interleaving them
+    // with ~100 catalogue notifications would leave the deck without labels
+    // for far longer than it leaves it without pictures.
+    if (_loadingApps) return;
+    if (_fetchingIcon || _iconQueue.isEmpty || !ready) return;
+    _fetchingIcon = true;
+    final appName = _iconQueue.removeAt(0);
+    await _send(RequestIcon(name: appName));
+    // The host answers with frames; _finishIconFetch releases the queue. A
+    // host that never answers must not wedge it, hence the timeout.
+    _iconTimeout = Timer(const Duration(seconds: 10), () {
+      _finishIconFetch(appName);
+    });
+  }
+
+  Timer? _iconTimeout;
+
+  void _finishIconFetch(String appName) {
+    _iconTimeout?.cancel();
+    _iconTimeout = null;
+    _fetchingIcon = false;
+    unawaited(_drainIconQueue());
   }
 
   void _append(String text, {required bool inbound}) {
@@ -262,6 +363,7 @@ class BtLinkSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    _iconTimeout?.cancel();
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }

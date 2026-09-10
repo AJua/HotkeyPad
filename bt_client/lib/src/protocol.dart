@@ -58,6 +58,8 @@ sealed class BtMessage {
         ),
         'end' => ListEnd(count: json['c'] as int? ?? 0),
         'open' => OpenApp(name: json['n'] as String),
+        'ico' => RequestIcon(name: json['n'] as String),
+        'ico!' => IconUnavailable(name: json['n'] as String),
         'ack' => Ack(
           ok: json['ok'] as bool? ?? false,
           message: json['m'] as String? ?? '',
@@ -104,6 +106,26 @@ final class ListEnd extends BtMessage {
   Map<String, Object?> toJson() => {'t': 'end', 'c': count};
 }
 
+/// Client -> host: send me this app's icon.
+final class RequestIcon extends BtMessage {
+  const RequestIcon({required this.name});
+
+  final String name;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'ico', 'n': name};
+}
+
+/// Host -> client: there is no icon for this app, stop waiting for one.
+final class IconUnavailable extends BtMessage {
+  const IconUnavailable({required this.name});
+
+  final String name;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'ico!', 'n': name};
+}
+
 /// Client -> host: launch this app.
 final class OpenApp extends BtMessage {
   const OpenApp({required this.name});
@@ -133,4 +155,78 @@ final class DebugText extends BtMessage {
 
   @override
   Map<String, Object?> toJson() => {'t': 'txt', 'm': text};
+}
+
+/// One slice of an icon, sent as binary rather than JSON.
+///
+/// A 64px PNG is around 5KB; base64 inside a JSON message would inflate that
+/// by a third and, at the MTU an iPhone negotiates, need roughly sixty
+/// notifications per icon. Binary frames roughly halve that.
+///
+/// Frames share the notify characteristic with JSON messages. A JSON message
+/// always begins with `{` (0x7b), so a leading [magic] byte tells them apart
+/// unambiguously.
+///
+/// Layout: `[magic][nameLength][name utf8][index u16be][total u16be][payload]`
+///
+/// The app name is repeated in every frame rather than tracked as connection
+/// state, so reassembly stays correct even if two icons ever interleave.
+abstract final class IconFrame {
+  static const magic = 0x01;
+
+  static bool looksLikeFrame(List<int> bytes) =>
+      bytes.isNotEmpty && bytes.first == magic;
+
+  static int headerSize(String name) => 6 + utf8.encode(name).length;
+
+  /// Bytes of icon data that fit in one notification of [maxNotifyLength].
+  static int payloadCapacity(int maxNotifyLength, String name) =>
+      maxNotifyLength - headerSize(name);
+
+  static Uint8List encode({
+    required String name,
+    required int index,
+    required int total,
+    required List<int> payload,
+  }) {
+    final nameBytes = utf8.encode(name);
+    if (nameBytes.length > 255) {
+      throw ArgumentError.value(name, 'name', 'too long to frame');
+    }
+    final bytes = BytesBuilder()
+      ..addByte(magic)
+      ..addByte(nameBytes.length)
+      ..add(nameBytes)
+      ..addByte((index >> 8) & 0xff)
+      ..addByte(index & 0xff)
+      ..addByte((total >> 8) & 0xff)
+      ..addByte(total & 0xff)
+      ..add(payload);
+    return bytes.toBytes();
+  }
+
+  /// Returns null for anything that is not a well-formed frame, including a
+  /// truncated one.
+  static ({String name, int index, int total, Uint8List payload})? decode(
+    List<int> bytes,
+  ) {
+    if (!looksLikeFrame(bytes) || bytes.length < 2) return null;
+    final nameLength = bytes[1];
+    final headerEnd = 2 + nameLength + 4;
+    if (bytes.length < headerEnd) return null;
+    try {
+      final name = utf8.decode(bytes.sublist(2, 2 + nameLength));
+      final index = (bytes[2 + nameLength] << 8) | bytes[3 + nameLength];
+      final total = (bytes[4 + nameLength] << 8) | bytes[5 + nameLength];
+      if (total == 0 || index >= total) return null;
+      return (
+        name: name,
+        index: index,
+        total: total,
+        payload: Uint8List.fromList(bytes.sublist(headerEnd)),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 }

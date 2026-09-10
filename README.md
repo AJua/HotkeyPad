@@ -31,8 +31,11 @@ host's peripheral UUID), so the buttons are usable the moment the app opens
 rather than after the catalogue finishes arriving, and two hosts keep separate
 layouts.
 
-Not done yet: app icons, actions beyond launching (media keys, shortcuts,
-scripts), folders/pages of buttons, reconnect on wake, and bonding.
+Buttons show the app's real icon, fetched once and cached on disk; the first
+letter stands in until one arrives.
+
+Not done yet: actions beyond launching (media keys, shortcuts, scripts),
+folders/pages of buttons, reconnect on wake, and bonding.
 
 ## Message protocol
 
@@ -47,6 +50,8 @@ hierarchy encoded as single-line JSON, one message per ATT operation:
 | `open`      | client -> host  | launch an app                    |
 | `ack`       | host -> client  | result of the last command       |
 | `txt`       | either          | debug console traffic            |
+| `ico`       | client -> host  | send this app's icon             |
+| `ico!`      | host -> client  | there is no icon, stop waiting   |
 
 There is no reassembly: a message must fit the negotiated MTU. The client
 requests a 512-byte MTU on Android, and the host refuses to send anything
@@ -57,6 +62,42 @@ catalogue is therefore streamed as one small notification per app, paced at
 Keys are one or two characters, and `BtMessage.decode` returns null for
 anything it does not recognise, so a version mismatch degrades instead of
 crashing.
+
+### Icons are binary, not JSON
+
+A 64px PNG is ~5KB. Base64 inside a JSON message would inflate that by a
+third and, at the MTU an iPhone negotiates, need roughly sixty notifications
+per icon. Icons therefore travel as binary frames on the same characteristic:
+
+```
+[0x01][nameLength][name utf8][index u16be][total u16be][payload]
+```
+
+A JSON message always starts with `{` (0x7b), so the leading `0x01` tells the
+two apart unambiguously. The app name is repeated in every frame rather than
+kept as connection state, so reassembly stays correct even if two icons
+interleave.
+
+The host renders icons with `NSWorkspace.icon(forFile:)` through a method
+channel (`macos/Runner/AppIconChannel.swift`) rather than reading
+`CFBundleIconFile` from Info.plist: modern apps keep their icon inside
+`Assets.car`, where the plist route finds nothing, and AppKit also returns a
+sensible generic icon for apps that have none.
+
+### Transfer ordering
+
+The catalogue is delivered before any icon. Names make the deck usable;
+pictures only make it pretty, and interleaving ~100 catalogue notifications
+with 5KB icons would delay the labels far longer than it delays the images.
+
+Two mechanisms enforce it. The client will not drain its icon queue while
+`_loadingApps` is set, and starts draining when `ListEnd` arrives. The host
+funnels every multi-notification transfer through a single promise chain, so
+a catalogue in flight completes before an icon begins.
+
+Icons are cached on the client's disk per host (`icon_cache.dart`), so this
+cost is paid once. A cached icon is read immediately and is *not* held back
+by the catalogue, since reading it costs nothing on the link.
 
 ## The macOS host is not sandboxed
 
