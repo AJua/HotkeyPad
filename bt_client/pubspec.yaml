@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   bluetooth_low_energy: ^6.2.1
   shared_preferences: ^2.5.5
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -89,3 +90,13 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+dependency_overrides:
+  # path_provider_foundation 2.6.0 loads a dylib through Flutter's
+  # native-assets mechanism (via objective_c). On this toolchain that fails to
+  # resolve on macOS and crashes the app at launch on iOS with EXC_BAD_ACCESS.
+  # 2.5.1 is the last release that is a plain method channel.
+  #
+  # Revisit when the toolchain moves: drop this override, run the app on a
+  # physical iPhone, and check that no objective_c.framework is needed.
+  path_provider_foundation: 2.5.1

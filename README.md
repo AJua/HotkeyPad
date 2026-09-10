@@ -97,7 +97,31 @@ a catalogue in flight completes before an icon begins.
 
 Icons are cached on the client's disk per host (`icon_cache.dart`), so this
 cost is paid once. A cached icon is read immediately and is *not* held back
-by the catalogue, since reading it costs nothing on the link.
+by the catalogue, since reading it costs nothing on the link. Files rather
+than preferences: shared_preferences is loaded into memory wholesale at
+startup, so a deck of thirty icons would weigh on every launch whether the
+deck is opened or not.
+
+## A pinned dependency worth revisiting
+
+`bt_client/pubspec.yaml` holds `path_provider_foundation` at **2.5.1** via
+`dependency_overrides`. From 2.6.0 that package loads a dylib through
+Flutter's native-assets mechanism (via `objective_c`); on this toolchain
+(Flutter 3.38.5) it fails to resolve on macOS and crashes the app at launch
+on iOS with `EXC_BAD_ACCESS`. 2.5.1 is the last plain method-channel release.
+
+`dependency_overrides` silently wins over the whole resolution graph, so this
+is the kind of pin that rots unnoticed. To retire it: drop the override, run
+`flutter pub get`, and check that `pubspec.lock` gains no `objective_c` and
+that `build/ios/iphoneos/Runner.app/Frameworks` gains no
+`objective_c.framework`. Then run it on a physical iPhone — the macOS
+symptom and the iOS symptom were different, and only the device showed the
+crash.
+
+Note that removing a native dependency does not remove its framework from an
+existing build directory. `flutter clean` is required, or the stale framework
+loads against a Dart side that no longer registers it and the app opens to a
+white screen.
 
 ## The macOS host is not sandboxed
 
