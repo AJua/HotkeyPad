@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'safe_insets.dart';
 import 'session.dart';
 
 /// The old chat screen, kept as a diagnostic tool: it shows every message on
@@ -65,7 +66,11 @@ class _DebugPageState extends State<DebugPage> {
                 child: log.isEmpty
                     ? const Center(child: Text('No traffic yet.'))
                     : ListView.builder(
-                        padding: const EdgeInsets.all(12),
+                        padding: safeScrollPadding(
+                          context,
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                         itemCount: log.length,
                         itemBuilder: (context, index) =>
                             _Bubble(message: log[log.length - 1 - index]),

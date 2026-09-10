@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'safe_insets.dart';
 import 'session.dart';
 
 /// Chooses which of the host's apps appear on the deck, and in what order.
@@ -57,7 +58,13 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           body: CustomScrollView(
+            // One padding for the whole scroll view: the slivers inside carry
+            // their own horizontal spacing relative to it.
             slivers: [
+              SliverPadding(
+                padding: safeScrollPadding(context),
+                sliver: SliverMainAxisGroup(
+                  slivers: [
               _header(context, 'On the deck (${selected.length})'),
               if (selected.isEmpty)
                 const SliverToBoxAdapter(
@@ -154,7 +161,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     );
                   },
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  ],
+                ),
+              ),
             ],
           ),
         );

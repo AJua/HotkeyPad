@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'deck_page.dart';
 import 'protocol.dart';
+import 'safe_insets.dart';
 import 'unsupported_page.dart';
 
 /// One entry in the discovery list, kept across advertisements so the list
@@ -246,6 +247,7 @@ class _ScanPageState extends State<ScanPage> {
                 devices.isEmpty
                     ? _EmptyState(discovering: _discovering)
                     : ListView.separated(
+                      padding: safeScrollPadding(context),
                       itemCount: devices.length,
                       separatorBuilder:
                           (_, _) => const Divider(height: 1, indent: 72),
@@ -379,7 +381,10 @@ class _AdapterBanner extends StatelessWidget {
     return Material(
       color: Theme.of(context).colorScheme.errorContainer,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: safeScrollPadding(
+          context,
+          horizontal: 16,
+        ).copyWith(top: 10, bottom: 10),
         child: Row(
           children: [
             const Icon(Icons.bluetooth_disabled, size: 18),

@@ -5,6 +5,7 @@ import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/material.dart';
 
 import 'debug_page.dart';
+import 'safe_insets.dart';
 import 'settings_page.dart';
 import 'session.dart';
 
@@ -92,7 +93,10 @@ class _DeckPageState extends State<DeckPage> {
                 Material(
                   color: Theme.of(context).colorScheme.errorContainer,
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: safeScrollPadding(
+                      context,
+                      horizontal: 12,
+                    ).copyWith(top: 12, bottom: 12),
                     child: Row(
                       children: [
                         const Icon(Icons.error_outline, size: 18),
@@ -153,7 +157,7 @@ class _DeckPageState extends State<DeckPage> {
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: safeScrollPadding(context, horizontal: 12, vertical: 12),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 140,
         mainAxisSpacing: 12,
