@@ -236,12 +236,27 @@ class BtLinkSession extends ChangeNotifier {
   }
 
   Future<void> connect() async {
+    final reconnecting =
+        _stage == LinkStage.disconnected || _stage == LinkStage.failed;
     _stage = LinkStage.connecting;
     _error = null;
     // A drop mid-catalogue leaves this set; clear it so the retry can ask.
     _loadingApps = false;
     notifyListeners();
     try {
+      // Reconnecting straight after a drop fails on Android with
+      // "Write descriptor failed with status: 1" (GATT_INVALID_HANDLE): the
+      // stack is still tearing the old link down when the new descriptor
+      // write arrives. Close it explicitly and give the stack a moment.
+      if (reconnecting) {
+        try {
+          await _central.disconnect(peripheral);
+        } catch (_) {
+          // Already gone is the expected case here.
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
+
       // Scanning while connecting slows the connection down and on some
       // platforms blocks it outright.
       await _central.stopDiscovery();
@@ -302,8 +317,21 @@ class BtLinkSession extends ChangeNotifier {
     } catch (error) {
       _stage = LinkStage.failed;
       _error = '$error';
+      _append('connect failed: $error', inbound: true);
       notifyListeners();
     }
+  }
+
+  /// The first line of [error], capped. Platform exceptions arrive with a
+  /// full Java stack trace attached, which is debug-console material — it
+  /// would otherwise push every button off the screen.
+  String? get errorSummary {
+    final error = _error;
+    if (error == null) return null;
+    final firstLine = error.split('\n').first.trim();
+    return firstLine.length > 160
+        ? '${firstLine.substring(0, 160)}…'
+        : firstLine;
   }
 
   Future<void> _loadSelection() async {

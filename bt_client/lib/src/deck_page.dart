@@ -63,13 +63,6 @@ class _DeckPageState extends State<DeckPage> {
         return Scaffold(
           appBar: AppBar(
             title: Text(widget.name),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(28),
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _StageIndicator(session: _session),
-              ),
-            ),
             actions: [
               IconButton(
                 tooltip: 'Deck settings',
@@ -87,30 +80,19 @@ class _DeckPageState extends State<DeckPage> {
               ),
             ],
           ),
-          body: Column(
+          body: Stack(
             children: [
-              if (_session.error != null)
-                Material(
-                  color: Theme.of(context).colorScheme.errorContainer,
-                  child: Padding(
-                    padding: safeScrollPadding(
-                      context,
-                      horizontal: 12,
-                    ).copyWith(top: 12, bottom: 12),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error_outline, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(_session.error!)),
-                        TextButton(
-                          onPressed: _session.connect,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
+              Positioned.fill(child: _body()),
+              // Built only while the link is unusable, so a connected deck
+              // has nothing layered over it to absorb taps.
+              if (_session.stage != LinkStage.ready)
+                Positioned.fill(
+                  child: _ConnectionOverlay(
+                    session: _session,
+                    deviceName: widget.name,
+                    onBack: () => Navigator.of(context).maybePop(),
                   ),
                 ),
-              Expanded(child: _body()),
             ],
           ),
         );
@@ -262,45 +244,113 @@ class _DeckButton extends StatelessWidget {
   }
 }
 
-class _StageIndicator extends StatelessWidget {
-  const _StageIndicator({required this.session});
+/// Covers the deck while the link is not usable.
+///
+/// Driven by the session's stage rather than pushed with `showDialog`: connect
+/// moves through several stages in about a second, and a pushed route would
+/// have to be popped in lockstep with them.
+class _ConnectionOverlay extends StatelessWidget {
+  const _ConnectionOverlay({
+    required this.session,
+    required this.deviceName,
+    required this.onBack,
+  });
 
   final BtLinkSession session;
+  final String deviceName;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final stage = session.stage;
-    final busy =
+    final working =
         stage == LinkStage.connecting ||
         stage == LinkStage.discovering ||
         stage == LinkStage.subscribing;
-    final color = switch (stage) {
-      LinkStage.ready => Colors.green,
-      LinkStage.failed => Theme.of(context).colorScheme.error,
-      LinkStage.disconnected => Theme.of(context).disabledColor,
-      _ => Theme.of(context).colorScheme.onSurfaceVariant,
-    };
-    final mtu = session.mtu;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Stack(
       children: [
-        if (busy)
-          const SizedBox(
-            width: 12,
-            height: 12,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        else
-          Icon(
-            stage == LinkStage.ready ? Icons.link : Icons.link_off,
-            size: 14,
-            color: color,
+        const ModalBarrier(dismissible: false, color: Colors.black54),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 360,
+                maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+              ),
+              child: Card(
+                elevation: 8,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (working)
+                        const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 3),
+                        )
+                      else
+                        Icon(
+                          stage == LinkStage.failed
+                              ? Icons.error_outline
+                              : Icons.link_off,
+                          size: 32,
+                          color: stage == LinkStage.failed
+                              ? theme.colorScheme.error
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                      const SizedBox(height: 16),
+                      Text(
+                        switch (stage) {
+                          LinkStage.connecting => 'Connecting to $deviceName',
+                          LinkStage.discovering => 'Discovering services',
+                          LinkStage.subscribing => 'Subscribing',
+                          LinkStage.disconnected => 'Disconnected',
+                          LinkStage.failed => 'Could not connect',
+                          LinkStage.ready => '',
+                        },
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      if (!working) ...[
+                        const SizedBox(height: 8),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            child: Text(
+                              session.errorSummary ??
+                                  'The link to $deviceName was lost.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: onBack,
+                              child: const Text('Back'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton.icon(
+                              onPressed: session.connect,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-        const SizedBox(width: 8),
-        Text(
-          mtu == null ? stage.label : '${stage.label} · MTU $mtu',
-          style: TextStyle(fontSize: 12, color: color),
         ),
       ],
     );
