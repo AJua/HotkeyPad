@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
+// Flutter's ConnectionState (StreamBuilder) collides with the BLE one.
+import 'package:flutter/widgets.dart' hide ConnectionState;
 
 import 'dart:typed_data';
 
@@ -79,6 +81,12 @@ class BtLinkSession extends ChangeNotifier {
   int? _mtu;
   String? _lastAck;
 
+  Timer? _reconnectTimer;
+  Timer? _countdownTimer;
+  int _reconnectAttempt = 0;
+  int? _reconnectIn;
+  AppLifecycleListener? _lifecycle;
+
   LinkStage get stage => _stage;
   String? get error => _error;
   bool get ready => _stage == LinkStage.ready;
@@ -94,8 +102,23 @@ class BtLinkSession extends ChangeNotifier {
   int? get mtu => _mtu;
   String? get lastAck => _lastAck;
 
+  /// How many reconnects have been attempted since the last good link.
+  int get reconnectAttempt => _reconnectAttempt;
+
+  /// Seconds until the next automatic attempt, or null when not waiting.
+  int? get reconnectIn => _reconnectIn;
+
   void start() {
     _loadSelection();
+
+    // Coming back from a locked screen is the common way this link dies, and
+    // the user is looking at the deck when it happens. Do not make them wait
+    // out the backoff.
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        if (_reconnectTimer?.isActive ?? false) _reconnectNow();
+      },
+    );
     _subscriptions.add(
       _central.connectionStateChanged.listen((event) {
         if (event.peripheral.uuid != peripheral.uuid) return;
@@ -104,6 +127,7 @@ class BtLinkSession extends ChangeNotifier {
           _notifyCharacteristic = null;
           _writeCharacteristic = null;
           notifyListeners();
+          _scheduleReconnect();
         }
       }),
     );
@@ -235,9 +259,53 @@ class BtLinkSession extends ChangeNotifier {
     if (_log.length > 200) _log.removeAt(0);
   }
 
+  /// Backs off so a host that is off for the evening is not polled every
+  /// second, while a host that is merely restarting is picked up quickly.
+  static int _backoffSeconds(int attempt) => switch (attempt) {
+    0 => 1,
+    1 => 2,
+    2 => 5,
+    3 => 10,
+    _ => 30,
+  };
+
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    _countdownTimer?.cancel();
+
+    final delay = _backoffSeconds(_reconnectAttempt);
+    _reconnectAttempt += 1;
+    _reconnectIn = delay;
+    notifyListeners();
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final remaining = _reconnectIn;
+      if (remaining == null || remaining <= 0) return;
+      _reconnectIn = remaining - 1;
+      notifyListeners();
+    });
+    _reconnectTimer = Timer(Duration(seconds: delay), _reconnectNow);
+  }
+
+  void _reconnectNow() {
+    _reconnectTimer?.cancel();
+    _countdownTimer?.cancel();
+    _reconnectIn = null;
+    connect();
+  }
+
+  void _cancelReconnect() {
+    _reconnectTimer?.cancel();
+    _countdownTimer?.cancel();
+    _reconnectTimer = null;
+    _countdownTimer = null;
+    _reconnectIn = null;
+  }
+
   Future<void> connect() async {
     final reconnecting =
         _stage == LinkStage.disconnected || _stage == LinkStage.failed;
+    _cancelReconnect();
     _stage = LinkStage.connecting;
     _error = null;
     // A drop mid-catalogue leaves this set; clear it so the retry can ask.
@@ -311,6 +379,7 @@ class BtLinkSession extends ChangeNotifier {
       );
 
       _stage = LinkStage.ready;
+      _reconnectAttempt = 0;
       notifyListeners();
 
       await refreshApps();
@@ -319,6 +388,9 @@ class BtLinkSession extends ChangeNotifier {
       _error = '$error';
       _append('connect failed: $error', inbound: true);
       notifyListeners();
+      // A device that does not speak BTLink will not start doing so; only
+      // transient failures are worth retrying.
+      if (error is! StateError) _scheduleReconnect();
     }
   }
 
@@ -391,6 +463,8 @@ class BtLinkSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    _cancelReconnect();
+    _lifecycle?.dispose();
     _iconTimeout?.cancel();
     for (final subscription in _subscriptions) {
       subscription.cancel();

@@ -268,6 +268,7 @@ class _ConnectionOverlay extends StatelessWidget {
         stage == LinkStage.connecting ||
         stage == LinkStage.discovering ||
         stage == LinkStage.subscribing;
+    final waiting = session.reconnectIn;
 
     return Stack(
       children: [
@@ -306,7 +307,10 @@ class _ConnectionOverlay extends StatelessWidget {
                       const SizedBox(height: 16),
                       Text(
                         switch (stage) {
-                          LinkStage.connecting => 'Connecting to $deviceName',
+                          LinkStage.connecting =>
+                            session.reconnectAttempt > 0
+                                ? 'Reconnecting to $deviceName'
+                                : 'Connecting to $deviceName',
                           LinkStage.discovering => 'Discovering services',
                           LinkStage.subscribing => 'Subscribing',
                           LinkStage.disconnected => 'Disconnected',
@@ -328,6 +332,18 @@ class _ConnectionOverlay extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (waiting != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            waiting == 0
+                                ? 'Retrying now...'
+                                : 'Retrying in ${waiting}s'
+                                      ' · attempt ${session.reconnectAttempt}',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -340,7 +356,9 @@ class _ConnectionOverlay extends StatelessWidget {
                             FilledButton.icon(
                               onPressed: session.connect,
                               icon: const Icon(Icons.refresh),
-                              label: const Text('Retry'),
+                              label: Text(
+                                waiting == null ? 'Retry' : 'Retry now',
+                              ),
                             ),
                           ],
                         ),
