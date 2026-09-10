@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'protocol.dart';
+
 /// Stores app icons so they are fetched over BLE once, not on every launch.
 /// A 64px PNG is ~5KB and takes a dozen notifications to transfer.
 ///
@@ -38,40 +40,29 @@ abstract final class IconCache {
       .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
       .join();
 
+  static String _fileName(String appName) =>
+      '${_safe(appName)}@${BtLink.iconSize}';
+
   static Future<Uint8List?> read(String hostId, String appName) async {
     final directory = await _directory(hostId);
     if (directory == null) return null;
-    final file = File('${directory.path}/${_safe(appName)}');
+    final file = File('${directory.path}/${_fileName(appName)}');
     try {
       if (file.existsSync()) return await file.readAsBytes();
     } on FileSystemException {
       return null;
     }
-    return _adoptLegacyEntry(hostId, appName, file);
+    await _discardLegacyEntry(hostId, appName);
+    return null;
   }
 
-  /// Earlier builds kept icons in shared_preferences. Move one across on
-  /// first read so an upgrade does not refetch a deck's worth of icons, and
-  /// drop the preference so the space is reclaimed.
-  static Future<Uint8List?> _adoptLegacyEntry(
-    String hostId,
-    String appName,
-    File destination,
-  ) async {
+  /// Earlier builds kept icons in shared_preferences, at a smaller size.
+  /// Those bytes are the wrong resolution to reuse, so they are dropped to
+  /// reclaim the space and refetched at the current size.
+  static Future<void> _discardLegacyEntry(String hostId, String appName) async {
     final key = 'icon:$hostId:$appName';
     final prefs = await SharedPreferences.getInstance();
-    final encoded = prefs.getString(key);
-    if (encoded == null) return null;
-    await prefs.remove(key);
-    try {
-      final bytes = base64Decode(encoded);
-      await destination.writeAsBytes(bytes, flush: true);
-      return bytes;
-    } on FormatException {
-      return null;
-    } on FileSystemException {
-      return null;
-    }
+    if (prefs.containsKey(key)) await prefs.remove(key);
   }
 
   static Future<void> write(
@@ -83,7 +74,7 @@ abstract final class IconCache {
     if (directory == null) return;
     try {
       await File(
-        '${directory.path}/${_safe(appName)}',
+        '${directory.path}/${_fileName(appName)}',
       ).writeAsBytes(bytes, flush: true);
     } on FileSystemException {
       // A cache that cannot be written is a slow deck, not a broken one.

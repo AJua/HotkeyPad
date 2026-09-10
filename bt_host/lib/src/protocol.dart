@@ -30,6 +30,17 @@ abstract final class BtLink {
   /// takes 18 and the flags 3. 'BTLink' fits in what is left; a longer name
   /// spills into the scan response and only passive scanners lose it.
   static const advertisedName = 'BTLink';
+
+  /// Points square for a rendered app icon.
+  ///
+  /// Deck buttons fill their whole tappable area with the icon, so on a 3x
+  /// phone screen this is scaled to roughly 300 physical pixels; 64px was
+  /// visibly soft there. The cost is ~15KB per icon instead of ~5KB, paid
+  /// once because the client caches them.
+  ///
+  /// The client's cache keys include this number, so changing it invalidates
+  /// stored icons rather than leaving stale ones at the old resolution.
+  static const iconSize = 128;
 }
 
 /// One message on the link.

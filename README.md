@@ -84,6 +84,14 @@ channel (`macos/Runner/AppIconChannel.swift`) rather than reading
 `Assets.car`, where the plist route finds nothing, and AppKit also returns a
 sensible generic icon for apps that have none.
 
+`BtLink.iconSize` (128) is shared by both projects. Deck buttons fill their
+whole tappable area with the icon, so on a 3x phone screen it is scaled to
+roughly 300 physical pixels and 64px was visibly soft. The cost is ~15KB per
+icon instead of ~5KB — around 87 frames and under two seconds each at the MTU
+an iPhone negotiates, paid once because of the cache. Cache filenames carry
+the size (`<hex>@128`), so changing the constant invalidates stored icons
+rather than leaving a set at the old resolution.
+
 ### Transfer ordering
 
 The catalogue is delivered before any icon. Names make the deck usable;

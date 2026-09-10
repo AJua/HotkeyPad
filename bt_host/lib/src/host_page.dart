@@ -332,7 +332,9 @@ class _HostPageState extends State<HostPage> {
     // icon before it has asked for the catalogue.
     await _ensureAppPaths();
     final path = _appPaths[appName];
-    final png = path == null ? null : await AppLauncher.icon(path);
+    final png = path == null
+        ? null
+        : await AppLauncher.icon(path, size: BtLink.iconSize);
     if (png == null) {
       await _send(central, IconUnavailable(name: appName));
       return;

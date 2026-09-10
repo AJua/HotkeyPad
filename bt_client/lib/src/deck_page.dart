@@ -158,7 +158,9 @@ class _DeckPageState extends State<DeckPage> {
         maxCrossAxisExtent: 140,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 1,
+        // Slightly taller than wide: the label strip takes the difference,
+        // leaving the icon area square.
+        childAspectRatio: 0.85,
       ),
       itemCount: selected.length,
       itemBuilder: (context, index) {
@@ -201,49 +203,55 @@ class _DeckButton extends StatelessWidget {
     ).toColor();
 
     return Material(
-      color: tint,
+      // A real icon brings its own colour and shape, so it sits on a neutral
+      // surface. The tint is what makes a letter placeholder distinguishable
+      // at a glance, so it stays until the icon arrives.
+      color: icon != null ? theme.colorScheme.surfaceContainerHighest : tint,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // The real icon when it has arrived; the initial is the
-              // placeholder that keeps the button usable until then.
-              if (icon != null)
-                Image.memory(
-                  icon!,
-                  width: 44,
-                  height: 44,
-                  filterQuality: FilterQuality.medium,
-                  gaplessPlayback: true,
-                )
-              else
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: theme.colorScheme.surface.withValues(
-                    alpha: 0.75,
-                  ),
-                  child: Text(
-                    appName.characters.first.toUpperCase(),
-                    style: theme.textTheme.titleLarge,
-                  ),
-                ),
-              const SizedBox(height: 8),
-              Text(
+        child: Column(
+          children: [
+            // The icon claims everything the label does not, so the whole
+            // button reads as the app rather than as a chip with a picture.
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                child: icon != null
+                    ? Image.memory(
+                        icon!,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.medium,
+                        gaplessPlayback: true,
+                      )
+                    : Center(
+                        child: FittedBox(
+                          child: Text(
+                            appName.characters.first.toUpperCase(),
+                            style: theme.textTheme.displaySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.55,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+              child: Text(
                 appName,
-                maxLines: 2,
+                maxLines: 1,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: theme.textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
