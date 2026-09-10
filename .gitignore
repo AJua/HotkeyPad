@@ -1,0 +1,4 @@
+.DS_Store
+
+# Each Flutter project carries its own .gitignore for build output,
+# .dart_tool/ and the like; this file only covers the workspace root.
