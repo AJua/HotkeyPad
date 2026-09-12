@@ -78,6 +78,7 @@ sealed class BtMessage {
         'lay' => LayoutStart(
           columns: json['c'] as int? ?? DeckLayout.defaultColumns,
           rows: json['r'] as int? ?? DeckLayout.defaultRows,
+          pages: json['p'] as int? ?? 1,
         ),
         'slot' => LayoutSlot(
           index: json['i'] as int,
@@ -194,49 +195,90 @@ class DeckLayout {
   const DeckLayout({
     required this.columns,
     required this.rows,
+    required this.pages,
     required this.slots,
   });
 
   /// An empty grid at the default size.
-  factory DeckLayout.empty({int columns = defaultColumns, int rows = defaultRows}) =>
-      DeckLayout(
-        columns: columns,
-        rows: rows,
-        slots: List<String?>.filled(columns * rows, null),
-      );
+  factory DeckLayout.empty({
+    int columns = defaultColumns,
+    int rows = defaultRows,
+    int pages = 1,
+  }) => DeckLayout(
+    columns: columns,
+    rows: rows,
+    pages: pages,
+    slots: List<String?>.filled(columns * rows * pages, null),
+  );
 
   static const defaultColumns = 5;
   static const defaultRows = 3;
+  static const maxPages = 8;
 
   final int columns;
   final int rows;
+  final int pages;
 
-  /// One entry per cell in reading order, null where the cell is empty.
+  /// One entry per cell across every page, in reading order, null where the
+  /// cell is empty. Flat rather than nested so an index identifies a cell
+  /// globally and a drag between pages needs no special case.
+  ///
   /// Values are [DeckItem] storage strings; the protocol does not interpret
   /// them.
   final List<String?> slots;
 
-  int get capacity => columns * rows;
+  /// Cells on one page.
+  int get pageCapacity => columns * rows;
 
-  DeckLayout resized({int? columns, int? rows}) {
+  /// Cells across every page.
+  int get capacity => pageCapacity * pages;
+
+  int indexOf({required int page, required int cell}) =>
+      page * pageCapacity + cell;
+
+  /// The slots belonging to [page], in reading order.
+  List<String?> page(int index) =>
+      slots.sublist(index * pageCapacity, (index + 1) * pageCapacity);
+
+  DeckLayout resized({int? columns, int? rows, int? pages}) {
     final newColumns = columns ?? this.columns;
     final newRows = rows ?? this.rows;
-    final resized = List<String?>.filled(newColumns * newRows, null);
+    final newPages = pages ?? this.pages;
+    final resized = List<String?>.filled(
+      newColumns * newRows * newPages,
+      null,
+    );
     // Keep cells where they are on screen rather than where they are in the
     // list: a row of buttons should not shuffle sideways when a column is
-    // added.
-    for (var row = 0; row < newRows && row < this.rows; row++) {
-      for (var column = 0; column < newColumns && column < this.columns; column++) {
-        resized[row * newColumns + column] = slots[row * this.columns + column];
+    // added, and a page should not absorb the next one's buttons.
+    for (var page = 0; page < newPages && page < this.pages; page++) {
+      for (var row = 0; row < newRows && row < this.rows; row++) {
+        for (var column = 0;
+            column < newColumns && column < this.columns;
+            column++) {
+          resized[page * newColumns * newRows + row * newColumns + column] =
+              slots[page * this.columns * this.rows + row * this.columns +
+                  column];
+        }
       }
     }
-    return DeckLayout(columns: newColumns, rows: newRows, slots: resized);
+    return DeckLayout(
+      columns: newColumns,
+      rows: newRows,
+      pages: newPages,
+      slots: resized,
+    );
   }
 
   DeckLayout withSlot(int index, String? value) {
     final copy = List<String?>.of(slots);
     copy[index] = value;
-    return DeckLayout(columns: columns, rows: rows, slots: copy);
+    return DeckLayout(
+      columns: columns,
+      rows: rows,
+      pages: pages,
+      slots: copy,
+    );
   }
 
   /// Moves the contents of [from] to [to], swapping if [to] is occupied.
@@ -246,12 +288,18 @@ class DeckLayout {
     final moving = copy[from];
     copy[from] = copy[to];
     copy[to] = moving;
-    return DeckLayout(columns: columns, rows: rows, slots: copy);
+    return DeckLayout(
+      columns: columns,
+      rows: rows,
+      pages: pages,
+      slots: copy,
+    );
   }
 
   Map<String, Object?> toJson() => {
     'columns': columns,
     'rows': rows,
+    'pages': pages,
     'slots': slots,
   };
 
@@ -259,13 +307,19 @@ class DeckLayout {
     if (json is! Map) return null;
     final columns = json['columns'];
     final rows = json['rows'];
+    // Layouts written before pages existed held a single page.
+    final pages = json['pages'] ?? 1;
     final slots = json['slots'];
-    if (columns is! int || rows is! int || slots is! List) return null;
+    if (columns is! int || rows is! int || pages is! int || slots is! List) {
+      return null;
+    }
     if (columns <= 0 || rows <= 0 || columns > 12 || rows > 12) return null;
-    if (slots.length != columns * rows) return null;
+    if (pages <= 0 || pages > maxPages) return null;
+    if (slots.length != columns * rows * pages) return null;
     return DeckLayout(
       columns: columns,
       rows: rows,
+      pages: pages,
       slots: slots.map((slot) => slot is String ? slot : null).toList(),
     );
   }
@@ -285,13 +339,23 @@ final class RequestLayout extends BtMessage {
 /// payload, for the same reason as the app catalogue: there is no reassembly
 /// on this link and a full grid would not fit a single notification.
 final class LayoutStart extends BtMessage {
-  const LayoutStart({required this.columns, required this.rows});
+  const LayoutStart({
+    required this.columns,
+    required this.rows,
+    required this.pages,
+  });
 
   final int columns;
   final int rows;
+  final int pages;
 
   @override
-  Map<String, Object?> toJson() => {'t': 'lay', 'c': columns, 'r': rows};
+  Map<String, Object?> toJson() => {
+    't': 'lay',
+    'c': columns,
+    'r': rows,
+    'p': pages,
+  };
 }
 
 /// Host -> client: the contents of one cell.

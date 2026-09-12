@@ -22,6 +22,8 @@ class DeckPage extends StatefulWidget {
 
 class _DeckPageState extends State<DeckPage> {
   late final BtLinkSession _session;
+  final _pages = PageController();
+  int _page = 0;
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _DeckPageState extends State<DeckPage> {
 
   @override
   void dispose() {
+    _pages.dispose();
     _session.dispose();
     super.dispose();
   }
@@ -136,40 +139,95 @@ class _DeckPageState extends State<DeckPage> {
       builder: (context, constraints) {
         const spacing = 10.0;
         final padding = safeScrollPadding(context, horizontal: 12, vertical: 12);
+        final dots = layout.pages > 1 ? 28.0 : 0.0;
         final width =
             constraints.maxWidth - padding.horizontal -
             spacing * (layout.columns - 1);
         final height =
-            constraints.maxHeight - padding.vertical -
+            constraints.maxHeight - padding.vertical - dots -
             spacing * (layout.rows - 1);
         final cellWidth = width / layout.columns;
         final cellHeight = height / layout.rows;
+        final ratio = cellHeight <= 0 ? 1.0 : cellWidth / cellHeight;
 
-        return GridView.builder(
-          padding: padding,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: layout.columns,
-            mainAxisSpacing: spacing,
-            crossAxisSpacing: spacing,
-            childAspectRatio: cellHeight <= 0
-                ? 1
-                : cellWidth / cellHeight,
-          ),
-          itemCount: layout.capacity,
-          itemBuilder: (context, index) {
-            final stored = layout.slots[index];
-            final item = stored == null ? null : DeckItem.parse(stored);
-            if (item == null) return const _EmptyCell();
-            if (item is AppItem) unawaited(_session.ensureIcon(item.name));
-            return _DeckButton(
-              item: item,
-              icon: item is AppItem ? _session.iconFor(item.name) : null,
-              onPressed: () => _press(item),
-            );
-          },
+        return Column(
+          children: [
+            Expanded(
+              child: PageView.builder(
+                controller: _pages,
+                itemCount: layout.pages,
+                onPageChanged: (page) => setState(() => _page = page),
+                itemBuilder: (context, page) => GridView.builder(
+                  padding: padding,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: layout.columns,
+                    mainAxisSpacing: spacing,
+                    crossAxisSpacing: spacing,
+                    childAspectRatio: ratio,
+                  ),
+                  itemCount: layout.pageCapacity,
+                  itemBuilder: (context, cell) {
+                    final stored =
+                        layout.slots[layout.indexOf(page: page, cell: cell)];
+                    final item = stored == null
+                        ? null
+                        : DeckItem.parse(stored);
+                    if (item == null) return const _EmptyCell();
+                    if (item is AppItem) {
+                      unawaited(_session.ensureIcon(item.name));
+                    }
+                    return _DeckButton(
+                      item: item,
+                      icon: item is AppItem
+                          ? _session.iconFor(item.name)
+                          : null,
+                      onPressed: () => _press(item),
+                    );
+                  },
+                ),
+              ),
+            ),
+            if (layout.pages > 1)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _PageDots(count: layout.pages, current: _page),
+              ),
+          ],
         );
       },
+    );
+  }
+}
+
+/// Which page of the deck is showing. Only drawn when there is more than
+/// one, so a single-page deck loses no room to it.
+class _PageDots extends StatelessWidget {
+  const _PageDots({required this.count, required this.current});
+
+  final int count;
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var page = 0; page < count; page++)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            width: page == current ? 20 : 8,
+            height: 8,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              color: page == current
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outlineVariant,
+            ),
+          ),
+      ],
     );
   }
 }

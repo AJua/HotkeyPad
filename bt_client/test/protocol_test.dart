@@ -161,13 +161,75 @@ void main() {
   });
 
   group('DeckLayout', () {
-    test('defaults to a 5x3 grid of empty cells', () {
+    test('defaults to one 5x3 page of empty cells', () {
       final layout = DeckLayout.empty();
 
       expect(layout.columns, 5);
       expect(layout.rows, 3);
+      expect(layout.pages, 1);
+      expect(layout.pageCapacity, 15);
       expect(layout.capacity, 15);
       expect(layout.slots.every((slot) => slot == null), isTrue);
+    });
+
+    test('pages extend the flat slot list', () {
+      final layout = DeckLayout.empty(pages: 3);
+
+      expect(layout.capacity, 45);
+      expect(layout.pageCapacity, 15);
+      expect(layout.indexOf(page: 2, cell: 4), 34);
+    });
+
+    test('page() returns just that page', () {
+      final layout = DeckLayout.empty(pages: 2)
+          .withSlot(0, 'app:First')
+          .withSlot(15, 'app:Second');
+
+      expect(layout.page(0).first, 'app:First');
+      expect(layout.page(0).length, 15);
+      expect(layout.page(1).first, 'app:Second');
+    });
+
+    test('moving works across pages', () {
+      // A drag from page 0 to page 1 is an ordinary index move.
+      final moved = DeckLayout.empty(pages: 2)
+          .withSlot(0, 'app:A')
+          .moved(0, 20);
+
+      expect(moved.slots[0], isNull);
+      expect(moved.slots[20], 'app:A');
+    });
+
+    test('adding a page leaves existing pages untouched', () {
+      final layout = DeckLayout.empty().withSlot(14, 'app:Last');
+
+      final grown = layout.resized(pages: 2);
+
+      expect(grown.capacity, 30);
+      expect(grown.slots[14], 'app:Last');
+      expect(grown.page(1).every((slot) => slot == null), isTrue);
+    });
+
+    test('removing a page drops only that page', () {
+      final layout = DeckLayout.empty(pages: 2)
+          .withSlot(0, 'app:Keep')
+          .withSlot(15, 'app:Drop');
+
+      final shrunk = layout.resized(pages: 1);
+
+      expect(shrunk.slots.contains('app:Keep'), isTrue);
+      expect(shrunk.slots.contains('app:Drop'), isFalse);
+    });
+
+    test('reads a layout written before pages existed', () {
+      final decoded = DeckLayout.fromJson({
+        'columns': 2,
+        'rows': 2,
+        'slots': <String?>[null, 'app:A', null, null],
+      });
+
+      expect(decoded!.pages, 1);
+      expect(decoded.slots[1], 'app:A');
     });
 
     test('moving swaps the two cells', () {
@@ -237,7 +299,7 @@ void main() {
     test('round-trip', () {
       const messages = <BtMessage>[
         RequestLayout(),
-        LayoutStart(columns: 5, rows: 3),
+        LayoutStart(columns: 5, rows: 3, pages: 2),
         LayoutSlot(index: 7, value: 'app:Safari'),
         LayoutEnd(),
       ];

@@ -173,8 +173,12 @@ class BtLinkSession extends ChangeNotifier {
         _append('${ok ? 'ok' : 'error'}: $message', inbound: true);
       case DebugText(:final text):
         _append(text, inbound: true);
-      case LayoutStart(:final columns, :final rows):
-        _incoming = DeckLayout.empty(columns: columns, rows: rows);
+      case LayoutStart(:final columns, :final rows, :final pages):
+        _incoming = DeckLayout.empty(
+          columns: columns,
+          rows: rows,
+          pages: pages,
+        );
         _loadingLayout = true;
       case LayoutSlot(:final index, :final value):
         final incoming = _incoming;

@@ -30,6 +30,11 @@ service, and the buttons launch applications over BLE.
 - Empty cells are drawn rather than skipped, so buttons stay where they were
   put, and the grid is sized to fill the screen — every button visible at
   once is the entire point of a deck.
+- **Pages** extend that without shrinking the buttons: swipe on the phone,
+  with dots showing where you are. In the editor, page tabs are also drop
+  targets, which is the only way to drag a button onto a page that is not
+  currently shown. Slots are one flat list across every page, so a drag
+  between pages is an ordinary index move rather than a special case.
 - Free-text messaging survives as the **debug console** (bug icon), which also
   shows every message on the link.
 

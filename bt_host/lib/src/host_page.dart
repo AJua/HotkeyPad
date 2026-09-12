@@ -346,7 +346,11 @@ class _HostPageState extends State<HostPage> {
     final layout = await LayoutStore.load();
     await _send(
       central,
-      LayoutStart(columns: layout.columns, rows: layout.rows),
+      LayoutStart(
+        columns: layout.columns,
+        rows: layout.rows,
+        pages: layout.pages,
+      ),
     );
     for (var index = 0; index < layout.slots.length; index++) {
       final value = layout.slots[index];
@@ -358,7 +362,8 @@ class _HostPageState extends State<HostPage> {
     if (mounted) {
       setState(() {
         _addLog(
-          'sent layout ${layout.columns}x${layout.rows} to '
+          'sent layout ${layout.columns}x${layout.rows}'
+          '${layout.pages > 1 ? ' x${layout.pages} pages' : ''} to '
           '${_short(central.uuid.toString())}',
         );
       });

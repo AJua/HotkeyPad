@@ -25,6 +25,7 @@ class LayoutPage extends StatefulWidget {
 
 class _LayoutPageState extends State<LayoutPage> {
   DeckLayout _layout = DeckLayout.empty();
+  int _page = 0;
   var _apps = <({String name, String category, String path})>[];
   final _icons = <String, Uint8List?>{};
   bool _loading = true;
@@ -62,9 +63,17 @@ class _LayoutPageState extends State<LayoutPage> {
   }
 
   Future<void> _apply(DeckLayout layout) async {
-    setState(() => _layout = layout);
+    setState(() {
+      _layout = layout;
+      _clampPage();
+    });
     await LayoutStore.save(layout);
     widget.onChanged(layout);
+  }
+
+  /// Keeps the visible page valid when pages are removed.
+  void _clampPage() {
+    if (_page >= _layout.pages) _page = _layout.pages - 1;
   }
 
   Future<void> _pick(int index) async {
@@ -109,16 +118,50 @@ class _LayoutPageState extends State<LayoutPage> {
                 value: _layout.rows,
                 onChanged: (value) => _apply(_layout.resized(rows: value)),
               ),
+              const SizedBox(width: 16),
+              _SizeStepper(
+                label: 'Pages',
+                value: _layout.pages,
+                max: DeckLayout.maxPages,
+                onChanged: (value) => _apply(_layout.resized(pages: value)),
+              ),
             ],
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'Click a cell to choose what it does. Drag a button to move it.',
+            'Click a cell to choose what it does. Drag a button to move it, '
+            'including onto another page.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
+        if (_layout.pages > 1)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                for (var page = 0; page < _layout.pages; page++)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _PageTab(
+                      index: page,
+                      selected: page == _page,
+                      onSelected: () => setState(() => _page = page),
+                      // Dropping a button on a tab moves it to that page,
+                      // which is the only way to reach a page that is not
+                      // currently shown.
+                      onDropped: (from) => _apply(
+                        _layout.moved(
+                          from,
+                          _layout.indexOf(page: page, cell: 0),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -140,8 +183,9 @@ class _LayoutPageState extends State<LayoutPage> {
                 // Mirrors what the phone will show.
                 childAspectRatio: cellHeight <= 0 ? 1 : cellWidth / cellHeight,
               ),
-              itemCount: _layout.capacity,
-              itemBuilder: (context, index) {
+              itemCount: _layout.pageCapacity,
+              itemBuilder: (context, cell) {
+                final index = _layout.indexOf(page: _page, cell: cell);
                 final stored = _layout.slots[index];
                 final item = stored == null ? null : DeckItem.parse(stored);
                 if (item is AppItem) unawaited(_ensureIcon(item.name));
@@ -288,10 +332,12 @@ class _SizeStepper extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
+    this.max = 8,
   });
 
   final String label;
   final int value;
+  final int max;
   final ValueChanged<int> onChanged;
 
   @override
@@ -307,7 +353,7 @@ class _SizeStepper extends StatelessWidget {
         ),
         Text('$value'),
         IconButton(
-          onPressed: value < 8 ? () => onChanged(value + 1) : null,
+          onPressed: value < max ? () => onChanged(value + 1) : null,
           icon: const Icon(Icons.add_circle_outline),
           visualDensity: VisualDensity.compact,
         ),
@@ -428,6 +474,46 @@ class _SectionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Text(text, style: Theme.of(context).textTheme.labelLarge),
+    );
+  }
+}
+
+/// A page selector that is also a drop target, so a button can be dragged to
+/// a page that is not currently shown.
+class _PageTab extends StatelessWidget {
+  const _PageTab({
+    required this.index,
+    required this.selected,
+    required this.onSelected,
+    required this.onDropped,
+  });
+
+  final int index;
+  final bool selected;
+  final VoidCallback onSelected;
+  final ValueChanged<int> onDropped;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DragTarget<int>(
+      onAcceptWithDetails: (details) => onDropped(details.data),
+      builder: (context, candidate, _) => InkWell(
+        onTap: onSelected,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: candidate.isNotEmpty
+                ? theme.colorScheme.primaryContainer
+                : selected
+                ? theme.colorScheme.secondaryContainer
+                : theme.colorScheme.surfaceContainerLow,
+          ),
+          child: Text('Page ${index + 1}'),
+        ),
+      ),
     );
   }
 }
