@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'debug_page.dart';
 import 'safe_insets.dart';
@@ -40,22 +40,10 @@ class _DeckPageState extends State<DeckPage> {
   }
 
   Future<void> _press(DeckItem item) async {
-    switch (item) {
-      case AppItem(:final name):
-        await _session.openApp(name);
-      case ActionItem(:final action):
-        await _session.runAction(action);
-    }
-    if (!mounted) return;
-    // The ack lands asynchronously; show whatever the host last said.
-    final ack = _session.lastAck;
-    if (ack != null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(ack), duration: const Duration(seconds: 2)),
-        );
-    }
+    // Fires before the round trip: the deck should feel like a button, not
+    // like a form that submits.
+    unawaited(HapticFeedback.selectionClick());
+    await _session.press(item);
   }
 
   @override
@@ -182,6 +170,8 @@ class _DeckPageState extends State<DeckPage> {
                       icon: item is AppItem
                           ? _session.iconFor(item.name)
                           : null,
+                      pressing: _session.isPressing(item),
+                      outcome: _session.feedbackFor(item),
                       onPressed: () => _press(item),
                     );
                   },
@@ -254,11 +244,17 @@ class _DeckButton extends StatelessWidget {
   const _DeckButton({
     required this.item,
     required this.icon,
+    required this.pressing,
+    required this.outcome,
     required this.onPressed,
   });
 
   final DeckItem item;
   final Uint8List? icon;
+  final bool pressing;
+
+  /// Result of the last press: true succeeded, false failed, null idle.
+  final bool? outcome;
   final VoidCallback onPressed;
 
   @override
@@ -283,8 +279,10 @@ class _DeckButton extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
-        child: Column(
+        child: Stack(
           children: [
+            Column(
+              children: [
             // The icon claims everything the label does not, so the whole
             // button reads as the app rather than as a chip with a picture.
             Expanded(
@@ -318,18 +316,53 @@ class _DeckButton extends StatelessWidget {
                       ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
-              child: Text(
-                item.label,
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Covers the button rather than sitting beside it: at deck sizes
+            // there is no room for a badge, and the whole button is the
+            // thing that was pressed.
+            if (pressing || outcome != null)
+              Positioned.fill(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  color: switch (outcome) {
+                    true => Colors.green.withValues(alpha: 0.82),
+                    false => theme.colorScheme.error.withValues(alpha: 0.82),
+                    null => theme.colorScheme.surface.withValues(alpha: 0.6),
+                  },
+                  child: Center(
+                    child: switch (outcome) {
+                      true => const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: 34,
+                      ),
+                      false => const Icon(
+                        Icons.priority_high,
+                        color: Colors.white,
+                        size: 34,
+                      ),
+                      null => const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                    },
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

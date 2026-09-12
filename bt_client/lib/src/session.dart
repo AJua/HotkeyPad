@@ -86,6 +86,16 @@ class BtLinkSession extends ChangeNotifier {
   int? _mtu;
   String? _lastAck;
 
+  /// The button waiting on an ack, and the outcome of the last one.
+  ///
+  /// Acks carry no correlation id, so this assumes one press is outstanding
+  /// at a time — true of a finger on a deck. A second press before the first
+  /// answers simply takes over the slot.
+  String? _pressing;
+  String? _feedbackFor;
+  bool? _feedbackOk;
+  Timer? _feedbackTimer;
+
   Timer? _reconnectTimer;
   Timer? _countdownTimer;
   int _reconnectAttempt = 0;
@@ -97,6 +107,13 @@ class BtLinkSession extends ChangeNotifier {
   bool get ready => _stage == LinkStage.ready;
   List<DeckApp> get apps => List.unmodifiable(_apps);
   DeckLayout? get layout => _layout;
+
+  /// True while this button's command is in flight.
+  bool isPressing(DeckItem item) => _pressing == item.stored;
+
+  /// The outcome of this button's last command, briefly, or null.
+  bool? feedbackFor(DeckItem item) =>
+      _feedbackFor == item.stored ? _feedbackOk : null;
   bool get loadingLayout => _loadingLayout;
   Uint8List? iconFor(String appName) => _icons[appName];
 
@@ -171,6 +188,7 @@ class BtLinkSession extends ChangeNotifier {
       case Ack(:final ok, :final message):
         _lastAck = message;
         _append('${ok ? 'ok' : 'error'}: $message', inbound: true);
+        _settlePress(ok);
       case DebugText(:final text):
         _append(text, inbound: true);
       case LayoutStart(:final columns, :final rows, :final pages):
@@ -452,10 +470,42 @@ class BtLinkSession extends ChangeNotifier {
     await _send(const RequestLayout());
   }
 
-  Future<void> runAction(DeckAction action) async {
-    _append(action.label, inbound: false);
+  /// Sends whatever this button does and tracks it for feedback.
+  Future<void> press(DeckItem item) async {
+    _feedbackTimer?.cancel();
+    _feedbackFor = null;
+    _feedbackOk = null;
+    _pressing = item.stored;
+    _append(item.label, inbound: false);
     notifyListeners();
-    await _send(RunAction(action: action));
+
+    switch (item) {
+      case AppItem(:final name):
+        await _send(OpenApp(name: name));
+      case ActionItem(:final action):
+        await _send(RunAction(action: action));
+    }
+
+    // A host that never answers must not leave the button spinning.
+    _feedbackTimer = Timer(const Duration(seconds: 6), () {
+      if (_pressing != null) _settlePress(false);
+    });
+  }
+
+  void _settlePress(bool ok) {
+    final pressed = _pressing;
+    if (pressed == null) return;
+    _feedbackTimer?.cancel();
+    _pressing = null;
+    _feedbackFor = pressed;
+    _feedbackOk = ok;
+    notifyListeners();
+    // Long enough to notice, short enough not to linger on the button.
+    _feedbackTimer = Timer(const Duration(milliseconds: 1400), () {
+      _feedbackFor = null;
+      _feedbackOk = null;
+      notifyListeners();
+    });
   }
 
   Future<void> refreshApps() async {
@@ -466,12 +516,6 @@ class BtLinkSession extends ChangeNotifier {
     _loadingApps = true;
     notifyListeners();
     await _send(const ListApps());
-  }
-
-  Future<void> openApp(String name) async {
-    _append('open $name', inbound: false);
-    notifyListeners();
-    await _send(OpenApp(name: name));
   }
 
   Future<void> sendDebugText(String text) async {
@@ -498,6 +542,7 @@ class BtLinkSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    _feedbackTimer?.cancel();
     _cancelReconnect();
     _lifecycle?.dispose();
     _iconTimeout?.cancel();

@@ -35,6 +35,10 @@ service, and the buttons launch applications over BLE.
   targets, which is the only way to drag a button onto a page that is not
   currently shown. Slots are one flat list across every page, so a drag
   between pages is an ordinary index move rather than a special case.
+- **Every press reports back.** A haptic tick fires immediately, the button
+  dims while the command is in flight, then flashes green for success or red
+  for failure. Over BLE a press is not instant, and a button that looks
+  identical whether it worked or not is worse than no feedback at all.
 - Free-text messaging survives as the **debug console** (bug icon), which also
   shows every message on the link.
 
