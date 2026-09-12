@@ -7,7 +7,6 @@ import 'package:flutter/widgets.dart' hide ConnectionState;
 
 import 'dart:typed_data';
 
-import 'deck_item.dart';
 import 'deck_store.dart';
 import 'icon_cache.dart';
 import 'protocol.dart';
@@ -61,9 +60,14 @@ class BtLinkSession extends ChangeNotifier {
   GATTCharacteristic? _notifyCharacteristic;
   GATTCharacteristic? _writeCharacteristic;
 
-  /// The user's chosen buttons, in deck order. Held here because both
-  /// screens read it, and it belongs to this host like the catalogue does.
-  var _selected = <DeckItem>[];
+  /// The grid the host sent. Cached locally so the deck draws immediately
+  /// on open rather than after the link comes up.
+  DeckLayout? _layout;
+
+  /// A layout being received cell by cell; promoted to [_layout] on
+  /// LayoutEnd so a partial grid is never shown.
+  DeckLayout? _incoming;
+  bool _loadingLayout = false;
   final _apps = <DeckApp>[];
 
   /// Decoded icons, keyed by app name. Populated from the disk cache first
@@ -92,9 +96,9 @@ class BtLinkSession extends ChangeNotifier {
   String? get error => _error;
   bool get ready => _stage == LinkStage.ready;
   List<DeckApp> get apps => List.unmodifiable(_apps);
-  List<DeckItem> get selected => List.unmodifiable(_selected);
+  DeckLayout? get layout => _layout;
+  bool get loadingLayout => _loadingLayout;
   Uint8List? iconFor(String appName) => _icons[appName];
-  bool isSelected(DeckItem item) => _selected.contains(item);
 
   /// Identifies this host's layout in storage.
   String get hostId => peripheral.uuid.toString();
@@ -110,7 +114,7 @@ class BtLinkSession extends ChangeNotifier {
   int? get reconnectIn => _reconnectIn;
 
   void start() {
-    _loadSelection();
+    _loadLayout();
 
     // Coming back from a locked screen is the common way this link dies, and
     // the user is looking at the deck when it happens. Do not make them wait
@@ -169,10 +173,31 @@ class BtLinkSession extends ChangeNotifier {
         _append('${ok ? 'ok' : 'error'}: $message', inbound: true);
       case DebugText(:final text):
         _append(text, inbound: true);
+      case LayoutStart(:final columns, :final rows):
+        _incoming = DeckLayout.empty(columns: columns, rows: rows);
+        _loadingLayout = true;
+      case LayoutSlot(:final index, :final value):
+        final incoming = _incoming;
+        if (incoming != null && index >= 0 && index < incoming.capacity) {
+          _incoming = incoming.withSlot(index, value);
+        }
+      case LayoutEnd():
+        final incoming = _incoming;
+        _loadingLayout = false;
+        if (incoming != null) {
+          _layout = incoming;
+          _incoming = null;
+          unawaited(DeckStore.save(hostId, incoming));
+          _append('layout: ${incoming.columns}x${incoming.rows}', inbound: true);
+        }
       case IconUnavailable(:final name):
         _append('no icon for $name', inbound: true);
         _finishIconFetch(name);
-      case ListApps() || OpenApp() || RequestIcon() || RunAction():
+      case ListApps() ||
+          OpenApp() ||
+          RequestIcon() ||
+          RunAction() ||
+          RequestLayout():
         // Client-to-host shapes; a host has no business sending them.
         _append('ignored a ${message.runtimeType}', inbound: true);
     }
@@ -383,7 +408,7 @@ class BtLinkSession extends ChangeNotifier {
       _reconnectAttempt = 0;
       notifyListeners();
 
-      await refreshApps();
+      await requestLayout();
     } catch (error) {
       _stage = LinkStage.failed;
       _error = '$error';
@@ -407,28 +432,20 @@ class BtLinkSession extends ChangeNotifier {
         : firstLine;
   }
 
-  Future<void> _loadSelection() async {
-    final stored = await DeckStore.load(hostId);
-    _selected = stored
-        .map(DeckItem.parse)
-        .whereType<DeckItem>()
-        .toList();
+  Future<void> _loadLayout() async {
+    final cached = await DeckStore.load(hostId);
+    if (cached == null || _layout != null) return;
+    _layout = cached;
     notifyListeners();
   }
 
-  Future<void> _saveSelection() =>
-      DeckStore.save(hostId, _selected.map((item) => item.stored).toList());
-
-  Future<void> toggleSelection(DeckItem item) async {
-    if (!_selected.remove(item)) _selected.add(item);
+  /// Asks the host for the current layout. The host pushes it again whenever
+  /// it is edited, so this is only needed on connect.
+  Future<void> requestLayout() async {
+    if (!ready) return;
+    _loadingLayout = true;
     notifyListeners();
-    await _saveSelection();
-  }
-
-  Future<void> reorderSelection(int oldIndex, int newIndex) async {
-    _selected = DeckStore.reordered(_selected, oldIndex, newIndex);
-    notifyListeners();
-    await _saveSelection();
+    await _send(const RequestLayout());
   }
 
   Future<void> runAction(DeckAction action) async {

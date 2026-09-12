@@ -74,6 +74,16 @@ sealed class BtMessage {
           // An action this build does not know about.
           null => null,
         },
+        'lay?' => const RequestLayout(),
+        'lay' => LayoutStart(
+          columns: json['c'] as int? ?? DeckLayout.defaultColumns,
+          rows: json['r'] as int? ?? DeckLayout.defaultRows,
+        ),
+        'slot' => LayoutSlot(
+          index: json['i'] as int,
+          value: json['v'] as String,
+        ),
+        'laye' => const LayoutEnd(),
         'ico' => RequestIcon(name: json['n'] as String),
         'ico!' => IconUnavailable(name: json['n'] as String),
         'ack' => Ack(
@@ -120,6 +130,187 @@ final class ListEnd extends BtMessage {
 
   @override
   Map<String, Object?> toJson() => {'t': 'end', 'c': count};
+}
+
+/// One button on the deck: either an app to launch or an action to perform.
+///
+/// Stored as a prefixed string so a layout saved by an older build — which
+/// only ever held bare app names — still loads.
+sealed class DeckItem {
+  const DeckItem();
+
+  String get stored;
+  String get label;
+
+  /// Returns null for a stored value this build does not understand, so an
+  /// action added by a newer peer is skipped rather than shown as a button
+  /// that does nothing.
+  static DeckItem? parse(String stored) {
+    if (stored.startsWith('act:')) {
+      final action = DeckAction.fromWire(stored.substring(4));
+      return action == null ? null : ActionItem(action);
+    }
+    final name = stored.startsWith('app:') ? stored.substring(4) : stored;
+    return name.isEmpty ? null : AppItem(name);
+  }
+
+  @override
+  bool operator ==(Object other) => other is DeckItem && other.stored == stored;
+
+  @override
+  int get hashCode => stored.hashCode;
+}
+
+final class AppItem extends DeckItem {
+  const AppItem(this.name);
+
+  final String name;
+
+  @override
+  String get stored => 'app:$name';
+
+  @override
+  String get label => name;
+}
+
+final class ActionItem extends DeckItem {
+  const ActionItem(this.action);
+
+  final DeckAction action;
+
+  @override
+  String get stored => 'act:${action.wire}';
+
+  @override
+  String get label => action.label;
+}
+
+/// The grid the client draws and the host edits.
+///
+/// The host owns this: a phone screen is a poor place to arrange a grid, and
+/// the host already knows which apps exist. The client receives it and
+/// renders it.
+class DeckLayout {
+  const DeckLayout({
+    required this.columns,
+    required this.rows,
+    required this.slots,
+  });
+
+  /// An empty grid at the default size.
+  factory DeckLayout.empty({int columns = defaultColumns, int rows = defaultRows}) =>
+      DeckLayout(
+        columns: columns,
+        rows: rows,
+        slots: List<String?>.filled(columns * rows, null),
+      );
+
+  static const defaultColumns = 5;
+  static const defaultRows = 3;
+
+  final int columns;
+  final int rows;
+
+  /// One entry per cell in reading order, null where the cell is empty.
+  /// Values are [DeckItem] storage strings; the protocol does not interpret
+  /// them.
+  final List<String?> slots;
+
+  int get capacity => columns * rows;
+
+  DeckLayout resized({int? columns, int? rows}) {
+    final newColumns = columns ?? this.columns;
+    final newRows = rows ?? this.rows;
+    final resized = List<String?>.filled(newColumns * newRows, null);
+    // Keep cells where they are on screen rather than where they are in the
+    // list: a row of buttons should not shuffle sideways when a column is
+    // added.
+    for (var row = 0; row < newRows && row < this.rows; row++) {
+      for (var column = 0; column < newColumns && column < this.columns; column++) {
+        resized[row * newColumns + column] = slots[row * this.columns + column];
+      }
+    }
+    return DeckLayout(columns: newColumns, rows: newRows, slots: resized);
+  }
+
+  DeckLayout withSlot(int index, String? value) {
+    final copy = List<String?>.of(slots);
+    copy[index] = value;
+    return DeckLayout(columns: columns, rows: rows, slots: copy);
+  }
+
+  /// Moves the contents of [from] to [to], swapping if [to] is occupied.
+  DeckLayout moved(int from, int to) {
+    if (from == to) return this;
+    final copy = List<String?>.of(slots);
+    final moving = copy[from];
+    copy[from] = copy[to];
+    copy[to] = moving;
+    return DeckLayout(columns: columns, rows: rows, slots: copy);
+  }
+
+  Map<String, Object?> toJson() => {
+    'columns': columns,
+    'rows': rows,
+    'slots': slots,
+  };
+
+  static DeckLayout? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final columns = json['columns'];
+    final rows = json['rows'];
+    final slots = json['slots'];
+    if (columns is! int || rows is! int || slots is! List) return null;
+    if (columns <= 0 || rows <= 0 || columns > 12 || rows > 12) return null;
+    if (slots.length != columns * rows) return null;
+    return DeckLayout(
+      columns: columns,
+      rows: rows,
+      slots: slots.map((slot) => slot is String ? slot : null).toList(),
+    );
+  }
+}
+
+/// Client -> host: send me the deck layout.
+final class RequestLayout extends BtMessage {
+  const RequestLayout();
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'lay?'};
+}
+
+/// Host -> client: a layout of this size follows, cell by cell.
+///
+/// Sent as a header plus one message per occupied cell rather than as one
+/// payload, for the same reason as the app catalogue: there is no reassembly
+/// on this link and a full grid would not fit a single notification.
+final class LayoutStart extends BtMessage {
+  const LayoutStart({required this.columns, required this.rows});
+
+  final int columns;
+  final int rows;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'lay', 'c': columns, 'r': rows};
+}
+
+/// Host -> client: the contents of one cell.
+final class LayoutSlot extends BtMessage {
+  const LayoutSlot({required this.index, required this.value});
+
+  final int index;
+  final String value;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'slot', 'i': index, 'v': value};
+}
+
+/// Host -> client: the layout is complete.
+final class LayoutEnd extends BtMessage {
+  const LayoutEnd();
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'laye'};
 }
 
 /// Something a deck button can do besides launching an app.

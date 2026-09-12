@@ -19,10 +19,17 @@ service, and the buttons launch applications over BLE.
 - Tapping a host connects, discovers GATT and subscribes.
 - On connect the client asks for the app catalogue; the host scans its
   application directories and streams the names back.
-- **The deck shows only the apps the user chose**, in the order they chose.
-  Pressing one launches it on the host, which replies with an ack.
-- **Deck settings** (tune icon) is where the catalogue lives: tick apps to add
-  them, drag the chosen ones to reorder, search to find one among ~100.
+- **The host owns the layout.** Arranging a grid on a phone screen is
+  miserable, and the host is where the app list already lives, so the editor
+  is a tab in the host window: a grid of cells, click one to choose what it
+  does, drag a button to move it. Columns and rows are adjustable; the
+  default is 5 x 3.
+- **The client renders what it is sent.** It has no settings of its own. The
+  host pushes the layout on connect and again after every edit, so the phone
+  updates while you arrange the grid.
+- Empty cells are drawn rather than skipped, so buttons stay where they were
+  put, and the grid is sized to fill the screen — every button visible at
+  once is the entire point of a deck.
 - Free-text messaging survives as the **debug console** (bug icon), which also
   shows every message on the link.
 
@@ -50,6 +57,11 @@ hierarchy encoded as single-line JSON, one message per ATT operation:
 | `open`      | client -> host  | launch an app                    |
 | `ack`       | host -> client  | result of the last command       |
 | `txt`       | either          | debug console traffic            |
+| `lay?`      | client -> host  | send the deck layout             |
+| `lay`       | host -> client  | layout header (columns, rows)    |
+| `slot`      | host -> client  | contents of one cell             |
+| `laye`      | host -> client  | layout complete                  |
+| `act`       | client -> host  | perform a media action           |
 | `ico`       | client -> host  | send this app's icon             |
 | `ico!`      | host -> client  | there is no icon, stop waiting   |
 
@@ -91,6 +103,27 @@ icon instead of ~5KB — around 87 frames and under two seconds each at the MTU
 an iPhone negotiates, paid once because of the cache. Cache filenames carry
 the size (`<hex>@128`), so changing the constant invalidates stored icons
 rather than leaving a set at the old resolution.
+
+The layout is streamed the same way as the catalogue — a header, one message
+per *occupied* cell, then an end marker — and is only promoted into view on
+the end marker, so a partial grid is never drawn. Empty cells are not sent;
+the header's dimensions place the rest.
+
+The client caches the layout it was sent (`deck_store.dart`) so the deck draws
+immediately on open rather than after the link comes up, and a brief drop does
+not blank the screen. It is a cache, never an authority: the host's copy wins
+on every connect.
+
+### Media actions
+
+Deck buttons can be media controls as well as apps. macOS needs two different
+mechanisms, which is worth remembering before touching this: volume is
+scriptable through `osascript` and needs no permission, while transport
+control (play/pause, next, previous) is not exposed to any scripting interface
+and must be posted as an HID system event. macOS silently drops those unless
+the app is trusted for Accessibility — `CGEvent.post` reports success either
+way — so the host checks `AXIsProcessTrusted` and returns an actionable error
+instead of letting the button appear to work.
 
 ### Transfer ordering
 

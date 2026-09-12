@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 
 import 'app_launcher.dart';
+import 'layout_page.dart';
+import 'layout_store.dart';
 import 'media_control.dart';
 import 'protocol.dart';
 import 'unsupported_page.dart';
@@ -272,12 +274,21 @@ class _HostPageState extends State<HostPage> {
         final result = await MediaControl.run(action);
         if (mounted) setState(() => _addLog(result.message));
         await _send(central, Ack(ok: result.ok, message: result.message));
+      case RequestLayout():
+        _touch(central, 'requested the layout');
+        await _queueTransfer(() => _sendLayout(central));
       case RequestIcon(:final name):
         _touch(central, 'icon for $name');
         await _queueTransfer(() => _sendIcon(central, name));
       case DebugText(:final text):
         _touch(central, 'said: $text');
-      case Ack() || AppEntry() || ListEnd() || IconUnavailable():
+      case Ack() ||
+          AppEntry() ||
+          ListEnd() ||
+          IconUnavailable() ||
+          LayoutStart() ||
+          LayoutSlot() ||
+          LayoutEnd():
         // Host-to-client shapes; a client has no business sending them.
         _touch(central, 'ignored a ${message.runtimeType}');
     }
@@ -325,6 +336,40 @@ class _HostPageState extends State<HostPage> {
       setState(() => _addLog('sent ${apps.length} apps to ${_short(
         central.uuid.toString(),
       )}'));
+    }
+  }
+
+  /// Streams the layout: a header, one message per occupied cell, then an
+  /// end marker. Empty cells are not sent — the header's dimensions are
+  /// enough to place the rest.
+  Future<void> _sendLayout(Central central) async {
+    final layout = await LayoutStore.load();
+    await _send(
+      central,
+      LayoutStart(columns: layout.columns, rows: layout.rows),
+    );
+    for (var index = 0; index < layout.slots.length; index++) {
+      final value = layout.slots[index];
+      if (value == null) continue;
+      await _send(central, LayoutSlot(index: index, value: value));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    await _send(central, const LayoutEnd());
+    if (mounted) {
+      setState(() {
+        _addLog(
+          'sent layout ${layout.columns}x${layout.rows} to '
+          '${_short(central.uuid.toString())}',
+        );
+      });
+    }
+  }
+
+  /// Pushes an edited layout to everyone currently subscribed, so the deck
+  /// on the phone changes as the grid is arranged here.
+  Future<void> _broadcastLayout(DeckLayout layout) async {
+    for (final client in _clients.values.where((c) => c.subscribed)) {
+      await _queueTransfer(() => _sendLayout(client.central));
     }
   }
 
@@ -528,9 +573,36 @@ class _HostPageState extends State<HostPage> {
       ..sort((a, b) => a.since.compareTo(b.since));
     final subscribedCount = clients.where((c) => c.subscribed).length;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Host service')),
-      body: ListView(
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('BTLink host'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Deck', icon: Icon(Icons.grid_view)),
+              Tab(text: 'Service', icon: Icon(Icons.bluetooth)),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            // Editing the grid is the everyday job; the service details are
+            // for when something is wrong.
+            LayoutPage(onChanged: _broadcastLayout),
+            _serviceTab(context, clients, subscribedCount),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _serviceTab(
+    BuildContext context,
+    List<ConnectedClient> clients,
+    int subscribedCount,
+  ) {
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           _StatusCard(
@@ -599,8 +671,7 @@ class _HostPageState extends State<HostPage> {
                 ),
               ),
             ),
-        ],
-      ),
+      ],
     );
   }
 }

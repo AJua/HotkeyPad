@@ -28,8 +28,29 @@ abstract final class AppLauncher {
   /// Only the top level of each directory is scanned: nesting deeper turns up
   /// helper bundles inside other apps, which are not things a user wants on a
   /// button.
+  /// Stand-ins so the layout editor can be developed and checked in a
+  /// browser, where there is no filesystem to scan.
+  static const _webSamples = [
+    'Safari',
+    'Terminal',
+    'Xcode',
+    'Android Studio',
+    'Slack',
+    'Notes',
+    'Music',
+    'Finder',
+    'System Settings',
+    'Calendar',
+  ];
+
   static Future<List<({String name, String category, String path})>>
   list() async {
+    if (kIsWeb) {
+      return [
+        for (final name in _webSamples)
+          (name: name, category: 'Apps', path: '/Applications/$name.app'),
+      ];
+    }
     if (!supported) return const [];
 
     final seen = <String>{};

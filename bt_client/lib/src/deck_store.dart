@@ -1,35 +1,30 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Persists which apps a user put on the deck, per host.
+import 'protocol.dart';
+
+/// Caches the layout the host sent, per host.
 ///
-/// Keyed by the host's peripheral UUID so two hosts do not share a layout.
-/// The deck is drawn from this, not from the host's catalogue, so it is
-/// usable the moment the app opens rather than after the catalogue arrives.
+/// The host owns the layout; this is only so the deck can draw something
+/// before the link is up, and so a brief drop does not blank the screen.
 abstract final class DeckStore {
-  static String _key(String hostId) => 'deck:$hostId';
+  static String _key(String hostId) => 'layout:$hostId';
 
-  /// Always returns a list the caller may mutate: the stored value and the
-  /// empty fallback are both unmodifiable, and the session edits this in
-  /// place.
-  static Future<List<String>> load(String hostId) async {
+  static Future<DeckLayout?> load(String hostId) async {
     final prefs = await SharedPreferences.getInstance();
-    return List.of(prefs.getStringList(_key(hostId)) ?? const []);
+    final encoded = prefs.getString(_key(hostId));
+    if (encoded == null) return null;
+    try {
+      return DeckLayout.fromJson(jsonDecode(encoded));
+    } on FormatException {
+      await prefs.remove(_key(hostId));
+      return null;
+    }
   }
 
-  /// Applies a drag from [oldIndex] to [newIndex].
-  ///
-  /// ReorderableList reports the target as if the dragged item were still in
-  /// place, so a downward drag is one too high. Pure so the off-by-one is
-  /// testable without a widget tree.
-  static List<T> reordered<T>(List<T> items, int oldIndex, int newIndex) {
-    final copy = List.of(items);
-    if (newIndex > oldIndex) newIndex -= 1;
-    copy.insert(newIndex, copy.removeAt(oldIndex));
-    return copy;
-  }
-
-  static Future<void> save(String hostId, List<String> appNames) async {
+  static Future<void> save(String hostId, DeckLayout layout) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_key(hostId), appNames);
+    await prefs.setString(_key(hostId), jsonEncode(layout.toJson()));
   }
 }

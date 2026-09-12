@@ -132,4 +132,121 @@ void main() {
       expect(BtMessage.decode(const [0xff, 0xfe]), isNull);
     });
   });
+
+  group('DeckItem', () {
+    test('round-trips both kinds', () {
+      for (final item in const [
+        AppItem('Safari'),
+        ActionItem(DeckAction.playPause),
+      ]) {
+        expect(DeckItem.parse(item.stored), item);
+      }
+    });
+
+    test('reads a bare app name saved by an older build', () {
+      expect(DeckItem.parse('Safari'), const AppItem('Safari'));
+    });
+
+    test('skips an item this build does not know', () {
+      expect(DeckItem.parse('act:teleport'), isNull);
+      expect(DeckItem.parse(''), isNull);
+    });
+
+    test('an app and an action never collide', () {
+      expect(
+        const AppItem('playpause').stored,
+        isNot(const ActionItem(DeckAction.playPause).stored),
+      );
+    });
+  });
+
+  group('DeckLayout', () {
+    test('defaults to a 5x3 grid of empty cells', () {
+      final layout = DeckLayout.empty();
+
+      expect(layout.columns, 5);
+      expect(layout.rows, 3);
+      expect(layout.capacity, 15);
+      expect(layout.slots.every((slot) => slot == null), isTrue);
+    });
+
+    test('moving swaps the two cells', () {
+      final layout = DeckLayout.empty()
+          .withSlot(0, 'app:A')
+          .withSlot(1, 'app:B');
+
+      final moved = layout.moved(0, 1);
+
+      expect(moved.slots[0], 'app:B');
+      expect(moved.slots[1], 'app:A');
+    });
+
+    test('moving into an empty cell leaves the source empty', () {
+      final moved = DeckLayout.empty().withSlot(0, 'app:A').moved(0, 7);
+
+      expect(moved.slots[0], isNull);
+      expect(moved.slots[7], 'app:A');
+    });
+
+    test('resizing keeps cells in the same screen position', () {
+      // Second row, first column of a 5-wide grid.
+      final layout = DeckLayout.empty().withSlot(5, 'app:A');
+
+      final wider = layout.resized(columns: 6);
+
+      // Still second row, first column — index 6 in a 6-wide grid. A naive
+      // copy would leave it at index 5, sliding it up a row.
+      expect(wider.slots[6], 'app:A');
+      expect(wider.slots[5], isNull);
+    });
+
+    test('shrinking drops cells that fall outside', () {
+      final layout = DeckLayout.empty().withSlot(4, 'app:Edge');
+
+      final narrower = layout.resized(columns: 3);
+
+      expect(narrower.capacity, 9);
+      expect(narrower.slots.contains('app:Edge'), isFalse);
+    });
+
+    test('rejects json that does not describe a grid', () {
+      expect(DeckLayout.fromJson(null), isNull);
+      expect(DeckLayout.fromJson({'columns': 5, 'rows': 3}), isNull);
+      expect(
+        DeckLayout.fromJson({'columns': 5, 'rows': 3, 'slots': <String?>[]}),
+        isNull,
+      );
+      expect(
+        DeckLayout.fromJson({'columns': 0, 'rows': 3, 'slots': <String?>[]}),
+        isNull,
+      );
+    });
+
+    test('round-trips through json', () {
+      final layout = DeckLayout.empty(columns: 2, rows: 2)
+          .withSlot(3, 'act:mute');
+
+      final decoded = DeckLayout.fromJson(layout.toJson());
+
+      expect(decoded!.slots, layout.slots);
+      expect(decoded.columns, 2);
+    });
+  });
+
+  group('layout messages', () {
+    test('round-trip', () {
+      const messages = <BtMessage>[
+        RequestLayout(),
+        LayoutStart(columns: 5, rows: 3),
+        LayoutSlot(index: 7, value: 'app:Safari'),
+        LayoutEnd(),
+      ];
+
+      for (final message in messages) {
+        final decoded = BtMessage.decode(message.encode());
+        expect(decoded.runtimeType, message.runtimeType);
+        expect(decoded!.toJson(), message.toJson());
+      }
+    });
+  });
 }
