@@ -1,4 +1,6 @@
+import 'package:bt_client/src/deck_item.dart';
 import 'package:bt_client/src/deck_store.dart';
+import 'package:bt_client/src/protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -58,6 +60,33 @@ void main() {
 
       expect(await DeckStore.load('host-1'), ['Safari', 'Terminal']);
       expect(await DeckStore.load('host-2'), ['Notes']);
+    });
+  });
+
+  group('DeckItem', () {
+    test('round-trips both kinds', () {
+      const items = [AppItem('Safari'), ActionItem(DeckAction.playPause)];
+
+      for (final item in items) {
+        expect(DeckItem.parse(item.stored), item);
+      }
+    });
+
+    test('reads a bare app name saved by an older build', () {
+      // Layouts stored before actions existed held the name with no prefix.
+      expect(DeckItem.parse('Safari'), const AppItem('Safari'));
+    });
+
+    test('skips an action this build does not know', () {
+      expect(DeckItem.parse('act:teleport'), isNull);
+      expect(DeckItem.parse(''), isNull);
+    });
+
+    test('an app and an action never collide', () {
+      expect(
+        const AppItem('playpause').stored,
+        isNot(const ActionItem(DeckAction.playPause).stored),
+      );
     });
   });
 }

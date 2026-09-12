@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 
 import 'app_launcher.dart';
+import 'media_control.dart';
 import 'protocol.dart';
 import 'unsupported_page.dart';
 
@@ -264,6 +265,11 @@ class _HostPageState extends State<HostPage> {
       case OpenApp(:final name):
         _touch(central, 'open $name');
         final result = await AppLauncher.open(name);
+        if (mounted) setState(() => _addLog(result.message));
+        await _send(central, Ack(ok: result.ok, message: result.message));
+      case RunAction(:final action):
+        _touch(central, action.label);
+        final result = await MediaControl.run(action);
         if (mounted) setState(() => _addLog(result.message));
         await _send(central, Ack(ok: result.ok, message: result.message));
       case RequestIcon(:final name):

@@ -69,6 +69,11 @@ sealed class BtMessage {
         ),
         'end' => ListEnd(count: json['c'] as int? ?? 0),
         'open' => OpenApp(name: json['n'] as String),
+        'act' => switch (DeckAction.fromWire(json['a'] as String? ?? '')) {
+          final action? => RunAction(action: action),
+          // An action this build does not know about.
+          null => null,
+        },
         'ico' => RequestIcon(name: json['n'] as String),
         'ico!' => IconUnavailable(name: json['n'] as String),
         'ack' => Ack(
@@ -115,6 +120,48 @@ final class ListEnd extends BtMessage {
 
   @override
   Map<String, Object?> toJson() => {'t': 'end', 'c': count};
+}
+
+/// Something a deck button can do besides launching an app.
+///
+/// Volume goes through AppleScript, which needs no special permission.
+/// Transport control has to be posted as a system media key, which macOS
+/// silently drops unless the host has been granted Accessibility — the host
+/// reports that rather than letting the button fail quietly.
+enum DeckAction {
+  playPause('playpause', 'Play / Pause'),
+  next('next', 'Next track'),
+  previous('previous', 'Previous track'),
+  volumeUp('volup', 'Volume up'),
+  volumeDown('voldown', 'Volume down'),
+  mute('mute', 'Mute');
+
+  const DeckAction(this.wire, this.label);
+
+  /// Short identifier on the wire; the enum name is not used so renaming a
+  /// constant cannot silently break an installed client.
+  final String wire;
+  final String label;
+
+  static DeckAction? fromWire(String wire) {
+    for (final action in values) {
+      if (action.wire == wire) return action;
+    }
+    return null;
+  }
+
+  bool get isVolume =>
+      this == volumeUp || this == volumeDown || this == mute;
+}
+
+/// Client -> host: perform an action that is not an app launch.
+final class RunAction extends BtMessage {
+  const RunAction({required this.action});
+
+  final DeckAction action;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'act', 'a': action.wire};
 }
 
 /// Client -> host: send me this app's icon.

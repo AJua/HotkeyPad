@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart' hide ConnectionState;
 
 import 'dart:typed_data';
 
+import 'deck_item.dart';
 import 'deck_store.dart';
 import 'icon_cache.dart';
 import 'protocol.dart';
@@ -62,7 +63,7 @@ class BtLinkSession extends ChangeNotifier {
 
   /// The user's chosen buttons, in deck order. Held here because both
   /// screens read it, and it belongs to this host like the catalogue does.
-  var _selected = <String>[];
+  var _selected = <DeckItem>[];
   final _apps = <DeckApp>[];
 
   /// Decoded icons, keyed by app name. Populated from the disk cache first
@@ -91,9 +92,9 @@ class BtLinkSession extends ChangeNotifier {
   String? get error => _error;
   bool get ready => _stage == LinkStage.ready;
   List<DeckApp> get apps => List.unmodifiable(_apps);
-  List<String> get selected => List.unmodifiable(_selected);
+  List<DeckItem> get selected => List.unmodifiable(_selected);
   Uint8List? iconFor(String appName) => _icons[appName];
-  bool isSelected(String appName) => _selected.contains(appName);
+  bool isSelected(DeckItem item) => _selected.contains(item);
 
   /// Identifies this host's layout in storage.
   String get hostId => peripheral.uuid.toString();
@@ -171,7 +172,7 @@ class BtLinkSession extends ChangeNotifier {
       case IconUnavailable(:final name):
         _append('no icon for $name', inbound: true);
         _finishIconFetch(name);
-      case ListApps() || OpenApp() || RequestIcon():
+      case ListApps() || OpenApp() || RequestIcon() || RunAction():
         // Client-to-host shapes; a host has no business sending them.
         _append('ignored a ${message.runtimeType}', inbound: true);
     }
@@ -407,20 +408,33 @@ class BtLinkSession extends ChangeNotifier {
   }
 
   Future<void> _loadSelection() async {
-    _selected = List.of(await DeckStore.load(hostId));
+    final stored = await DeckStore.load(hostId);
+    _selected = stored
+        .map(DeckItem.parse)
+        .whereType<DeckItem>()
+        .toList();
     notifyListeners();
   }
 
-  Future<void> toggleSelection(String appName) async {
-    if (!_selected.remove(appName)) _selected.add(appName);
+  Future<void> _saveSelection() =>
+      DeckStore.save(hostId, _selected.map((item) => item.stored).toList());
+
+  Future<void> toggleSelection(DeckItem item) async {
+    if (!_selected.remove(item)) _selected.add(item);
     notifyListeners();
-    await DeckStore.save(hostId, _selected);
+    await _saveSelection();
   }
 
   Future<void> reorderSelection(int oldIndex, int newIndex) async {
     _selected = DeckStore.reordered(_selected, oldIndex, newIndex);
     notifyListeners();
-    await DeckStore.save(hostId, _selected);
+    await _saveSelection();
+  }
+
+  Future<void> runAction(DeckAction action) async {
+    _append(action.label, inbound: false);
+    notifyListeners();
+    await _send(RunAction(action: action));
   }
 
   Future<void> refreshApps() async {

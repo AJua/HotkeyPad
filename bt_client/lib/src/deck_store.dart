@@ -21,11 +21,7 @@ abstract final class DeckStore {
   /// ReorderableList reports the target as if the dragged item were still in
   /// place, so a downward drag is one too high. Pure so the off-by-one is
   /// testable without a widget tree.
-  static List<String> reordered(
-    List<String> items,
-    int oldIndex,
-    int newIndex,
-  ) {
+  static List<T> reordered<T>(List<T> items, int oldIndex, int newIndex) {
     final copy = List.of(items);
     if (newIndex > oldIndex) newIndex -= 1;
     copy.insert(newIndex, copy.removeAt(oldIndex));

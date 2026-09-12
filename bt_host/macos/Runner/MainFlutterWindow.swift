@@ -10,6 +10,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     AppIconChannel.register(with: flutterViewController)
+    MediaKeyChannel.register(with: flutterViewController)
 
     super.awakeFromNib()
   }

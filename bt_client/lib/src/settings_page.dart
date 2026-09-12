@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'safe_insets.dart';
+import 'deck_item.dart';
+import 'protocol.dart';
 import 'session.dart';
 
 /// Chooses which of the host's apps appear on the deck, and in what order.
@@ -80,30 +82,49 @@ class _SettingsPageState extends State<SettingsPage> {
                   itemCount: selected.length,
                   onReorder: session.reorderSelection,
                   itemBuilder: (context, index) {
-                    final name = selected[index];
-                    final onHost =
-                        session.apps.isEmpty ||
-                        session.apps.any((app) => app.name == name);
+                    final item = selected[index];
+                    // Only apps can be missing; actions are always available.
+                    final missing =
+                        item is AppItem &&
+                        session.apps.isNotEmpty &&
+                        !session.apps.any((app) => app.name == item.name);
                     return Material(
-                      key: ValueKey('selected:$name'),
+                      key: ValueKey('selected:${item.stored}'),
                       child: ListTile(
                         leading: ReorderableDragStartListener(
                           index: index,
                           child: const Icon(Icons.drag_handle),
                         ),
-                        title: Text(name),
-                        subtitle: onHost
-                            ? null
-                            : const Text('not found on the host'),
+                        title: Text(item.label),
+                        subtitle: missing
+                            ? const Text('not found on the host')
+                            : (item is ActionItem
+                                  ? const Text('Media control')
+                                  : null),
                         trailing: IconButton(
                           tooltip: 'Remove',
-                          onPressed: () => session.toggleSelection(name),
+                          onPressed: () => session.toggleSelection(item),
                           icon: const Icon(Icons.remove_circle_outline),
                         ),
                       ),
                     );
                   },
                 ),
+              _header(context, 'Media controls'),
+              SliverList.builder(
+                itemCount: DeckAction.values.length,
+                itemBuilder: (context, index) {
+                  final action = DeckAction.values[index];
+                  final item = ActionItem(action);
+                  return CheckboxListTile(
+                    value: session.isSelected(item),
+                    onChanged: (_) => session.toggleSelection(item),
+                    title: Text(action.label),
+                    secondary: Icon(item.fallbackIcon),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  );
+                },
+              ),
               _header(context, 'All apps on the host'),
               SliverToBoxAdapter(
                 child: Padding(
@@ -152,9 +173,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   itemCount: catalogue.length,
                   itemBuilder: (context, index) {
                     final app = catalogue[index];
+                    final item = AppItem(app.name);
                     return CheckboxListTile(
-                      value: session.isSelected(app.name),
-                      onChanged: (_) => session.toggleSelection(app.name),
+                      value: session.isSelected(item),
+                      onChanged: (_) => session.toggleSelection(item),
                       title: Text(app.name),
                       subtitle: Text(app.category),
                       controlAffinity: ListTileControlAffinity.leading,

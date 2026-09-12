@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/material.dart';
 
+import 'deck_item.dart';
 import 'debug_page.dart';
 import 'safe_insets.dart';
 import 'settings_page.dart';
@@ -41,8 +42,13 @@ class _DeckPageState extends State<DeckPage> {
     );
   }
 
-  Future<void> _press(String appName) async {
-    await _session.openApp(appName);
+  Future<void> _press(DeckItem item) async {
+    switch (item) {
+      case AppItem(:final name):
+        await _session.openApp(name);
+      case ActionItem(:final action):
+        await _session.runAction(action);
+    }
     if (!mounted) return;
     // The ack lands asynchronously; show whatever the host last said.
     final ack = _session.lastAck;
@@ -150,14 +156,14 @@ class _DeckPageState extends State<DeckPage> {
       ),
       itemCount: selected.length,
       itemBuilder: (context, index) {
-        final appName = selected[index];
-        // Fills from the disk cache, or the host for anything new. Safe to
-        // call on every build: the session ignores repeats.
-        unawaited(_session.ensureIcon(appName));
+        final item = selected[index];
+        // Only apps have an icon to fetch. Safe to call on every build: the
+        // session ignores repeats.
+        if (item is AppItem) unawaited(_session.ensureIcon(item.name));
         return _DeckButton(
-          appName: appName,
-          icon: _session.iconFor(appName),
-          onPressed: () => _press(appName),
+          item: item,
+          icon: item is AppItem ? _session.iconFor(item.name) : null,
+          onPressed: () => _press(item),
         );
       },
     );
@@ -166,12 +172,12 @@ class _DeckPageState extends State<DeckPage> {
 
 class _DeckButton extends StatelessWidget {
   const _DeckButton({
-    required this.appName,
+    required this.item,
     required this.icon,
     required this.onPressed,
   });
 
-  final String appName;
+  final DeckItem item;
   final Uint8List? icon;
   final VoidCallback onPressed;
 
@@ -180,7 +186,7 @@ class _DeckButton extends StatelessWidget {
     final theme = Theme.of(context);
     // A stable colour per app so buttons stay recognisable by position and
     // hue rather than by reading every label.
-    final hue = (appName.codeUnits.fold<int>(0, (a, b) => a + b) * 37) % 360;
+    final hue = (item.label.codeUnits.fold<int>(0, (a, b) => a + b) * 37) % 360;
     final tint = HSLColor.fromAHSL(
       1,
       hue.toDouble(),
@@ -213,14 +219,21 @@ class _DeckButton extends StatelessWidget {
                       )
                     : Center(
                         child: FittedBox(
-                          child: Text(
-                            appName.characters.first.toUpperCase(),
-                            style: theme.textTheme.displaySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.55,
-                              ),
-                            ),
-                          ),
+                          // An action has a meaningful glyph; an app that has
+                          // not sent its icon yet only has its initial.
+                          child: item is ActionItem
+                              ? Icon(
+                                  item.fallbackIcon,
+                                  size: 40,
+                                  color: theme.colorScheme.onSurface,
+                                )
+                              : Text(
+                                  item.label.characters.first.toUpperCase(),
+                                  style: theme.textTheme.displaySmall?.copyWith(
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.55),
+                                  ),
+                                ),
                         ),
                       ),
               ),
@@ -228,7 +241,7 @@ class _DeckButton extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
               child: Text(
-                appName,
+                item.label,
                 maxLines: 1,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
