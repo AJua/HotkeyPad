@@ -48,6 +48,44 @@ List<DeckItem> itemsDroppedByResize(
   return dropped;
 }
 
+/// Asks before a shrink deletes [dropped]. Returns whether to proceed.
+///
+/// A standalone function, not a method on the editor, so it can be pumped
+/// and tapped through in isolation — without dragging in the editor's own
+/// state and the real disk I/O ([LayoutStore], [AppLauncher]) that loading
+/// it would trigger.
+Future<bool> confirmResizeDrop(
+  BuildContext context,
+  List<DeckItem> dropped,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(
+        dropped.length == 1
+            ? 'Remove 1 button?'
+            : 'Remove ${dropped.length} buttons?',
+      ),
+      content: Text(
+        'Shrinking the grid no longer has room for '
+        '${dropped.map((item) => item.label).join(', ')}. '
+        'This cannot be undone.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
 /// Edits the grid the client will draw.
 ///
 /// Lives on the host because a phone screen is a poor place to arrange a
@@ -143,38 +181,10 @@ class _LayoutPageState extends State<LayoutPage> {
       rows: rows,
       pages: pages,
     );
-    if (dropped.isNotEmpty && !await _confirmDrop(dropped)) return;
+    if (dropped.isNotEmpty && !await confirmResizeDrop(context, dropped)) {
+      return;
+    }
     await _apply(_layout.resized(columns: columns, rows: rows, pages: pages));
-  }
-
-  /// Asks before a shrink deletes [dropped]. Returns whether to proceed.
-  Future<bool> _confirmDrop(List<DeckItem> dropped) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          dropped.length == 1
-              ? 'Remove 1 button?'
-              : 'Remove ${dropped.length} buttons?',
-        ),
-        content: Text(
-          'Shrinking the grid no longer has room for '
-          '${dropped.map((item) => item.label).join(', ')}. '
-          'This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    return confirmed ?? false;
   }
 
   /// Keeps the visible page valid when pages are removed.

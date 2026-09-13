@@ -215,4 +215,77 @@ void main() {
       }
     });
   });
+
+  group('confirmResizeDrop', () {
+    /// Opens the dialog and, if [tap] is given, taps that action's button.
+    /// Returns whatever confirmResizeDrop resolved to — null while the
+    /// dialog is still open, i.e. when [tap] is left out.
+    Future<bool?> confirm(
+      WidgetTester tester,
+      List<DeckItem> dropped, {
+      String? tap,
+    }) async {
+      bool? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  result = await confirmResizeDrop(context, dropped);
+                },
+                child: const Text('ask'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('ask'));
+      await tester.pumpAndSettle();
+      if (tap != null) {
+        await tester.tap(find.text(tap));
+        await tester.pumpAndSettle();
+      }
+      return result;
+    }
+
+    testWidgets('names the buttons that would be removed', (tester) async {
+      await confirm(tester, const [AppItem('Safari'), AppItem('Chrome')]);
+
+      expect(find.text('Remove 2 buttons?'), findsOneWidget);
+      expect(
+        find.text(
+          'Shrinking the grid no longer has room for Safari, Chrome. '
+          'This cannot be undone.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('uses singular wording for exactly one button', (tester) async {
+      await confirm(tester, const [AppItem('Safari')]);
+
+      expect(find.text('Remove 1 button?'), findsOneWidget);
+    });
+
+    testWidgets('Cancel reports false', (tester) async {
+      final result = await confirm(tester, const [
+        AppItem('Safari'),
+      ], tap: 'Cancel');
+
+      expect(result, isFalse);
+      // And the dialog is actually gone, not just reporting false while
+      // still open.
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('Remove reports true', (tester) async {
+      final result = await confirm(tester, const [
+        AppItem('Safari'),
+      ], tap: 'Remove');
+
+      expect(result, isTrue);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+  });
 }
