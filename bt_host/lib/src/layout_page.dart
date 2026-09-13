@@ -166,56 +166,91 @@ class _LayoutPageState extends State<LayoutPage> {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                const spacing = 10.0;
-                // Square cells in a centred block, the same as the phone
-                // draws, so this is a preview rather than an approximation.
-                final cell = math.min(
-                  (constraints.maxWidth - spacing * (_layout.columns - 1)) /
-                      _layout.columns,
-                  (constraints.maxHeight - spacing * (_layout.rows - 1)) /
-                      _layout.rows,
-                );
-                return Center(
-                  child: SizedBox(
-                    width: cell * _layout.columns +
-                        spacing * (_layout.columns - 1),
-                    height: cell * _layout.rows + spacing * (_layout.rows - 1),
-                    child: GridView.builder(
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: _layout.columns,
-                mainAxisSpacing: spacing,
-                crossAxisSpacing: spacing,
-                childAspectRatio: 1,
-              ),
-              itemCount: _layout.pageCapacity,
-              itemBuilder: (context, cell) {
-                final index = _layout.indexOf(page: _page, cell: cell);
-                final stored = _layout.slots[index];
-                final item = stored == null ? null : DeckItem.parse(stored);
-                if (item is AppItem) unawaited(_ensureIcon(item.name));
-                return _Cell(
-                  index: index,
-                  item: item,
-                  icon: item is AppItem ? _icons[item.name] : null,
-                  onTap: () => _pick(index),
-                  onClear: stored == null
-                      ? null
-                      : () => _apply(_layout.withSlot(index, null)),
-                  onMoved: (from) => _apply(_layout.moved(from, index)),
-                );
+            child: LayoutGrid(
+              layout: _layout,
+              page: _page,
+              iconFor: (appName) {
+                unawaited(_ensureIcon(appName));
+                return _icons[appName];
               },
-                    ),
-                  ),
-                );
-              },
+              onPick: _pick,
+              onClear: (index) => _apply(_layout.withSlot(index, null)),
+              onMove: (from, to) => _apply(_layout.moved(from, to)),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The editable grid for one page.
+///
+/// Deliberately free of storage and platform channels: it takes a layout and
+/// reports edits, which is what makes the drag behaviour testable.
+class LayoutGrid extends StatelessWidget {
+  const LayoutGrid({
+    super.key,
+    required this.layout,
+    required this.page,
+    required this.iconFor,
+    required this.onPick,
+    required this.onClear,
+    required this.onMove,
+  });
+
+  final DeckLayout layout;
+  final int page;
+  final Uint8List? Function(String appName) iconFor;
+  final ValueChanged<int> onPick;
+  final ValueChanged<int> onClear;
+
+  /// Called with the source and destination slot indices.
+  final void Function(int from, int to) onMove;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 10.0;
+        // Square cells in a centred block, the same as the phone draws, so
+        // this is a preview rather than an approximation.
+        final cell = math.min(
+          (constraints.maxWidth - spacing * (layout.columns - 1)) /
+              layout.columns,
+          (constraints.maxHeight - spacing * (layout.rows - 1)) / layout.rows,
+        );
+        return Center(
+          child: SizedBox(
+            width: cell * layout.columns + spacing * (layout.columns - 1),
+            height: cell * layout.rows + spacing * (layout.rows - 1),
+            child: GridView.builder(
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: layout.columns,
+                mainAxisSpacing: spacing,
+                crossAxisSpacing: spacing,
+                childAspectRatio: 1,
+              ),
+              itemCount: layout.pageCapacity,
+              itemBuilder: (context, cellIndex) {
+                final index = layout.indexOf(page: page, cell: cellIndex);
+                final stored = layout.slots[index];
+                final item = stored == null ? null : DeckItem.parse(stored);
+                return _Cell(
+                  index: index,
+                  item: item,
+                  icon: item is AppItem ? iconFor(item.name) : null,
+                  onTap: () => onPick(index),
+                  onClear: stored == null ? null : () => onClear(index),
+                  onMoved: (from) => onMove(from, index),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -240,6 +275,7 @@ class _Cell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DragTarget<int>(
+      key: ValueKey('cell-$index'),
       onWillAcceptWithDetails: (details) => details.data != index,
       onAcceptWithDetails: (details) => onMoved(details.data),
       builder: (context, candidate, _) {
@@ -276,7 +312,10 @@ class _Cell extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        // Same reason as the client: a bare Stack aligns its non-positioned
+        // child to topStart, leaving the icon off centre.
         child: Stack(
+          fit: StackFit.expand,
           children: [
             if (!filled)
               Center(
@@ -286,37 +325,45 @@ class _Cell extends StatelessWidget {
                 ),
               )
             else
-              Column(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                      child: icon != null
-                          ? Image.memory(icon!, fit: BoxFit.contain)
-                          : Center(
-                              child: FittedBox(
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final side = constraints.maxWidth;
+                  final iconSize = side * 0.52;
+                  final margin = (side - iconSize) / 2;
+                  return Column(
+                    children: [
+                      SizedBox(height: margin),
+                      SizedBox(
+                        width: iconSize,
+                        height: iconSize,
+                        child: icon != null
+                            ? Image.memory(icon!, fit: BoxFit.contain)
+                            : FittedBox(
                                 child: item is ActionItem
-                                    ? Icon(deckFallbackIcon(item!), size: 36)
+                                    ? Icon(deckFallbackIcon(item!))
                                     : Text(
                                         item!.label.characters.first
                                             .toUpperCase(),
-                                        style: theme.textTheme.headlineMedium,
+                                        style:
+                                            theme.textTheme.headlineMedium,
                                       ),
                               ),
-                            ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
-                    child: Text(
-                      item!.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelSmall,
-                    ),
-                  ),
-                ],
+                      ),
+                      const Spacer(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          item!.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelSmall,
+                        ),
+                      ),
+                      SizedBox(height: margin * 0.4),
+                    ],
+                  );
+                },
               ),
             if (onClear != null)
               Positioned(

@@ -540,57 +540,70 @@ class _DeckButton extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
+        // Without expand, the Column is only as wide as its widest child and
+        // Stack aligns it to topStart, which pulls the icon off centre.
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            Column(
-              children: [
-            // The icon claims everything the label does not, so the whole
-            // button reads as the app rather than as a chip with a picture.
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                child: icon != null
-                    ? Image.memory(
-                        icon!,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.medium,
-                        gaplessPlayback: true,
-                      )
-                    : Center(
-                        child: FittedBox(
-                          // An action has a meaningful glyph; an app that has
-                          // not sent its icon yet only has its initial.
-                          child: item is ActionItem
-                              ? Icon(
-                                  deckFallbackIcon(item),
-                                  size: 40,
-                                  color: theme.colorScheme.onSurface,
-                                )
-                              : Text(
-                                  item.label.characters.first.toUpperCase(),
-                                  style: theme.textTheme.displaySmall?.copyWith(
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.55),
-                                  ),
-                                ),
+            // The icon is sized so the space above it matches the space at
+            // its sides, which is what makes the padding read as even. Filling
+            // the cell instead left a wide gap above the icon and a cramped
+            // one between it and the label.
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final side = constraints.maxWidth;
+                final iconSize = side * 0.52;
+                final margin = (side - iconSize) / 2;
+                return Column(
+                  children: [
+                    SizedBox(height: margin),
+                    SizedBox(
+                      width: iconSize,
+                      height: iconSize,
+                      child: icon != null
+                          ? Image.memory(
+                              icon!,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                              gaplessPlayback: true,
+                            )
+                          : FittedBox(
+                              // An action has a meaningful glyph; an app that
+                              // has not sent its icon yet only has its initial.
+                              child: item is ActionItem
+                                  ? Icon(
+                                      deckFallbackIcon(item),
+                                      color: theme.colorScheme.onSurface,
+                                    )
+                                  : Text(
+                                      item.label.characters.first.toUpperCase(),
+                                      style: theme.textTheme.displaySmall
+                                          ?.copyWith(
+                                            color: theme.colorScheme.onSurface
+                                                .withValues(alpha: 0.55),
+                                          ),
+                                    ),
+                            ),
+                    ),
+                    const Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(
+                        item.label,
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-              ),
-            ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
-                  child: Text(
-                    item.label,
-                    maxLines: 1,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                ),
-              ],
+                    SizedBox(height: margin * 0.4),
+                  ],
+                );
+              },
             ),
+
             // Covers the button rather than sitting beside it: at deck sizes
             // there is no room for a badge, and the whole button is the
             // thing that was pressed.
