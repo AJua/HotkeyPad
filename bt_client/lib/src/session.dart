@@ -66,6 +66,9 @@ class BtLinkSession extends ChangeNotifier {
   /// first frame after a restart is already the right one.
   DeckTheme _theme = DeckTheme.system;
 
+  /// Labels off means icons alone, with square cells the icon fills.
+  bool _showLabels = true;
+
   /// Notified when the host changes the appearance.
   ValueChanged<DeckTheme>? onTheme;
 
@@ -114,6 +117,7 @@ class BtLinkSession extends ChangeNotifier {
   bool get ready => _stage == LinkStage.ready;
   List<DeckApp> get apps => List.unmodifiable(_apps);
   DeckTheme get theme => _theme;
+  bool get showLabels => _showLabels;
   DeckLayout? get layout => _layout;
 
   /// True while this button's command is in flight.
@@ -220,11 +224,16 @@ class BtLinkSession extends ChangeNotifier {
           unawaited(DeckStore.save(hostId, incoming));
           _append('layout: ${incoming.columns}x${incoming.rows}', inbound: true);
         }
-      case SetTheme(:final theme):
+      case SetAppearance(:final theme, :final showLabels):
         _theme = theme;
-        unawaited(DeckStore.saveTheme(hostId, theme));
+        _showLabels = showLabels;
+        unawaited(DeckStore.saveAppearance(hostId, theme, showLabels));
         onTheme?.call(theme);
-        _append('theme: ${theme.label.toLowerCase()}', inbound: true);
+        _append(
+          'appearance: ${theme.label.toLowerCase()}, '
+          'labels ${showLabels ? 'on' : 'off'}',
+          inbound: true,
+        );
       case IconUnavailable(:final name):
         _append('no icon for $name', inbound: true);
         _finishIconFetch(name);
@@ -468,14 +477,15 @@ class BtLinkSession extends ChangeNotifier {
   }
 
   Future<void> _loadLayout() async {
-    final cachedTheme = await DeckStore.loadTheme(hostId);
-    if (cachedTheme != _theme) {
-      _theme = cachedTheme;
-      onTheme?.call(cachedTheme);
+    final cached = await DeckStore.loadAppearance(hostId);
+    _showLabels = cached.showLabels;
+    if (cached.theme != _theme) {
+      _theme = cached.theme;
+      onTheme?.call(cached.theme);
     }
-    final cached = await DeckStore.load(hostId);
-    if (cached == null || _layout != null) return;
-    _layout = cached;
+    final cachedLayout = await DeckStore.load(hostId);
+    if (cachedLayout == null || _layout != null) return;
+    _layout = cachedLayout;
     notifyListeners();
   }
 

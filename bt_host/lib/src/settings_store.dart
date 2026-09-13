@@ -12,7 +12,7 @@ import 'protocol.dart';
 abstract final class SettingsStore {
   /// Used when there is no filesystem — the web build, which exists only to
   /// develop the editor UI.
-  static DeckTheme? _inMemory;
+  static ({DeckTheme theme, bool showLabels})? _inMemory;
 
   static File? get _file {
     if (kIsWeb) return null;
@@ -21,28 +21,38 @@ abstract final class SettingsStore {
     return File('$home/Library/Application Support/BTLink/settings.json');
   }
 
-  static Future<DeckTheme> loadTheme() async {
+  static Future<({DeckTheme theme, bool showLabels})> load() async {
+    const fallback = (theme: DeckTheme.system, showLabels: true);
     final file = _file;
-    if (file == null) return _inMemory ?? DeckTheme.system;
+    if (file == null) return _inMemory ?? fallback;
     try {
-      if (!file.existsSync()) return DeckTheme.system;
+      if (!file.existsSync()) return fallback;
       final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! Map) return DeckTheme.system;
-      return DeckTheme.fromWire(decoded['theme'] as String?);
+      if (decoded is! Map) return fallback;
+      return (
+        theme: DeckTheme.fromWire(decoded['theme'] as String?),
+        showLabels: decoded['showLabels'] as bool? ?? true,
+      );
     } catch (_) {
-      return DeckTheme.system;
+      return fallback;
     }
   }
 
-  static Future<void> saveTheme(DeckTheme theme) async {
+  static Future<void> save({
+    required DeckTheme theme,
+    required bool showLabels,
+  }) async {
     final file = _file;
     if (file == null) {
-      _inMemory = theme;
+      _inMemory = (theme: theme, showLabels: showLabels);
       return;
     }
     try {
       await file.parent.create(recursive: true);
-      await file.writeAsString(jsonEncode({'theme': theme.wire}), flush: true);
+      await file.writeAsString(
+        jsonEncode({'theme': theme.wire, 'showLabels': showLabels}),
+        flush: true,
+      );
     } on FileSystemException {
       // Losing a preference is better than taking the app down.
     }

@@ -161,8 +161,10 @@ orientation to follow.
 
 ### Appearance
 
-System, Light or Dark, chosen on the host and pushed to the phone with the
-layout. It follows the same rule as the grid: the host owns configuration,
+System, Light or Dark plus a button-labels switch, chosen on the host and
+pushed to the phone with the layout. Turning labels off changes the geometry
+as well as hiding text: with no caption to leave room for, cells become
+square and the icon fills them edge to edge. It follows the same rule as the grid: the host owns configuration,
 the client renders what it is sent. Picking it per-device would mean a
 settings screen on the phone, which is the thing this design removed.
 

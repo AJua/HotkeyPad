@@ -363,9 +363,11 @@ class _DeckPageState extends State<DeckPage> {
       builder: (context, constraints) {
         const spacing = 10.0;
         const margin = 12.0;
-        // Taller than wide: the label needs a band of its own, and a taller
-        // cell is a bigger target for a thumb without making the grid wider.
-        const cellRatio = 0.86;
+        // Taller than wide when there are labels, since the text needs a
+        // band of its own. Without labels there is nothing to leave room
+        // for, so cells go square and the icon fills them.
+        final labels = session.showLabels;
+        final cellRatio = labels ? 0.86 : 1.0;
         final padding = safeScrollPadding(
           context,
           horizontal: margin,
@@ -438,6 +440,7 @@ class _DeckPageState extends State<DeckPage> {
                             icon: item is AppItem
                                 ? session.iconFor(item.name)
                                 : null,
+                            showLabel: labels,
                             pressing: session.isPressing(item),
                             outcome: session.feedbackFor(item),
                             onPressed: () => _press(session, item),
@@ -515,6 +518,7 @@ class _DeckButton extends StatelessWidget {
   const _DeckButton({
     required this.item,
     required this.icon,
+    required this.showLabel,
     required this.pressing,
     required this.outcome,
     required this.onPressed,
@@ -522,6 +526,7 @@ class _DeckButton extends StatelessWidget {
 
   final DeckItem item;
   final Uint8List? icon;
+  final bool showLabel;
   final bool pressing;
 
   /// Result of the last press: true succeeded, false failed, null idle.
@@ -562,9 +567,9 @@ class _DeckButton extends StatelessWidget {
             LayoutBuilder(
               builder: (context, constraints) {
                 final width = constraints.maxWidth;
-                final iconSize = width * 0.72;
-                // Equal to the side margins, so the icon sits in a band of
-                // even padding with the label below it.
+                // With a label the icon leaves room for it and for even
+                // margins; without one it takes the whole cell.
+                final iconSize = showLabel ? width * 0.72 : width;
                 final margin = (width - iconSize) / 2;
                 return Column(
                   children: [
@@ -602,23 +607,25 @@ class _DeckButton extends StatelessWidget {
                     // instead, where it matches the margin at the icon's
                     // sides. The gap is nearly nothing because the text's
                     // own line height already provides the visible space.
-                    SizedBox(height: margin * 0.05),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(
-                        item.label,
-                        maxLines: 1,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          // Trimmed so the label does not float away from
-                          // the icon on its own leading.
-                          height: 1.1,
+                    if (showLabel) ...[
+                      SizedBox(height: margin * 0.05),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          item.label,
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            // Trimmed so the label does not float away from
+                            // the icon on its own leading.
+                            height: 1.1,
+                          ),
                         ),
                       ),
-                    ),
-                    const Spacer(),
+                      const Spacer(),
+                    ],
                   ],
                 );
               },

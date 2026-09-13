@@ -23,14 +23,24 @@ abstract final class DeckStore {
     }
   }
 
-  static Future<DeckTheme> loadTheme(String hostId) async {
+  static Future<({DeckTheme theme, bool showLabels})> loadAppearance(
+    String hostId,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
-    return DeckTheme.fromWire(prefs.getString('theme:$hostId'));
+    return (
+      theme: DeckTheme.fromWire(prefs.getString('theme:$hostId')),
+      showLabels: prefs.getBool('labels:$hostId') ?? true,
+    );
   }
 
-  static Future<void> saveTheme(String hostId, DeckTheme theme) async {
+  static Future<void> saveAppearance(
+    String hostId,
+    DeckTheme theme,
+    bool showLabels,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('theme:$hostId', theme.wire);
+    await prefs.setBool('labels:$hostId', showLabels);
   }
 
   static Future<void> save(String hostId, DeckLayout layout) async {

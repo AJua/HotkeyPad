@@ -384,10 +384,27 @@ void main() {
   group('DeckTheme', () {
     test('round-trips through a message', () {
       for (final theme in DeckTheme.values) {
-        final decoded = BtMessage.decode(SetTheme(theme: theme).encode());
-        expect(decoded, isA<SetTheme>());
-        expect((decoded! as SetTheme).theme, theme);
+        for (final showLabels in [true, false]) {
+          final decoded =
+              BtMessage.decode(
+                    SetAppearance(theme: theme, showLabels: showLabels)
+                        .encode(),
+                  )
+                  as SetAppearance?;
+          expect(decoded!.theme, theme);
+          expect(decoded.showLabels, showLabels);
+        }
       }
+    });
+
+    test('labels default to on when an older host omits them', () {
+      // A host that predates the switch always drew labels.
+      final decoded =
+          BtMessage.decode(utf8.encode('{"t":"thm","v":"dark"}'))
+              as SetAppearance?;
+
+      expect(decoded!.showLabels, isTrue);
+      expect(decoded.theme, DeckTheme.dark);
     });
 
     test('an unknown or missing value falls back to system', () {

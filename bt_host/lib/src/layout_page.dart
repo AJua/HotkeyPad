@@ -18,7 +18,7 @@ class LayoutPage extends StatefulWidget {
   const LayoutPage({
     super.key,
     required this.onChanged,
-    required this.onThemeChanged,
+    required this.onAppearanceChanged,
     required this.onShowService,
   });
 
@@ -26,9 +26,9 @@ class LayoutPage extends StatefulWidget {
   /// connected clients.
   final ValueChanged<DeckLayout> onChanged;
 
-  /// Called when the appearance is changed, so it can be applied here and
+  /// Called when the appearance changes, so it can be applied here and
   /// pushed to the phone.
-  final ValueChanged<DeckTheme> onThemeChanged;
+  final void Function(DeckTheme theme, bool showLabels) onAppearanceChanged;
 
   /// Opens the service view, which is reached from the settings dialog now
   /// that there are no tabs.
@@ -41,6 +41,7 @@ class LayoutPage extends StatefulWidget {
 class _LayoutPageState extends State<LayoutPage> {
   DeckLayout _layout = DeckLayout.empty();
   DeckTheme _theme = DeckTheme.system;
+  bool _showLabels = true;
   int _page = 0;
   var _apps = <({String name, String category, String path})>[];
   final _icons = <String, Uint8List?>{};
@@ -54,12 +55,13 @@ class _LayoutPageState extends State<LayoutPage> {
 
   Future<void> _load() async {
     final layout = await LayoutStore.load();
-    final theme = await SettingsStore.loadTheme();
+    final appearance = await SettingsStore.load();
     final apps = await AppLauncher.list();
     if (!mounted) return;
     setState(() {
       _layout = layout;
-      _theme = theme;
+      _theme = appearance.theme;
+      _showLabels = appearance.showLabels;
       _apps = apps;
       _loading = false;
     });
@@ -122,10 +124,23 @@ class _LayoutPageState extends State<LayoutPage> {
                   showSelectedIcon: false,
                   onSelectionChanged: (selection) {
                     setDialogState(() {});
-                    _setTheme(selection.first);
+                    _setAppearance(theme: selection.first);
                   },
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 4),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _showLabels,
+                  onChanged: (value) {
+                    setDialogState(() {});
+                    _setAppearance(showLabels: value);
+                  },
+                  title: const Text('Button labels'),
+                  subtitle: const Text(
+                    'Off makes cells square and lets the icon fill them',
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Text('Grid', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 4),
                 _SizeStepper(
@@ -183,10 +198,13 @@ class _LayoutPageState extends State<LayoutPage> {
     );
   }
 
-  Future<void> _setTheme(DeckTheme theme) async {
-    setState(() => _theme = theme);
-    await SettingsStore.saveTheme(theme);
-    widget.onThemeChanged(theme);
+  Future<void> _setAppearance({DeckTheme? theme, bool? showLabels}) async {
+    setState(() {
+      _theme = theme ?? _theme;
+      _showLabels = showLabels ?? _showLabels;
+    });
+    await SettingsStore.save(theme: _theme, showLabels: _showLabels);
+    widget.onAppearanceChanged(_theme, _showLabels);
   }
 
   Future<void> _pick(int index) async {

@@ -21,8 +21,8 @@ class _BtHostAppState extends State<BtHostApp> {
   @override
   void initState() {
     super.initState();
-    SettingsStore.loadTheme().then((theme) {
-      if (mounted) setState(() => _theme = theme);
+    SettingsStore.load().then((appearance) {
+      if (mounted) setState(() => _theme = appearance.theme);
     });
   }
 

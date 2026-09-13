@@ -291,7 +291,7 @@ class _HostPageState extends State<HostPage> {
       case DebugText(:final text):
         _touch(central, 'said: $text');
       case Ack() ||
-          SetTheme() ||
+          SetAppearance() ||
           AppEntry() ||
           ListEnd() ||
           IconUnavailable() ||
@@ -370,7 +370,14 @@ class _HostPageState extends State<HostPage> {
     await _send(central, const LayoutEnd());
     // The appearance rides along with the layout so a fresh client is
     // dressed correctly before it draws anything.
-    await _send(central, SetTheme(theme: await SettingsStore.loadTheme()));
+    final appearance = await SettingsStore.load();
+    await _send(
+      central,
+      SetAppearance(
+        theme: appearance.theme,
+        showLabels: appearance.showLabels,
+      ),
+    );
     if (mounted) {
       setState(() {
         _addLog(
@@ -384,9 +391,10 @@ class _HostPageState extends State<HostPage> {
 
   /// Pushes the appearance to everyone subscribed, so the phone follows the
   /// Mac the moment it is changed here.
-  Future<void> _broadcastTheme(DeckTheme theme) async {
+  Future<void> _broadcastAppearance(DeckTheme theme, bool showLabels) async {
+    final message = SetAppearance(theme: theme, showLabels: showLabels);
     for (final client in _clients.values.where((c) => c.subscribed)) {
-      await _queueTransfer(() => _send(client.central, SetTheme(theme: theme)));
+      await _queueTransfer(() => _send(client.central, message));
     }
   }
 
@@ -617,9 +625,9 @@ class _HostPageState extends State<HostPage> {
     return Scaffold(
       body: LayoutPage(
         onChanged: _broadcastLayout,
-        onThemeChanged: (theme) {
+        onAppearanceChanged: (theme, showLabels) {
           widget.onThemeChanged(theme);
-          _broadcastTheme(theme);
+          _broadcastAppearance(theme, showLabels);
         },
         onShowService: () => setState(() => _showingService = true),
       ),

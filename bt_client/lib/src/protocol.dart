@@ -74,7 +74,11 @@ sealed class BtMessage {
           // An action this build does not know about.
           null => null,
         },
-        'thm' => SetTheme(theme: DeckTheme.fromWire(json['v'] as String?)),
+        'thm' => SetAppearance(
+          theme: DeckTheme.fromWire(json['v'] as String?),
+          // Absent on an older host, which always drew labels.
+          showLabels: json['lbl'] as bool? ?? true,
+        ),
         'lay?' => const RequestLayout(),
         'lay' => LayoutStart(
           columns: json['c'] as int? ?? DeckLayout.defaultColumns,
@@ -385,15 +389,23 @@ enum DeckTheme {
 /// Host -> client: use this appearance.
 ///
 /// Sent with the layout on connect and again whenever it changes, so the
-/// phone follows the Mac rather than keeping a setting of its own — the host
+/// phone follows the Mac rather than keeping settings of its own — the host
 /// owns configuration here as it does the grid.
-final class SetTheme extends BtMessage {
-  const SetTheme({required this.theme});
+final class SetAppearance extends BtMessage {
+  const SetAppearance({required this.theme, required this.showLabels});
 
   final DeckTheme theme;
 
+  /// With labels off the deck is icons alone: cells go square and the icon
+  /// fills them, since there is no caption to leave room for.
+  final bool showLabels;
+
   @override
-  Map<String, Object?> toJson() => {'t': 'thm', 'v': theme.wire};
+  Map<String, Object?> toJson() => {
+    't': 'thm',
+    'v': theme.wire,
+    'lbl': showLabels,
+  };
 }
 
 /// Client -> host: send me the deck layout.
