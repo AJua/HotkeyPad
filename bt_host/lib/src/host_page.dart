@@ -71,6 +71,11 @@ class _HostPageState extends State<HostPage> {
   bool _showingService = false;
   int _appCount = 0;
 
+  /// Whether the media keys and key combinations can actually reach macOS.
+  /// Re-checked when the window regains focus, since granting it happens in
+  /// System Settings rather than here.
+  bool _accessibility = true;
+
   /// App name -> bundle path, filled when the catalogue is built so an icon
   /// request does not have to rescan the disk.
   final _appPaths = <String, String>{};
@@ -111,6 +116,7 @@ class _HostPageState extends State<HostPage> {
         _ensureAuthorized();
       }
       _autoStart();
+      _refreshAccessibility();
     });
   }
 
@@ -121,6 +127,13 @@ class _HostPageState extends State<HostPage> {
     if (_state != BluetoothLowEnergyState.poweredOn) return;
     _autoStarted = true;
     _toggleAdvertising();
+  }
+
+  Future<void> _refreshAccessibility() async {
+    final trusted = await MediaControl.trusted;
+    if (mounted && trusted != _accessibility) {
+      setState(() => _accessibility = trusted);
+    }
   }
 
   /// Returns whether the app may use Bluetooth. Only Android has a runtime
@@ -350,17 +363,21 @@ class _HostPageState extends State<HostPage> {
   Future<void> _pressSlot(Central central, int index) async {
     final layout = await LayoutStore.load();
     if (index < 0 || index >= layout.slots.length) {
+      _touch(central, 'slot $index is outside the layout');
       await _send(central, const Ack(ok: false, message: 'No such button'));
       return;
     }
     final stored = layout.slots[index];
     final item = stored == null ? null : DeckItem.parse(stored);
     if (item == null) {
+      _touch(central, 'slot $index is empty');
       await _send(central, const Ack(ok: false, message: 'Empty button'));
       return;
     }
 
-    _touch(central, item.label);
+    // Names the slot as well as what was in it: the client sends only a
+    // number, and the log should not read as though it sent the action.
+    _touch(central, 'slot $index -> ${item.label}');
     final result = switch (item) {
       AppItem(:final name) => await AppLauncher.open(name),
       ActionItem(:final action) => await MediaControl.run(action),
@@ -671,6 +688,25 @@ class _HostPageState extends State<HostPage> {
     return ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (!_accessibility)
+            Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: ListTile(
+                leading: const Icon(Icons.lock_outline),
+                title: const Text('Accessibility is not granted'),
+                subtitle: const Text(
+                  'Media keys and key combinations will do nothing until '
+                  'this app is allowed in System Settings',
+                ),
+                trailing: FilledButton(
+                  onPressed: () async {
+                    await MediaControl.requestTrust();
+                    await _refreshAccessibility();
+                  },
+                  child: const Text('Grant'),
+                ),
+              ),
+            ),
           _StatusCard(
             state: _state,
             appCount: _appCount,

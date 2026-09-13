@@ -487,6 +487,40 @@ void main() {
       expect(tall.orientedFor(portrait: false).columns, 5);
     });
 
+    test('a turned cell maps back to the host index', () {
+      // Host layout: 5 wide, 3 tall. Top-right is 4; second row start is 5.
+      final source = DeckLayout.empty(columns: 5, rows: 3)
+          .withSlot(4, 'app:TopRight')
+          .withSlot(5, 'app:SecondRowStart');
+      final turned = source.transposed();
+
+      for (var index = 0; index < turned.capacity; index++) {
+        final stored = turned.slots[index];
+        if (stored == null) continue;
+        // Whatever a cell shows, its mapped index holds the same thing in
+        // the host's copy — which is what makes a press land correctly.
+        expect(source.slots[turned.sourceIndex(index)], stored);
+      }
+    });
+
+    test('an unturned layout maps indices to themselves', () {
+      final layout = DeckLayout.empty();
+
+      for (var index = 0; index < layout.capacity; index++) {
+        expect(layout.sourceIndex(index), index);
+      }
+    });
+
+    test('mapping works across pages', () {
+      final source = DeckLayout.empty(columns: 5, rows: 3, pages: 2)
+          .withSlot(16, 'app:SecondPage');
+      final turned = source.transposed();
+
+      final shown = turned.slots.indexOf('app:SecondPage');
+      expect(shown, greaterThanOrEqualTo(turned.pageCapacity));
+      expect(turned.sourceIndex(shown), 16);
+    });
+
     test('a square grid is never turned', () {
       final square = DeckLayout.empty(columns: 3, rows: 3)
           .withSlot(1, 'app:A');

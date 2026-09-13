@@ -415,6 +415,7 @@ class DeckLayout {
     required this.rows,
     required this.pages,
     required this.slots,
+    this.isTurned = false,
   });
 
   /// An empty grid at the default size.
@@ -436,6 +437,11 @@ class DeckLayout {
   final int columns;
   final int rows;
   final int pages;
+
+  /// True when this is a turned view of the host's layout. Cell indices
+  /// here are not the host's, so [sourceIndex] must translate before one is
+  /// sent back.
+  final bool isTurned;
 
   /// One entry per cell across every page, in reading order, null where the
   /// cell is empty. Flat rather than nested so an index identifies a cell
@@ -488,6 +494,22 @@ class DeckLayout {
     );
   }
 
+  /// The index this cell has in the host's layout.
+  ///
+  /// A turned view renumbers every cell, and the host resolves a press
+  /// against its own unturned copy — so sending the on-screen index would
+  /// fire whichever button happens to sit at that number over there.
+  int sourceIndex(int index) {
+    if (!isTurned) return index;
+    final page = index ~/ pageCapacity;
+    final cell = index % pageCapacity;
+    final row = cell ~/ columns;
+    final column = cell % columns;
+    // Rows and columns are swapped relative to the source, so this view's
+    // column is the source's row. The source is `rows` wide.
+    return page * pageCapacity + column * rows + row;
+  }
+
   /// Swaps rows and columns, so a 5-wide grid becomes 5-tall.
   ///
   /// A transpose rather than a rotation: the first row becomes the first
@@ -511,6 +533,8 @@ class DeckLayout {
       rows: columns,
       pages: pages,
       slots: swapped,
+      // Turning twice returns to the host's numbering.
+      isTurned: !isTurned,
     );
   }
 

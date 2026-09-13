@@ -7,13 +7,15 @@ Two Flutter apps that talk to each other over Bluetooth Low Energy.
 | `bt_host`   | the host service    | peripheral |
 | `bt_client` | the client app      | central    |
 
-`bt_host` publishes a GATT service and advertises it. `bt_client` scans and
-lists what it finds, tagging anything that advertises the BTLink service.
+`bt_host` publishes a GATT service, advertises it, and is where the deck is
+arranged. `bt_client` finds that service by itself and renders whatever it is
+sent.
 
 ## What it does
 
-A Stream Deck Mobile for your Mac: the phone is the deck, the Mac runs the
-service, and the buttons launch applications over BLE.
+A Stream Deck for your Mac: the phone is the deck, the Mac runs the service,
+and the two talk over BLE. A button can launch an app, work the media keys,
+send a keyboard combination, run a shell command, or fire a macOS Shortcut.
 
 - **The client opens straight onto the deck.** It scans in the background,
   takes the first host that advertises the BTLink service, and connects. With
@@ -201,6 +203,13 @@ the Mac was not already configured with. That distinction is academic while
 buttons only launch apps; it is the whole design once they can hold shell
 commands.
 
+**The index must be the host's, not the screen's.** A portrait deck is a
+transposed view of the host's grid, which renumbers every cell, so the client
+maps back through `DeckLayout.sourceIndex` before sending. Without that a
+press in portrait fires whichever button happens to sit at that number in the
+host's copy — an error invisible in landscape, where the two numberings
+coincide.
+
 ### Buttons
 
 Five kinds: an application, a media action, a shell command, a macOS
@@ -225,16 +234,25 @@ Items with extra fields — a custom emoji, a command — are stored as JSON in
 the layout; simple ones keep their short prefixed form (`app:Safari`), which
 stays readable in the file and loadable by an older build.
 
-### Media actions
+### What needs Accessibility, and what does not
 
-Deck buttons can be media controls as well as apps. macOS needs two different
-mechanisms, which is worth remembering before touching this: volume is
-scriptable through `osascript` and needs no permission, while transport
-control (play/pause, next, previous) is not exposed to any scripting interface
-and must be posted as an HID system event. macOS silently drops those unless
-the app is trusted for Accessibility — `CGEvent.post` reports success either
-way — so the host checks `AXIsProcessTrusted` and returns an actionable error
-instead of letting the button appear to work.
+Three of the five button kinds reach macOS through interfaces that need the
+app trusted for Accessibility, and macOS **silently drops** those events
+without it — `CGEvent.post` reports success either way. Anything relying on
+that is checked first rather than left to fail invisibly:
+
+| Action | Mechanism | Permission |
+| ------ | --------- | ---------- |
+| Launch an app | `open -a` | none |
+| Volume, mute | `osascript`, scriptable | none |
+| Play/pause, next, previous | HID system event | **Accessibility** |
+| Key combination | System Events keystroke | **Accessibility** |
+| Shell command, Shortcut | `sh`, `shortcuts` CLI | none |
+
+Pressing a button that needs the permission puts up the system prompt that
+deep-links to the right settings pane. macOS shows that once per app, so
+Service details also carries a persistent banner with a Grant button for
+afterwards.
 
 ### Transfer ordering
 
@@ -325,23 +343,33 @@ is not declared is denied outright.
 
 ## Verified on hardware
 
-Galaxy A54 (Android 16) as client, macOS as host:
+Sony XQ-DC72 (Android 16) as client, macOS as host, end to end:
 
-- client scan lists ~200 nearby devices
-- the host shows up as `BTLink` with the HOST badge at -52 dBm
-- tapping it reaches Connected + Subscribed
-- text typed on the client arrives at the host (`wrote: hello from android`)
+- the client finds the host and connects with no interaction, then draws the
+  layout it is sent — grid, pages, real app icons, emoji overrides
+- swiping anywhere in the deck area turns the page, including the wide
+  margins in landscape
+- rotating transposes the grid (5x3 landscape, 3x5 portrait) and moves the
+  app bar to the edge that was the top, in both landscape directions
+- pressing a button: Volume up moved the Mac from 44% to 50%; a shell button
+  wrote its file; a Shortcut button reported `Started Shazam 捷徑`; an app
+  button with a custom emoji still opened Safari
+- a key combination reaches the host as the right slot and comes back with
+  the Accessibility prompt
+- buttons dim while in flight, then flash green or red; a host killed
+  mid-session produces the disconnect overlay and the deck reconnects on its
+  own when it returns
 
-That run predates the deck and used Android as the client. The user has since confirmed on hardware that
-launching apps works and the catalogue arrives.
+Covered by tests rather than by hand: the binary icon frame format including
+CJK names and truncation, layout serialisation and resizing, transposition
+and index mapping, every message shape, the deck cache, and the editor's drag
+behaviour.
 
-Covered by tests: `bt_host/test/app_launcher_test.dart` scans this machine for
-real (96 apps found, `Safari` among them) and checks a nonexistent app fails
-cleanly; `bt_client/test/deck_store_test.dart` covers the reorder off-by-one
-and per-host persistence.
-
-Not yet exercised on hardware: the settings/deck flow, and host -> client
-notifications.
+**Not verified:** the iOS client beyond compiling — in particular the app
+bar's edge inference takes a different branch there (notch side rather than
+navigation bar side). Actually *sending* a keystroke or a transport media
+key also needs Accessibility granted through a macOS dialog, which cannot be
+driven from a shell.
 
 ## Platform support
 

@@ -455,7 +455,14 @@ class _DeckPageState extends State<DeckPage> {
                             showLabel: labels,
                             pressing: session.isPressing(item),
                             outcome: session.feedbackFor(item),
-                            onPressed: () => _press(session, index, item),
+                            // The host numbers cells its own way; a
+                            // turned deck must translate before telling it
+                            // which one was pressed.
+                            onPressed: () => _press(
+                              session,
+                              layout.sourceIndex(index),
+                              item,
+                            ),
                           );
                         },
                       ),

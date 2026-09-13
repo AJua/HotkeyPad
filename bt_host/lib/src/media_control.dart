@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -50,6 +51,8 @@ abstract final class MediaControl {
       await _channel.invokeMethod<bool>('key', {'key': action.wire});
       return (ok: true, message: action.label);
     } on PlatformException catch (error) {
+      // The only expected failure is the missing permission; prompt for it.
+      if (error.code == 'not-trusted') unawaited(requestTrust());
       return (ok: false, message: error.message ?? 'Media key failed');
     } on MissingPluginException {
       return (ok: false, message: 'Media keys are unavailable');

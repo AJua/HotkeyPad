@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -125,6 +126,10 @@ abstract final class CommandRunner {
       return (ok: false, message: 'Key combinations are macOS only');
     }
     if (!await MediaControl.trusted) {
+      // Puts up the system prompt that deep-links to the right pane. macOS
+      // shows it once per app, so this cannot become a nuisance — the
+      // status line in Service details covers it after that.
+      unawaited(MediaControl.requestTrust());
       return (
         ok: false,
         message:
