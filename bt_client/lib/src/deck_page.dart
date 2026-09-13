@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
@@ -348,70 +349,102 @@ class _DeckPageState extends State<DeckPage> {
       );
     }
 
-    // The whole point of a deck is that every button is visible at once, so
-    // the cells are sized to fill the space rather than to a fixed ratio that
-    // would push the last row off-screen.
+    // Every button visible at once is the point of a deck, so the grid is
+    // sized to fit rather than scrolled. Cells stay square and the block is
+    // centred: stretching them to fill would make buttons wide in landscape
+    // and tall in portrait, and leave the margins uneven once the app bar
+    // has taken one edge.
     return LayoutBuilder(
       builder: (context, constraints) {
         const spacing = 10.0;
-        final padding = safeScrollPadding(context, horizontal: 12, vertical: 12);
+        const margin = 12.0;
+        final padding = safeScrollPadding(
+          context,
+          horizontal: margin,
+          vertical: margin,
+        );
         final dots = layout.pages > 1 ? 28.0 : 0.0;
-        final width =
-            constraints.maxWidth - padding.horizontal -
-            spacing * (layout.columns - 1);
-        final height =
-            constraints.maxHeight - padding.vertical - dots -
-            spacing * (layout.rows - 1);
-        final cellWidth = width / layout.columns;
-        final cellHeight = height / layout.rows;
-        final ratio = cellHeight <= 0 ? 1.0 : cellWidth / cellHeight;
 
-        return Column(
-          children: [
-            Expanded(
-              child: PageView.builder(
-                controller: _pages,
-                itemCount: layout.pages,
-                onPageChanged: (page) => setState(() => _page = page),
-                itemBuilder: (context, page) => GridView.builder(
-                  padding: padding,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: layout.columns,
-                    mainAxisSpacing: spacing,
-                    crossAxisSpacing: spacing,
-                    childAspectRatio: ratio,
+        final freeWidth =
+            constraints.maxWidth -
+            padding.horizontal -
+            spacing * (layout.columns - 1);
+        final freeHeight =
+            constraints.maxHeight -
+            padding.vertical -
+            dots -
+            spacing * (layout.rows - 1);
+
+        // The square that fits both ways decides the cell size; whichever
+        // axis has room to spare becomes even margin on both sides.
+        final cell = math.min(
+          freeWidth / layout.columns,
+          freeHeight / layout.rows,
+        );
+        final gridWidth =
+            cell * layout.columns + spacing * (layout.columns - 1);
+        final gridHeight = cell * layout.rows + spacing * (layout.rows - 1);
+
+        return Padding(
+          padding: padding,
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: SizedBox(
+                    width: gridWidth.isFinite && gridWidth > 0
+                        ? gridWidth
+                        : null,
+                    height: gridHeight.isFinite && gridHeight > 0
+                        ? gridHeight
+                        : null,
+                    child: PageView.builder(
+                      controller: _pages,
+                      itemCount: layout.pages,
+                      onPageChanged: (page) => setState(() => _page = page),
+                      itemBuilder: (context, page) => GridView.builder(
+                        padding: EdgeInsets.zero,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: layout.columns,
+                              mainAxisSpacing: spacing,
+                              crossAxisSpacing: spacing,
+                              childAspectRatio: 1,
+                            ),
+                        itemCount: layout.pageCapacity,
+                        itemBuilder: (context, cell) {
+                          final stored = layout
+                              .slots[layout.indexOf(page: page, cell: cell)];
+                          final item = stored == null
+                              ? null
+                              : DeckItem.parse(stored);
+                          if (item == null) return const _EmptyCell();
+                          if (item is AppItem) {
+                            unawaited(session.ensureIcon(item.name));
+                          }
+                          return _DeckButton(
+                            item: item,
+                            icon: item is AppItem
+                                ? session.iconFor(item.name)
+                                : null,
+                            pressing: session.isPressing(item),
+                            outcome: session.feedbackFor(item),
+                            onPressed: () => _press(session, item),
+                          );
+                        },
+                      ),
+                    ),
                   ),
-                  itemCount: layout.pageCapacity,
-                  itemBuilder: (context, cell) {
-                    final stored =
-                        layout.slots[layout.indexOf(page: page, cell: cell)];
-                    final item = stored == null
-                        ? null
-                        : DeckItem.parse(stored);
-                    if (item == null) return const _EmptyCell();
-                    if (item is AppItem) {
-                      unawaited(session.ensureIcon(item.name));
-                    }
-                    return _DeckButton(
-                      item: item,
-                      icon: item is AppItem
-                          ? session.iconFor(item.name)
-                          : null,
-                      pressing: session.isPressing(item),
-                      outcome: session.feedbackFor(item),
-                      onPressed: () => _press(session, item),
-                    );
-                  },
                 ),
               ),
-            ),
-            if (layout.pages > 1)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _PageDots(count: layout.pages, current: _page),
-              ),
-          ],
+              if (layout.pages > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: _PageDots(count: layout.pages, current: _page),
+                ),
+            ],
+          ),
         );
       },
     );

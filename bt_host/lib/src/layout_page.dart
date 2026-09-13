@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -168,20 +169,27 @@ class _LayoutPageState extends State<LayoutPage> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 const spacing = 10.0;
-                final cellWidth =
-                    (constraints.maxWidth - spacing * (_layout.columns - 1)) /
-                    _layout.columns;
-                final cellHeight =
-                    (constraints.maxHeight - spacing * (_layout.rows - 1)) /
-                    _layout.rows;
-                return GridView.builder(
+                // Square cells in a centred block, the same as the phone
+                // draws, so this is a preview rather than an approximation.
+                final cell = math.min(
+                  (constraints.maxWidth - spacing * (_layout.columns - 1)) /
+                      _layout.columns,
+                  (constraints.maxHeight - spacing * (_layout.rows - 1)) /
+                      _layout.rows,
+                );
+                return Center(
+                  child: SizedBox(
+                    width: cell * _layout.columns +
+                        spacing * (_layout.columns - 1),
+                    height: cell * _layout.rows + spacing * (_layout.rows - 1),
+                    child: GridView.builder(
+              padding: EdgeInsets.zero,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: _layout.columns,
                 mainAxisSpacing: spacing,
                 crossAxisSpacing: spacing,
-                // Mirrors what the phone will show.
-                childAspectRatio: cellHeight <= 0 ? 1 : cellWidth / cellHeight,
+                childAspectRatio: 1,
               ),
               itemCount: _layout.pageCapacity,
               itemBuilder: (context, cell) {
@@ -200,6 +208,8 @@ class _LayoutPageState extends State<LayoutPage> {
                   onMoved: (from) => _apply(_layout.moved(from, index)),
                 );
               },
+                    ),
+                  ),
                 );
               },
             ),

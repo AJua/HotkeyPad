@@ -33,8 +33,11 @@ service, and the buttons launch applications over BLE.
   host pushes the layout on connect and again after every edit, so the phone
   updates while you arrange the grid.
 - Empty cells are drawn rather than skipped, so buttons stay where they were
-  put, and the grid is sized to fill the screen — every button visible at
-  once is the entire point of a deck.
+  put. Every button is visible at once — that is the entire point of a deck —
+  with square cells in a centred block rather than stretched to fill: filling
+  made buttons wide in landscape and tall in portrait, and left uneven margins
+  once the app bar took an edge. Whichever axis has room to spare becomes
+  equal margin on both sides.
 - **Pages** extend that without shrinking the buttons: swipe on the phone,
   with dots showing where you are. In the editor, page tabs are also drop
   targets, which is the only way to drag a button onto a page that is not
