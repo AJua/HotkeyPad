@@ -298,6 +298,28 @@ class BtLinkSession extends ChangeNotifier {
     unawaited(_drainIconQueue());
   }
 
+  /// Retries every deck icon that never arrived.
+  ///
+  /// A frame lost mid-transfer leaves nothing to retry on its own — see
+  /// [_finishIconFetch] — so pulling to refresh is the user's way to ask
+  /// again, rather than living with a fallback glyph until the app restarts.
+  Future<void> refreshIcons() async {
+    final layout = _layout;
+    if (layout == null) return;
+    final missing = <String>{
+      for (final slot in layout.slots)
+        if (slot != null)
+          if (DeckItem.parse(slot.value) case AppItem(:final name))
+            if (!_icons.containsKey(name)) name,
+    };
+    // Clear the "already asked" guard first so ensureIcon does not just see
+    // itself as already having tried and skip straight past.
+    missing.forEach(_requestedIcons.remove);
+    for (final name in missing) {
+      unawaited(ensureIcon(name));
+    }
+  }
+
   Future<void> _drainIconQueue() async {
     // The catalogue comes first. Icons are large and many; interleaving them
     // with ~100 catalogue notifications would leave the deck without labels

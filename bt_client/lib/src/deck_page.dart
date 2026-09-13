@@ -357,6 +357,29 @@ class _DeckPageState extends State<DeckPage> {
     // centred: stretching them to fill would make buttons wide in landscape
     // and tall in portrait, and leave the margins uneven once the app bar
     // has taken one edge.
+    //
+    // Pulling down retries any icon that never arrived (see
+    // BtLinkSession.refreshIcons) — a dropped frame otherwise has no way to
+    // recover on its own. The grid itself never scrolls, so this needs its
+    // own vertical scrollable to detect the pull; SliverFillRemaining keeps
+    // it filling the screen without becoming scrollable content in its own
+    // right. Vertical pull and the PageView's horizontal swipe are different
+    // axes, so neither steals gestures from the other.
+    return RefreshIndicator(
+      onRefresh: session.refreshIcons,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _deck(session, layout),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _deck(BtLinkSession session, DeckLayout layout) {
     return LayoutBuilder(
       builder: (context, constraints) {
         const spacing = 10.0;
