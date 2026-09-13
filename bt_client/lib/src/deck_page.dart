@@ -392,7 +392,7 @@ class _DeckPageState extends State<DeckPage> {
   Widget _deck(BtLinkSession session, DeckLayout layout) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const spacing = 10.0;
+        const spacing = 6.0;
         const margin = 12.0;
         // Taller than wide when there are labels, since the text needs a
         // band of its own. Without labels there is nothing to leave room
@@ -542,22 +542,15 @@ class _PageDots extends StatelessWidget {
   }
 }
 
-/// A slot the host left empty. Drawn rather than skipped so the grid keeps
-/// its shape and buttons stay where the user put them.
+/// A slot the host left empty. Kept as a plain gap rather than skipped so
+/// the grid holds its shape and the filled buttons stay where the user put
+/// them; it used to carry a grey background of its own, which just read as
+/// a blank, unfinished-looking box next to real icons.
 class _EmptyCell extends StatelessWidget {
   const _EmptyCell();
 
   @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerLow.withValues(alpha: 0.4),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const SizedBox.expand();
 }
 
 class _DeckButton extends StatelessWidget {
@@ -593,10 +586,12 @@ class _DeckButton extends StatelessWidget {
     ).toColor();
 
     return Material(
-      // A real icon brings its own colour and shape, so it sits on a neutral
-      // surface. The tint is what makes a letter placeholder distinguishable
-      // at a glance, so it stays until the icon arrives.
-      color: icon != null ? theme.colorScheme.surfaceContainerHighest : tint,
+      // A real icon brings its own colour, shape, and often its own
+      // padding — a filled neutral square behind it just showed through
+      // that padding as a flat grey box. The tint is what makes a letter
+      // placeholder distinguishable at a glance, so it stays until a real
+      // icon arrives.
+      color: icon != null ? Colors.transparent : tint,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -606,20 +601,16 @@ class _DeckButton extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // The icon is sized so the space above it matches the space at
-            // its sides, which is what makes the padding read as even. Filling
-            // the cell instead left a wide gap above the icon and a cramped
-            // one between it and the label.
+            // The icon always fills the slot's full width, flush with the
+            // top — no margin is reserved around it for a label. A labelled
+            // cell is already taller than it is wide (see cellRatio below
+            // this widget), so the label has the leftover height to itself,
+            // under the icon, rather than the icon shrinking to make room.
             LayoutBuilder(
               builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                // With a label the icon leaves room for it and for even
-                // margins; without one it takes the whole cell.
-                final iconSize = showLabel ? width * 0.72 : width;
-                final margin = (width - iconSize) / 2;
+                final iconSize = constraints.maxWidth;
                 return Column(
                   children: [
-                    SizedBox(height: margin),
                     SizedBox(
                       width: iconSize,
                       height: iconSize,
@@ -633,7 +624,7 @@ class _DeckButton extends StatelessWidget {
                                 item.emoji!,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: iconSize * 0.78,
+                                  fontSize: iconSize * 0.82,
                                   height: 1,
                                 ),
                               ),
@@ -663,13 +654,11 @@ class _DeckButton extends StatelessWidget {
                                     ),
                             ),
                     ),
-                    // The label belongs to the icon, so it sits directly
-                    // under it; the leftover height falls below the text
-                    // instead, where it matches the margin at the icon's
-                    // sides. The gap is nearly nothing because the text's
-                    // own line height already provides the visible space.
+                    // The label sits directly under the icon; the cell's
+                    // extra height (see cellRatio) falls below the text
+                    // instead, via the Spacer.
                     if (showLabel) ...[
-                      SizedBox(height: margin * 0.05),
+                      const SizedBox(height: 2),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 6),
                         child: Text(

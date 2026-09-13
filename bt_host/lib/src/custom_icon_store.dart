@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart' show SvgBytesLoader, vg;
 
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 
@@ -49,21 +51,23 @@ abstract final class CustomIconStore {
     return cropToSquarePng(picked);
   }
 
-  /// Decodes [bytes], crops the centred square, and re-encodes at
-  /// [BtLink.iconSize] — a plain resize would squash a non-square photo
+  /// Decodes [bytes] — a raster image, or SVG source, sniffed by
+  /// [_looksLikeSvg] since that's the one format [instantiateImageCodec]
+  /// cannot handle on its own — crops the centred square, and re-encodes at
+  /// [BtLink.iconSize]. A plain resize would squash a non-square source
   /// rather than crop it, and deck buttons are square.
   ///
   /// Public, not an implementation detail of [pickAndProcess], so it can be
   /// tested directly against synthetic images without a real file picker.
   static Future<Uint8List?> cropToSquarePng(Uint8List bytes) async {
-    final Codec codec;
+    final Image source;
     try {
-      codec = await instantiateImageCodec(bytes);
+      source = _looksLikeSvg(bytes)
+          ? await _rasterizeSvg(bytes)
+          : await _decodeRaster(bytes);
     } catch (_) {
       return null;
     }
-    final frame = await codec.getNextFrame();
-    final source = frame.image;
     try {
       final side = source.width < source.height ? source.width : source.height;
       final srcRect = Rect.fromLTWH(
@@ -73,12 +77,24 @@ abstract final class CustomIconStore {
         side.toDouble(),
       );
       const size = BtLink.iconSize;
+      // No inset: the button already leaves its own margin around the icon
+      // box (the grid's cell spacing, plus each app icon's own art), so
+      // shrinking the image further on top of that just made a custom icon
+      // read as smaller than the built-in ones next to it — the goal is to
+      // fill the same box they do, not sit inside it with room to spare.
+      const content = size * 1.0;
+      // Real app icons are drawn as a rounded square, not a sharp one —
+      // without this a custom icon's straight corners stood out (and read as
+      // bigger) next to the curved ones either side of it.
+      const cornerRadius = content * 0.18;
+      const destRect = Rect.fromLTWH(0, 0, content, content);
       final recorder = PictureRecorder();
       final canvas = Canvas(recorder);
+      canvas.clipRRect(RRect.fromRectAndRadius(destRect, const Radius.circular(cornerRadius)));
       canvas.drawImageRect(
         source,
         srcRect,
-        Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
+        destRect,
         Paint()..filterQuality = FilterQuality.high,
       );
       final picture = recorder.endRecording();
@@ -95,6 +111,65 @@ abstract final class CustomIconStore {
       }
     } finally {
       source.dispose();
+    }
+  }
+
+  /// Sniffs [bytes] for SVG source rather than trying to parse it properly —
+  /// a real parse only to reject non-SVG input would be wasted work, since
+  /// [_decodeRaster] already handles every other format this app needs to
+  /// accept. Looks at a small prefix so a large photo isn't fully decoded as
+  /// text just to rule it out.
+  static bool _looksLikeSvg(Uint8List bytes) {
+    final prefixLength = bytes.length < 2048 ? bytes.length : 2048;
+    final String prefix;
+    try {
+      prefix = utf8.decode(bytes.sublist(0, prefixLength), allowMalformed: true);
+    } catch (_) {
+      return false;
+    }
+    return prefix.toLowerCase().contains('<svg');
+  }
+
+  static Future<Image> _decodeRaster(Uint8List bytes) async {
+    final codec = await instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    return frame.image;
+  }
+
+  /// Rasterizes SVG source into an [Image], scaled so its larger dimension
+  /// lands at a comfortable working resolution — [cropToSquarePng] then
+  /// crops and resizes it exactly like any other decoded image, so a vector
+  /// icon goes through the same centred-square treatment as a photo.
+  ///
+  /// A vector has no natural pixel size, unlike a raster frame; [targetSide]
+  /// stands in for one, chosen well above [BtLink.iconSize] so the crop
+  /// below still has real detail to work with.
+  static Future<Image> _rasterizeSvg(Uint8List bytes) async {
+    const targetSide = 512.0;
+    final pictureInfo = await vg.loadPicture(SvgBytesLoader(bytes), null);
+    try {
+      final svgSize = pictureInfo.size;
+      final side = svgSize.width > svgSize.height
+          ? svgSize.width
+          : svgSize.height;
+      // A missing width/height/viewBox leaves size at zero; fall back to
+      // drawing it at face value rather than dividing by zero.
+      final scale = side > 0 ? targetSide / side : 1.0;
+      final width = (svgSize.width * scale).round().clamp(1, 4096);
+      final height = (svgSize.height * scale).round().clamp(1, 4096);
+
+      final recorder = PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.scale(scale);
+      canvas.drawPicture(pictureInfo.picture);
+      final scaledPicture = recorder.endRecording();
+      try {
+        return await scaledPicture.toImage(width, height);
+      } finally {
+        scaledPicture.dispose();
+      }
+    } finally {
+      pictureInfo.picture.dispose();
     }
   }
 

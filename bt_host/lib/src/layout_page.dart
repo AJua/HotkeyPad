@@ -446,7 +446,7 @@ class LayoutGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const spacing = 10.0;
+        const spacing = 6.0;
         // Same proportions the phone draws, so this previews rather than
         // approximates.
         const cellRatio = 0.86;
@@ -542,13 +542,22 @@ class _Cell extends StatelessWidget {
   Widget _content(BuildContext context, bool highlighted) {
     final theme = Theme.of(context);
     final filled = item != null;
+    // A real icon brings its own colour, shape, and often its own padding —
+    // a filled neutral square behind it just showed through that padding as
+    // a flat grey box.
+    final hasRealIcon = filled && icon != null;
 
     return Material(
       color: highlighted
           ? theme.colorScheme.primaryContainer
+          : hasRealIcon
+          ? Colors.transparent
           : filled
           ? theme.colorScheme.surfaceContainerHighest
-          : theme.colorScheme.surfaceContainerLow,
+          // An empty cell is just a "+" hint, not a button — a filled grey
+          // background behind it (especially next to real icons that carry
+          // their own colour) read as a plain, unfinished-looking box.
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -581,7 +590,7 @@ class _Cell extends StatelessWidget {
                                   item!.emoji!,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: iconSize * 0.78,
+                                    fontSize: iconSize * 0.82,
                                     height: 1,
                                   ),
                                 ),

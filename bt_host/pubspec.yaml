@@ -37,6 +37,7 @@ dependencies:
   bluetooth_low_energy: ^6.2.1
   bt_link_protocol:
     path: ../packages/bt_link_protocol
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
