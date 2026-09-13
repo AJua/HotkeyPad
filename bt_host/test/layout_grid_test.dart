@@ -216,6 +216,56 @@ void main() {
     });
   });
 
+  group('currentButtonSummary', () {
+    test('null for an empty slot', () {
+      expect(currentButtonSummary(null), isNull);
+    });
+
+    test('null for a value this build cannot parse', () {
+      expect(currentButtonSummary(''), isNull);
+    });
+
+    test('names the app for an app button', () {
+      expect(
+        currentButtonSummary(const AppItem('Safari').stored),
+        'Opens Safari',
+      );
+    });
+
+    test('prefixes the action label for a media button', () {
+      expect(
+        currentButtonSummary(const ActionItem(DeckAction.volumeUp).stored),
+        'Action: Volume up',
+      );
+    });
+
+    test('shows the actual command for a shell button', () {
+      const item = ShellItem(command: 'say hello', label: 'Greet');
+      expect(currentButtonSummary(item.stored), 'Runs: say hello');
+    });
+
+    test('shows the key combination even when a custom label is set', () {
+      // A custom label ("Screenshot") is what the button shows; the
+      // summary still names the actual keys, since that's what someone
+      // reopening the picker wants to check.
+      const item = KeyComboItem(
+        modifiers: [KeyModifier.command, KeyModifier.shift],
+        key: '4',
+        special: null,
+        label: 'Screenshot',
+      );
+      expect(currentButtonSummary(item.stored), 'Sends ⌘⇧4');
+    });
+
+    test('names the shortcut for a Shortcut button', () {
+      const item = ShortcutItem(name: 'Start focus');
+      expect(
+        currentButtonSummary(item.stored),
+        'Runs the "Start focus" Shortcut',
+      );
+    });
+  });
+
   group('confirmResizeDrop', () {
     /// Opens the dialog and, if [tap] is given, taps that action's button.
     /// Returns whatever confirmResizeDrop resolved to — null while the

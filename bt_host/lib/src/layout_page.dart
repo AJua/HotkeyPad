@@ -87,6 +87,23 @@ Future<bool> confirmResizeDrop(
   return confirmed ?? false;
 }
 
+/// A human-readable read-out of what [stored] actually does — the command a
+/// Shell or Key combination button runs, not just its label — so reopening
+/// the picker answers "what is this?" without guessing from the icon alone
+/// or clicking through to a sub-dialog. Null for an empty slot or a value
+/// this build cannot parse.
+String? currentButtonSummary(String? stored) {
+  final item = stored == null ? null : DeckItem.parse(stored);
+  return switch (item) {
+    null => null,
+    AppItem(:final name) => 'Opens $name',
+    ActionItem(:final action) => 'Action: ${action.label}',
+    ShellItem(:final command) => 'Runs: $command',
+    KeyComboItem(:final combination) => 'Sends $combination',
+    ShortcutItem(:final name) => 'Runs the "$name" Shortcut',
+  };
+}
+
 /// Edits the grid the client will draw.
 ///
 /// Lives on the host because a phone screen is a poor place to arrange a
@@ -690,11 +707,8 @@ class _PickerDialogState extends State<_PickerDialog> {
     _search.addListener(() => setState(() => _query = _search.text.trim()));
     // Prefill with whatever this slot already shows, so reopening the picker
     // does not silently drop a custom icon.
-    final existing = widget.current == null
-        ? null
-        : DeckItem.parse(widget.current!);
-    _emoji = existing?.emoji;
-    _customIconId = existing?.customIconId;
+    _emoji = _existing?.emoji;
+    _customIconId = _existing?.customIconId;
   }
 
   @override
@@ -703,13 +717,19 @@ class _PickerDialogState extends State<_PickerDialog> {
     super.dispose();
   }
 
+  /// What this slot currently holds, or null if it is empty. Parsed fresh
+  /// rather than cached: `widget.current` never changes under this widget,
+  /// but re-parsing a short string is cheaper than a field to keep in sync.
+  DeckItem? get _existing =>
+      widget.current == null ? null : DeckItem.parse(widget.current!);
+
+  String? get _currentSummary => currentButtonSummary(widget.current);
+
   void _choose(DeckItem item) =>
       Navigator.of(context).pop(DeckItemChoice(item.stored));
 
   Future<void> _composeKeyCombo() async {
-    final existing = widget.current == null
-        ? null
-        : DeckItem.parse(widget.current!);
+    final existing = _existing;
     final item = await showDialog<KeyComboItem>(
       context: context,
       builder: (context) => _KeyComboDialog(
@@ -723,9 +743,7 @@ class _PickerDialogState extends State<_PickerDialog> {
   }
 
   Future<void> _composeShell() async {
-    final existing = widget.current == null
-        ? null
-        : DeckItem.parse(widget.current!);
+    final existing = _existing;
     final item = await showDialog<ShellItem>(
       context: context,
       builder: (context) => _ShellDialog(
@@ -785,6 +803,17 @@ class _PickerDialogState extends State<_PickerDialog> {
                 ),
               ],
             ),
+            if (_currentSummary != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _currentSummary!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Expanded(
               child: ListView(
