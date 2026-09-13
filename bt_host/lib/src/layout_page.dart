@@ -11,6 +11,43 @@ import 'layout_store.dart';
 import 'settings_store.dart';
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 
+/// The buttons a resize to this shape would leave outside the grid.
+///
+/// A pure function of [layout] so a dry run costs nothing and can be
+/// checked before anything is actually applied — shrinking is the only
+/// direction that can delete a button, and there is no undo once it does.
+/// Mirrors the bounds [DeckLayout.resized] keeps a cell within exactly, so
+/// what this reports as dropped is what that would actually drop.
+List<DeckItem> itemsDroppedByResize(
+  DeckLayout layout, {
+  int? columns,
+  int? rows,
+  int? pages,
+}) {
+  final newColumns = columns ?? layout.columns;
+  final newRows = rows ?? layout.rows;
+  final newPages = pages ?? layout.pages;
+  final dropped = <DeckItem>[];
+  for (var page = 0; page < layout.pages; page++) {
+    for (var row = 0; row < layout.rows; row++) {
+      for (var column = 0; column < layout.columns; column++) {
+        if (page < newPages && row < newRows && column < newColumns) {
+          continue;
+        }
+        final slot =
+            layout.slots[layout.indexOf(
+              page: page,
+              cell: row * layout.columns + column,
+            )];
+        if (slot == null) continue;
+        final item = DeckItem.parse(slot.value);
+        if (item != null) dropped.add(item);
+      }
+    }
+  }
+  return dropped;
+}
+
 /// Edits the grid the client will draw.
 ///
 /// Lives on the host because a phone screen is a poor place to arrange a
@@ -95,6 +132,51 @@ class _LayoutPageState extends State<LayoutPage> {
     widget.onChanged(layout);
   }
 
+  /// Resizes to [columns]/[rows]/[pages], confirming first if a button would
+  /// no longer fit. Shrinking is the only direction that can delete
+  /// anything — growing only ever adds empty cells — and there is no undo,
+  /// so this is a dry run: nothing is applied until the user says so.
+  Future<void> _resize({int? columns, int? rows, int? pages}) async {
+    final dropped = itemsDroppedByResize(
+      _layout,
+      columns: columns,
+      rows: rows,
+      pages: pages,
+    );
+    if (dropped.isNotEmpty && !await _confirmDrop(dropped)) return;
+    await _apply(_layout.resized(columns: columns, rows: rows, pages: pages));
+  }
+
+  /// Asks before a shrink deletes [dropped]. Returns whether to proceed.
+  Future<bool> _confirmDrop(List<DeckItem> dropped) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          dropped.length == 1
+              ? 'Remove 1 button?'
+              : 'Remove ${dropped.length} buttons?',
+        ),
+        content: Text(
+          'Shrinking the grid no longer has room for '
+          '${dropped.map((item) => item.label).join(', ')}. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   /// Keeps the visible page valid when pages are removed.
   void _clampPage() {
     if (_page >= _layout.pages) _page = _layout.pages - 1;
@@ -150,26 +232,26 @@ class _LayoutPageState extends State<LayoutPage> {
                 _SizeStepper(
                   label: 'Columns',
                   value: _layout.columns,
-                  onChanged: (value) {
+                  onChanged: (value) async {
+                    await _resize(columns: value);
                     setDialogState(() {});
-                    _apply(_layout.resized(columns: value));
                   },
                 ),
                 _SizeStepper(
                   label: 'Rows',
                   value: _layout.rows,
-                  onChanged: (value) {
+                  onChanged: (value) async {
+                    await _resize(rows: value);
                     setDialogState(() {});
-                    _apply(_layout.resized(rows: value));
                   },
                 ),
                 _SizeStepper(
                   label: 'Pages',
                   value: _layout.pages,
                   max: DeckLayout.maxPages,
-                  onChanged: (value) {
+                  onChanged: (value) async {
+                    await _resize(pages: value);
                     setDialogState(() {});
-                    _apply(_layout.resized(pages: value));
                   },
                 ),
                 const Divider(height: 32),

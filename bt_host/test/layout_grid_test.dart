@@ -122,9 +122,9 @@ void main() {
   });
 
   testWidgets('only the requested page is shown', (tester) async {
-    final layout = DeckLayout.empty(pages: 2)
-        .withSlot(0, 'app:FirstPage')
-        .withSlot(15, 'app:SecondPage');
+    final layout = DeckLayout.empty(
+      pages: 2,
+    ).withSlot(0, 'app:FirstPage').withSlot(15, 'app:SecondPage');
 
     await pumpGrid(tester, layout, page: 1);
 
@@ -133,5 +133,86 @@ void main() {
     // Indices stay global, so the second page starts at 15.
     expect(cell(15), findsOneWidget);
     expect(cell(0), findsNothing);
+  });
+
+  group('itemsDroppedByResize', () {
+    test('growing never drops anything', () {
+      final layout = DeckLayout.empty().withSlot(14, 'app:Last');
+
+      expect(itemsDroppedByResize(layout, columns: 6), isEmpty);
+      expect(itemsDroppedByResize(layout, rows: 4), isEmpty);
+      expect(itemsDroppedByResize(layout, pages: 2), isEmpty);
+    });
+
+    test('reports exactly what shrinking columns would drop', () {
+      // Default 5x3: column 4 (the last one) holds a button on every row.
+      final layout = DeckLayout.empty()
+          .withSlot(4, 'app:TopRight')
+          .withSlot(9, 'act:mute')
+          .withSlot(14, 'app:BottomRight')
+          .withSlot(0, 'app:Kept');
+
+      final dropped = itemsDroppedByResize(layout, columns: 4);
+
+      expect(dropped, [
+        const AppItem('TopRight'),
+        const ActionItem(DeckAction.mute),
+        const AppItem('BottomRight'),
+      ]);
+    });
+
+    test('reports exactly what shrinking rows would drop', () {
+      final layout = DeckLayout.empty()
+          .withSlot(0, 'app:Kept')
+          .withSlot(10, 'app:BottomLeft');
+
+      expect(itemsDroppedByResize(layout, rows: 2), [
+        const AppItem('BottomLeft'),
+      ]);
+    });
+
+    test('reports exactly what shrinking pages would drop', () {
+      final layout = DeckLayout.empty(
+        pages: 2,
+      ).withSlot(0, 'app:FirstPage').withSlot(15, 'app:SecondPage');
+
+      expect(itemsDroppedByResize(layout, pages: 1), [
+        const AppItem('SecondPage'),
+      ]);
+    });
+
+    test('skips empty cells outside the new bounds', () {
+      final layout = DeckLayout.empty().withSlot(0, 'app:Kept');
+
+      expect(itemsDroppedByResize(layout, columns: 1), isEmpty);
+    });
+
+    test('agrees with what resized() actually removes', () {
+      final layout = DeckLayout.empty(
+        pages: 2,
+      ).withSlot(4, 'app:A').withSlot(9, 'app:B').withSlot(20, 'app:C');
+
+      for (final shape in [
+        (columns: 3, rows: 3, pages: 2),
+        (columns: 5, rows: 2, pages: 2),
+        (columns: 5, rows: 3, pages: 1),
+      ]) {
+        final dropped = itemsDroppedByResize(
+          layout,
+          columns: shape.columns,
+          rows: shape.rows,
+          pages: shape.pages,
+        );
+        final resized = layout.resized(
+          columns: shape.columns,
+          rows: shape.rows,
+          pages: shape.pages,
+        );
+        final kept = resized.slots.whereType<DeckSlot>().length;
+        final before = layout.slots.whereType<DeckSlot>().length;
+
+        expect(dropped.length, before - kept, reason: 'shape $shape');
+      }
+    });
   });
 }
