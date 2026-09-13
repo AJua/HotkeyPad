@@ -393,7 +393,18 @@ class BtLinkSession extends ChangeNotifier {
     _reconnectIn = null;
   }
 
+  /// Distinguishes connection attempts so a superseded one cannot report
+  /// back. A timed-out attempt is abandoned, not cancelled — CoreBluetooth
+  /// keeps working on it — so without this an old attempt could later
+  /// declare itself ready over a newer one.
+  int _attempt = 0;
+
+  /// Long enough for a slow link, short enough that a host which never comes
+  /// back does not strand the deck.
+  static const _connectTimeout = Duration(seconds: 20);
+
   Future<void> connect() async {
+    final attempt = ++_attempt;
     final reconnecting =
         _stage == LinkStage.disconnected || _stage == LinkStage.failed;
     _cancelReconnect();
@@ -403,13 +414,20 @@ class BtLinkSession extends ChangeNotifier {
     _loadingApps = false;
     notifyListeners();
     try {
+      // The whole sequence is bounded, not just one step of it. iOS never
+      // gives up on a connect: CoreBluetooth waits indefinitely for a
+      // peripheral to reappear, so a host restarted at the wrong moment
+      // leaves connect() hanging forever. Since connect() has already
+      // cancelled the backoff, nothing would ever retry — the deck simply
+      // stops reconnecting. Android's GATT layer times out on its own,
+      // which is why this only ever showed up on iPhone.
       // Reconnecting straight after a drop fails on Android with
       // "Write descriptor failed with status: 1" (GATT_INVALID_HANDLE): the
       // stack is still tearing the old link down when the new descriptor
       // write arrives. Close it explicitly and give the stack a moment.
       if (reconnecting) {
         try {
-          await _central.disconnect(peripheral);
+          await _central.disconnect(peripheral).timeout(_connectTimeout);
         } catch (_) {
           // Already gone is the expected case here.
         }
@@ -419,7 +437,7 @@ class BtLinkSession extends ChangeNotifier {
       // Scanning while connecting slows the connection down and on some
       // platforms blocks it outright.
       await _central.stopDiscovery();
-      await _central.connect(peripheral);
+      await _central.connect(peripheral).timeout(_connectTimeout);
 
       _stage = LinkStage.discovering;
       notifyListeners();
@@ -435,7 +453,9 @@ class BtLinkSession extends ChangeNotifier {
         }
       }
 
-      final services = await _central.discoverGATT(peripheral);
+      final services = await _central
+          .discoverGATT(peripheral)
+          .timeout(_connectTimeout);
       final service = services
           .where((s) => s.uuid == BtLink.serviceUuid)
           .firstOrNull;
@@ -463,24 +483,25 @@ class BtLinkSession extends ChangeNotifier {
       _writeCharacteristic = write;
       notifyListeners();
 
-      await _central.setCharacteristicNotifyState(
-        peripheral,
-        notify,
-        state: true,
-      );
+      await _central
+          .setCharacteristicNotifyState(peripheral, notify, state: true)
+          .timeout(_connectTimeout);
 
+      if (attempt != _attempt) return;
       _stage = LinkStage.ready;
       _reconnectAttempt = 0;
       notifyListeners();
 
       await requestLayout();
     } catch (error) {
+      // A newer attempt owns the state now; this one just goes quiet.
+      if (attempt != _attempt) return;
       _stage = LinkStage.failed;
       _error = '$error';
       _append('connect failed: $error', inbound: true);
       notifyListeners();
       // A device that does not speak BTLink will not start doing so; only
-      // transient failures are worth retrying.
+      // transient failures are worth retrying. A timeout is transient.
       if (error is! StateError) _scheduleReconnect();
     }
   }
