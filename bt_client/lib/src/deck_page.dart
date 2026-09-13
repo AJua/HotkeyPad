@@ -398,23 +398,35 @@ class _DeckPageState extends State<DeckPage> {
             cellHeight * layout.rows + spacing * (layout.rows - 1);
 
         return Padding(
-          padding: padding,
+          // Vertical only. The horizontal inset is already subtracted from
+          // the grid's width above, so applying it here as well would just
+          // narrow the swipe area — and the edges are exactly where a thumb
+          // starts a swipe from.
+          padding: EdgeInsets.only(
+            top: padding.top,
+            bottom: padding.bottom,
+          ),
           child: Column(
             children: [
               Expanded(
-                child: Center(
-                  child: SizedBox(
-                    width: gridWidth.isFinite && gridWidth > 0
-                        ? gridWidth
-                        : null,
-                    height: gridHeight.isFinite && gridHeight > 0
-                        ? gridHeight
-                        : null,
-                    child: PageView.builder(
-                      controller: _pages,
-                      itemCount: layout.pages,
-                      onPageChanged: (page) => setState(() => _page = page),
-                      itemBuilder: (context, page) => GridView.builder(
+                // The PageView spans the whole area and each page centres
+                // its own grid, rather than the PageView being sized to the
+                // grid. In landscape the grid leaves wide margins, and a
+                // swipe starting there has to turn the page too — it is
+                // still the deck, just the empty part of it.
+                child: PageView.builder(
+                  controller: _pages,
+                  itemCount: layout.pages,
+                  onPageChanged: (page) => setState(() => _page = page),
+                  itemBuilder: (context, page) => Center(
+                    child: SizedBox(
+                      width: gridWidth.isFinite && gridWidth > 0
+                          ? gridWidth
+                          : null,
+                      height: gridHeight.isFinite && gridHeight > 0
+                          ? gridHeight
+                          : null,
+                      child: GridView.builder(
                         padding: EdgeInsets.zero,
                         physics: const NeverScrollableScrollPhysics(),
                         gridDelegate:
