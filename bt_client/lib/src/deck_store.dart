@@ -23,6 +23,16 @@ abstract final class DeckStore {
     }
   }
 
+  static Future<DeckTheme> loadTheme(String hostId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return DeckTheme.fromWire(prefs.getString('theme:$hostId'));
+  }
+
+  static Future<void> saveTheme(String hostId, DeckTheme theme) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('theme:$hostId', theme.wire);
+  }
+
   static Future<void> save(String hostId, DeckLayout layout) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key(hostId), jsonEncode(layout.toJson()));

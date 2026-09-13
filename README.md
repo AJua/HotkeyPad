@@ -154,6 +154,19 @@ to the left.
 Only the client does this. The host is a desktop window and has no
 orientation to follow.
 
+### Appearance
+
+System, Light or Dark, chosen on the host and pushed to the phone with the
+layout. It follows the same rule as the grid: the host owns configuration,
+the client renders what it is sent. Picking it per-device would mean a
+settings screen on the phone, which is the thing this design removed.
+
+The client caches it beside the layout, so a restart draws the right
+appearance on the first frame rather than flashing the wrong one.
+
+Host preferences live in `settings.json`, separate from `layout.json`, so
+writing one cannot clobber the other.
+
 ### Finding the host
 
 The search is driven by the adapter's state, not by asking for permission and

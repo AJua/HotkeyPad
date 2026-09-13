@@ -62,6 +62,13 @@ class BtLinkSession extends ChangeNotifier {
 
   /// The grid the host sent. Cached locally so the deck draws immediately
   /// on open rather than after the link comes up.
+  /// The appearance the host asked for. Cached alongside the layout so the
+  /// first frame after a restart is already the right one.
+  DeckTheme _theme = DeckTheme.system;
+
+  /// Notified when the host changes the appearance.
+  ValueChanged<DeckTheme>? onTheme;
+
   DeckLayout? _layout;
 
   /// A layout being received cell by cell; promoted to [_layout] on
@@ -106,6 +113,7 @@ class BtLinkSession extends ChangeNotifier {
   String? get error => _error;
   bool get ready => _stage == LinkStage.ready;
   List<DeckApp> get apps => List.unmodifiable(_apps);
+  DeckTheme get theme => _theme;
   DeckLayout? get layout => _layout;
 
   /// True while this button's command is in flight.
@@ -212,6 +220,11 @@ class BtLinkSession extends ChangeNotifier {
           unawaited(DeckStore.save(hostId, incoming));
           _append('layout: ${incoming.columns}x${incoming.rows}', inbound: true);
         }
+      case SetTheme(:final theme):
+        _theme = theme;
+        unawaited(DeckStore.saveTheme(hostId, theme));
+        onTheme?.call(theme);
+        _append('theme: ${theme.label.toLowerCase()}', inbound: true);
       case IconUnavailable(:final name):
         _append('no icon for $name', inbound: true);
         _finishIconFetch(name);
@@ -455,6 +468,11 @@ class BtLinkSession extends ChangeNotifier {
   }
 
   Future<void> _loadLayout() async {
+    final cachedTheme = await DeckStore.loadTheme(hostId);
+    if (cachedTheme != _theme) {
+      _theme = cachedTheme;
+      onTheme?.call(cachedTheme);
+    }
     final cached = await DeckStore.load(hostId);
     if (cached == null || _layout != null) return;
     _layout = cached;

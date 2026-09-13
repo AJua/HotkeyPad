@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'app_launcher.dart';
 import 'deck_icons.dart';
 import 'layout_store.dart';
+import 'settings_store.dart';
 import 'protocol.dart';
 
 /// Edits the grid the client will draw.
@@ -14,11 +15,19 @@ import 'protocol.dart';
 /// Lives on the host because a phone screen is a poor place to arrange a
 /// grid, and the host is where the app list already is.
 class LayoutPage extends StatefulWidget {
-  const LayoutPage({super.key, required this.onChanged});
+  const LayoutPage({
+    super.key,
+    required this.onChanged,
+    required this.onThemeChanged,
+  });
 
   /// Called after every edit so the service can push the new layout to
   /// connected clients.
   final ValueChanged<DeckLayout> onChanged;
+
+  /// Called when the appearance is changed, so it can be applied here and
+  /// pushed to the phone.
+  final ValueChanged<DeckTheme> onThemeChanged;
 
   @override
   State<LayoutPage> createState() => _LayoutPageState();
@@ -26,6 +35,7 @@ class LayoutPage extends StatefulWidget {
 
 class _LayoutPageState extends State<LayoutPage> {
   DeckLayout _layout = DeckLayout.empty();
+  DeckTheme _theme = DeckTheme.system;
   int _page = 0;
   var _apps = <({String name, String category, String path})>[];
   final _icons = <String, Uint8List?>{};
@@ -39,10 +49,12 @@ class _LayoutPageState extends State<LayoutPage> {
 
   Future<void> _load() async {
     final layout = await LayoutStore.load();
+    final theme = await SettingsStore.loadTheme();
     final apps = await AppLauncher.list();
     if (!mounted) return;
     setState(() {
       _layout = layout;
+      _theme = theme;
       _apps = apps;
       _loading = false;
     });
@@ -75,6 +87,12 @@ class _LayoutPageState extends State<LayoutPage> {
   /// Keeps the visible page valid when pages are removed.
   void _clampPage() {
     if (_page >= _layout.pages) _page = _layout.pages - 1;
+  }
+
+  Future<void> _setTheme(DeckTheme theme) async {
+    setState(() => _theme = theme);
+    await SettingsStore.saveTheme(theme);
+    widget.onThemeChanged(theme);
   }
 
   Future<void> _pick(int index) async {
@@ -118,6 +136,17 @@ class _LayoutPageState extends State<LayoutPage> {
                 label: 'Rows',
                 value: _layout.rows,
                 onChanged: (value) => _apply(_layout.resized(rows: value)),
+              ),
+              const SizedBox(width: 24),
+              SegmentedButton<DeckTheme>(
+                segments: [
+                  for (final theme in DeckTheme.values)
+                    ButtonSegment(value: theme, label: Text(theme.label)),
+                ],
+                selected: {_theme},
+                showSelectedIcon: false,
+                onSelectionChanged: (selection) =>
+                    _setTheme(selection.first),
               ),
               const SizedBox(width: 16),
               _SizeStepper(

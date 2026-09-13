@@ -10,6 +10,7 @@ import 'layout_page.dart';
 import 'layout_store.dart';
 import 'media_control.dart';
 import 'protocol.dart';
+import 'settings_store.dart';
 import 'unsupported_page.dart';
 
 /// A client that the host has seen. Centrals are only reported to us when
@@ -41,7 +42,10 @@ class ConnectedClient {
 }
 
 class HostPage extends StatefulWidget {
-  const HostPage({super.key});
+  const HostPage({super.key, required this.onThemeChanged});
+
+  /// Lets the app above re-dress itself when the theme is changed here.
+  final ValueChanged<DeckTheme> onThemeChanged;
 
   @override
   State<HostPage> createState() => _HostPageState();
@@ -283,6 +287,7 @@ class _HostPageState extends State<HostPage> {
       case DebugText(:final text):
         _touch(central, 'said: $text');
       case Ack() ||
+          SetTheme() ||
           AppEntry() ||
           ListEnd() ||
           IconUnavailable() ||
@@ -359,6 +364,9 @@ class _HostPageState extends State<HostPage> {
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
     await _send(central, const LayoutEnd());
+    // The appearance rides along with the layout so a fresh client is
+    // dressed correctly before it draws anything.
+    await _send(central, SetTheme(theme: await SettingsStore.loadTheme()));
     if (mounted) {
       setState(() {
         _addLog(
@@ -367,6 +375,14 @@ class _HostPageState extends State<HostPage> {
           '${_short(central.uuid.toString())}',
         );
       });
+    }
+  }
+
+  /// Pushes the appearance to everyone subscribed, so the phone follows the
+  /// Mac the moment it is changed here.
+  Future<void> _broadcastTheme(DeckTheme theme) async {
+    for (final client in _clients.values.where((c) => c.subscribed)) {
+      await _queueTransfer(() => _send(client.central, SetTheme(theme: theme)));
     }
   }
 
@@ -594,7 +610,13 @@ class _HostPageState extends State<HostPage> {
           children: [
             // Editing the grid is the everyday job; the service details are
             // for when something is wrong.
-            LayoutPage(onChanged: _broadcastLayout),
+            LayoutPage(
+              onChanged: _broadcastLayout,
+              onThemeChanged: (theme) {
+                widget.onThemeChanged(theme);
+                _broadcastTheme(theme);
+              },
+            ),
             _serviceTab(context, clients, subscribedCount),
           ],
         ),

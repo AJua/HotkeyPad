@@ -17,7 +17,10 @@ import 'session.dart';
 /// one: there is normally exactly one Mac to talk to, and choosing it from a
 /// list of every radio in the room is a chore, not a feature.
 class DeckPage extends StatefulWidget {
-  const DeckPage({super.key});
+  const DeckPage({super.key, required this.onTheme});
+
+  /// Reports the appearance the host asked for, so the app can apply it.
+  final ValueChanged<DeckTheme> onTheme;
 
   @override
   State<DeckPage> createState() => _DeckPageState();
@@ -183,7 +186,9 @@ class _DeckPageState extends State<DeckPage> {
       _session = BtLinkSession(
         peripheral: peripheral,
         name: name?.isNotEmpty == true ? name! : BtLink.advertisedName,
-      )..start();
+      )
+        ..onTheme = widget.onTheme
+        ..start();
     });
   }
 

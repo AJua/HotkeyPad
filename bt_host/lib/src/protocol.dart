@@ -74,6 +74,7 @@ sealed class BtMessage {
           // An action this build does not know about.
           null => null,
         },
+        'thm' => SetTheme(theme: DeckTheme.fromWire(json['v'] as String?)),
         'lay?' => const RequestLayout(),
         'lay' => LayoutStart(
           columns: json['c'] as int? ?? DeckLayout.defaultColumns,
@@ -358,6 +359,41 @@ class DeckLayout {
       slots: slots.map((slot) => slot is String ? slot : null).toList(),
     );
   }
+}
+
+/// Appearance, chosen on the host and applied on both.
+enum DeckTheme {
+  system('sys', 'System'),
+  light('light', 'Light'),
+  dark('dark', 'Dark');
+
+  const DeckTheme(this.wire, this.label);
+
+  /// Short identifier on the wire; the enum name is not used so renaming a
+  /// constant cannot silently break an installed client.
+  final String wire;
+  final String label;
+
+  static DeckTheme fromWire(String? wire) {
+    for (final theme in values) {
+      if (theme.wire == wire) return theme;
+    }
+    return DeckTheme.system;
+  }
+}
+
+/// Host -> client: use this appearance.
+///
+/// Sent with the layout on connect and again whenever it changes, so the
+/// phone follows the Mac rather than keeping a setting of its own — the host
+/// owns configuration here as it does the grid.
+final class SetTheme extends BtMessage {
+  const SetTheme({required this.theme});
+
+  final DeckTheme theme;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'thm', 'v': theme.wire};
 }
 
 /// Client -> host: send me the deck layout.

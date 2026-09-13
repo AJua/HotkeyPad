@@ -380,4 +380,26 @@ void main() {
       expect(square.transposed().slots, square.slots);
     });
   });
+
+  group('DeckTheme', () {
+    test('round-trips through a message', () {
+      for (final theme in DeckTheme.values) {
+        final decoded = BtMessage.decode(SetTheme(theme: theme).encode());
+        expect(decoded, isA<SetTheme>());
+        expect((decoded! as SetTheme).theme, theme);
+      }
+    });
+
+    test('an unknown or missing value falls back to system', () {
+      expect(DeckTheme.fromWire('solarized'), DeckTheme.system);
+      expect(DeckTheme.fromWire(null), DeckTheme.system);
+    });
+
+    test('is offered as system, light, dark', () {
+      expect(
+        DeckTheme.values.map((theme) => theme.label),
+        ['System', 'Light', 'Dark'],
+      );
+    });
+  });
 }
