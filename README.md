@@ -34,10 +34,13 @@ service, and the buttons launch applications over BLE.
   updates while you arrange the grid.
 - Empty cells are drawn rather than skipped, so buttons stay where they were
   put. Every button is visible at once — that is the entire point of a deck —
-  with square cells in a centred block rather than stretched to fill: filling
-  made buttons wide in landscape and tall in portrait, and left uneven margins
-  once the app bar took an edge. Whichever axis has room to spare becomes
-  equal margin on both sides.
+  in a centred block rather than stretched to fill: filling made buttons wide
+  in landscape and tall in portrait, and left uneven margins once the app bar
+  took an edge. Whichever axis has room to spare becomes equal margin on both
+  sides. Cells are slightly taller than wide — the label needs a band of its
+  own, and a taller cell is a bigger thumb target without widening the grid.
+  The icon is measured against the cell's *width*, so the space above it
+  equals the space at its sides.
 - **Pages** extend that without shrinking the buttons: swipe on the phone,
   with dots showing where you are. In the editor, page tabs are also drop
   targets, which is the only way to drag a button onto a page that is not

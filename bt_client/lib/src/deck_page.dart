@@ -358,6 +358,9 @@ class _DeckPageState extends State<DeckPage> {
       builder: (context, constraints) {
         const spacing = 10.0;
         const margin = 12.0;
+        // Taller than wide: the label needs a band of its own, and a taller
+        // cell is a bigger target for a thumb without making the grid wider.
+        const cellRatio = 0.86;
         final padding = safeScrollPadding(
           context,
           horizontal: margin,
@@ -375,15 +378,17 @@ class _DeckPageState extends State<DeckPage> {
             dots -
             spacing * (layout.rows - 1);
 
-        // The square that fits both ways decides the cell size; whichever
-        // axis has room to spare becomes even margin on both sides.
-        final cell = math.min(
+        // Whichever axis runs out first decides the cell width; the other
+        // axis keeps its spare room as even margin on both sides.
+        final cellWidth = math.min(
           freeWidth / layout.columns,
-          freeHeight / layout.rows,
+          freeHeight / layout.rows * cellRatio,
         );
+        final cellHeight = cellWidth / cellRatio;
         final gridWidth =
-            cell * layout.columns + spacing * (layout.columns - 1);
-        final gridHeight = cell * layout.rows + spacing * (layout.rows - 1);
+            cellWidth * layout.columns + spacing * (layout.columns - 1);
+        final gridHeight =
+            cellHeight * layout.rows + spacing * (layout.rows - 1);
 
         return Padding(
           padding: padding,
@@ -410,7 +415,7 @@ class _DeckPageState extends State<DeckPage> {
                               crossAxisCount: layout.columns,
                               mainAxisSpacing: spacing,
                               crossAxisSpacing: spacing,
-                              childAspectRatio: 1,
+                              childAspectRatio: cellRatio,
                             ),
                         itemCount: layout.pageCapacity,
                         itemBuilder: (context, cell) {
@@ -551,9 +556,11 @@ class _DeckButton extends StatelessWidget {
             // one between it and the label.
             LayoutBuilder(
               builder: (context, constraints) {
-                final side = constraints.maxWidth;
-                final iconSize = side * 0.52;
-                final margin = (side - iconSize) / 2;
+                final width = constraints.maxWidth;
+                final iconSize = width * 0.72;
+                // Equal to the side margins, so the icon sits in a band of
+                // even padding with the label below it.
+                final margin = (width - iconSize) / 2;
                 return Column(
                   children: [
                     SizedBox(height: margin),
@@ -598,7 +605,7 @@ class _DeckButton extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(height: margin * 0.4),
+                    SizedBox(height: margin * 0.55),
                   ],
                 );
               },

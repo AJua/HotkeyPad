@@ -213,17 +213,21 @@ class LayoutGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         const spacing = 10.0;
-        // Square cells in a centred block, the same as the phone draws, so
-        // this is a preview rather than an approximation.
-        final cell = math.min(
+        // Same proportions the phone draws, so this previews rather than
+        // approximates.
+        const cellRatio = 0.86;
+        final cellWidth = math.min(
           (constraints.maxWidth - spacing * (layout.columns - 1)) /
               layout.columns,
-          (constraints.maxHeight - spacing * (layout.rows - 1)) / layout.rows,
+          (constraints.maxHeight - spacing * (layout.rows - 1)) /
+              layout.rows *
+              cellRatio,
         );
+        final cellHeight = cellWidth / cellRatio;
         return Center(
           child: SizedBox(
-            width: cell * layout.columns + spacing * (layout.columns - 1),
-            height: cell * layout.rows + spacing * (layout.rows - 1),
+            width: cellWidth * layout.columns + spacing * (layout.columns - 1),
+            height: cellHeight * layout.rows + spacing * (layout.rows - 1),
             child: GridView.builder(
               padding: EdgeInsets.zero,
               physics: const NeverScrollableScrollPhysics(),
@@ -231,7 +235,7 @@ class LayoutGrid extends StatelessWidget {
                 crossAxisCount: layout.columns,
                 mainAxisSpacing: spacing,
                 crossAxisSpacing: spacing,
-                childAspectRatio: 1,
+                childAspectRatio: cellRatio,
               ),
               itemCount: layout.pageCapacity,
               itemBuilder: (context, cellIndex) {
@@ -327,9 +331,9 @@ class _Cell extends StatelessWidget {
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final side = constraints.maxWidth;
-                  final iconSize = side * 0.52;
-                  final margin = (side - iconSize) / 2;
+                  final width = constraints.maxWidth;
+                  final iconSize = width * 0.72;
+                  final margin = (width - iconSize) / 2;
                   return Column(
                     children: [
                       SizedBox(height: margin),
@@ -360,7 +364,7 @@ class _Cell extends StatelessWidget {
                           style: theme.textTheme.labelSmall,
                         ),
                       ),
-                      SizedBox(height: margin * 0.4),
+                      SizedBox(height: margin * 0.55),
                     ],
                   );
                 },
