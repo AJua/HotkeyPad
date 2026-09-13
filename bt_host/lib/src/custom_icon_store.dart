@@ -25,7 +25,7 @@ abstract final class CustomIconStore {
     if (kIsWeb) return null;
     final home = Platform.environment['HOME'];
     if (home == null) return null;
-    return Directory('$home/Library/Application Support/BTLink/custom_icons');
+    return Directory('$home/.config/BTLink/custom_icons');
   }
 
   static String _fileName(String id) => '$id.png';

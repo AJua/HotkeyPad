@@ -18,7 +18,7 @@ abstract final class SettingsStore {
     if (kIsWeb) return null;
     final home = Platform.environment['HOME'];
     if (home == null) return null;
-    return File('$home/Library/Application Support/BTLink/settings.json');
+    return File('$home/.config/BTLink/settings.json');
   }
 
   static Future<({DeckTheme theme, bool showLabels})> load() async {

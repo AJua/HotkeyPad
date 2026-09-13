@@ -18,7 +18,7 @@ abstract final class LayoutStore {
     if (kIsWeb) return null;
     final home = Platform.environment['HOME'];
     if (home == null) return null;
-    return File('$home/Library/Application Support/BTLink/layout.json');
+    return File('$home/.config/BTLink/layout.json');
   }
 
   static Future<DeckLayout> load() async {
