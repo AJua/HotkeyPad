@@ -101,6 +101,7 @@ String? currentButtonSummary(String? stored) {
     ShellItem(:final command) => 'Runs: $command',
     KeyComboItem(:final combination) => 'Sends $combination',
     ShortcutItem(:final name) => 'Runs the "$name" Shortcut',
+    ComboItem(:final steps) => 'Runs ${steps.length} steps',
   };
 }
 
@@ -259,7 +260,7 @@ class _LayoutPageState extends State<LayoutPage> {
                 const SizedBox(height: 12),
                 Text('Grid', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 4),
-                _SizeStepper(
+                _NumberStepper(
                   label: 'Columns',
                   value: _layout.columns,
                   onChanged: (value) async {
@@ -267,7 +268,7 @@ class _LayoutPageState extends State<LayoutPage> {
                     setDialogState(() {});
                   },
                 ),
-                _SizeStepper(
+                _NumberStepper(
                   label: 'Rows',
                   value: _layout.rows,
                   onChanged: (value) async {
@@ -275,7 +276,7 @@ class _LayoutPageState extends State<LayoutPage> {
                     setDialogState(() {});
                   },
                 ),
-                _SizeStepper(
+                _NumberStepper(
                   label: 'Pages',
                   value: _layout.pages,
                   max: DeckLayout.maxPages,
@@ -634,18 +635,31 @@ class _Cell extends StatelessWidget {
   }
 }
 
-class _SizeStepper extends StatelessWidget {
-  const _SizeStepper({
+/// A labelled +/- control for an integer, e.g. grid size or a combo step's
+/// delay. Buttons rather than a text field on purpose: a field needs a
+/// controller to keep in sync with a value that can also change from
+/// outside (a step being reordered, say), and that is exactly the kind of
+/// lifecycle bug a text field invites — see IconPicker's emoji dialog.
+class _NumberStepper extends StatelessWidget {
+  const _NumberStepper({
     required this.label,
     required this.value,
     required this.onChanged,
+    this.min = 1,
     this.max = 8,
+    this.step = 1,
+    this.format,
   });
 
   final String label;
   final int value;
+  final int min;
   final int max;
+  final int step;
   final ValueChanged<int> onChanged;
+
+  /// How to display [value]; defaults to the bare number.
+  final String Function(int value)? format;
 
   @override
   Widget build(BuildContext context) {
@@ -655,13 +669,13 @@ class _SizeStepper extends StatelessWidget {
           child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
         ),
         IconButton(
-          onPressed: value > 1 ? () => onChanged(value - 1) : null,
+          onPressed: value > min ? () => onChanged(value - step) : null,
           icon: const Icon(Icons.remove_circle_outline),
           visualDensity: VisualDensity.compact,
         ),
-        Text('$value'),
+        Text(format?.call(value) ?? '$value'),
         IconButton(
-          onPressed: value < max ? () => onChanged(value + 1) : null,
+          onPressed: value < max ? () => onChanged(value + step) : null,
           icon: const Icon(Icons.add_circle_outline),
           visualDensity: VisualDensity.compact,
         ),
@@ -681,11 +695,17 @@ class _PickerDialog extends StatefulWidget {
     required this.apps,
     required this.shortcuts,
     required this.current,
+    this.allowCombo = true,
   });
 
   final List<({String name, String category, String path})> apps;
   final List<String> shortcuts;
   final String? current;
+
+  /// False when this picker is itself being used to choose one step of a
+  /// combo — hides "Button combo...", since a combo cannot contain another
+  /// combo (see [ComboStep.fromJson]).
+  final bool allowCombo;
 
   @override
   State<_PickerDialog> createState() => _PickerDialogState();
@@ -748,6 +768,22 @@ class _PickerDialogState extends State<_PickerDialog> {
       context: context,
       builder: (context) => _ShellDialog(
         existing: existing is ShellItem ? existing : null,
+        emoji: _emoji,
+        customIconId: _customIconId,
+      ),
+    );
+    if (item == null || !mounted) return;
+    _choose(item);
+  }
+
+  Future<void> _composeCombo() async {
+    final existing = _existing;
+    final item = await showDialog<ComboItem>(
+      context: context,
+      builder: (context) => ComboDialog(
+        apps: widget.apps,
+        shortcuts: widget.shortcuts,
+        existing: existing is ComboItem ? existing : null,
         emoji: _emoji,
         customIconId: _customIconId,
       ),
@@ -832,6 +868,13 @@ class _PickerDialogState extends State<_PickerDialog> {
                       subtitle: const Text('Sent to whatever is frontmost'),
                       onTap: _composeKeyCombo,
                     ),
+                    if (widget.allowCombo)
+                      ListTile(
+                        leading: const Icon(Icons.playlist_play),
+                        title: const Text('Button combo...'),
+                        subtitle: const Text('Runs other buttons in sequence'),
+                        onTap: _composeCombo,
+                      ),
                     const _SectionLabel('Media controls'),
                     for (final action in DeckAction.values)
                       ListTile(
@@ -1439,6 +1482,204 @@ class _KeyComboDialogState extends State<_KeyComboDialog> {
         FilledButton(
           onPressed: _valid ? _save : null,
           child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Composes a button combo: an ordered list of other buttons' actions, each
+/// picked once through [_PickerDialog] itself (with `allowCombo: false`, so
+/// a combo cannot contain another combo) and then held as its own copy, not
+/// a live reference back to wherever it was picked from.
+class ComboDialog extends StatefulWidget {
+  const ComboDialog({
+    super.key,
+    required this.apps,
+    required this.shortcuts,
+    required this.existing,
+    required this.emoji,
+    required this.customIconId,
+  });
+
+  final List<({String name, String category, String path})> apps;
+  final List<String> shortcuts;
+  final ComboItem? existing;
+  final String? emoji;
+  final String? customIconId;
+
+  @override
+  State<ComboDialog> createState() => _ComboDialogState();
+}
+
+class _ComboDialogState extends State<ComboDialog> {
+  late final _label = TextEditingController(text: widget.existing?.label ?? '');
+  late final List<ComboStep> _steps = [...?widget.existing?.steps];
+
+  @override
+  void dispose() {
+    _label.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addStep() async {
+    final chosen = await showDialog<DeckItemChoice>(
+      context: context,
+      builder: (context) => _PickerDialog(
+        apps: widget.apps,
+        shortcuts: widget.shortcuts,
+        current: null,
+        allowCombo: false,
+      ),
+    );
+    if (chosen == null || !mounted) return;
+    final action = DeckItem.parse(chosen.stored);
+    if (action == null) return;
+    setState(() {
+      // A first step defaults to firing immediately; later ones default to
+      // a gap worth noticing. Either is just a starting point — every
+      // step's delay, including the first, can be adjusted afterward.
+      _steps.add(ComboStep(action: action, delayMs: _steps.isEmpty ? 0 : 500));
+    });
+  }
+
+  void _removeStep(int index) => setState(() => _steps.removeAt(index));
+
+  void _moveStep(int index, int delta) {
+    final target = index + delta;
+    if (target < 0 || target >= _steps.length) return;
+    setState(() => _steps.insert(target, _steps.removeAt(index)));
+  }
+
+  void _setDelay(int index, int delayMs) {
+    setState(
+      () => _steps[index] = ComboStep(
+        action: _steps[index].action,
+        delayMs: delayMs,
+      ),
+    );
+  }
+
+  bool get _valid => _steps.length >= 2 && _label.text.trim().isNotEmpty;
+
+  void _save() {
+    if (!_valid) return;
+    Navigator.of(context).pop(
+      ComboItem(
+        steps: List.of(_steps),
+        label: _label.text.trim(),
+        emoji: widget.emoji ?? widget.existing?.emoji,
+        customIconId: widget.customIconId ?? widget.existing?.customIconId,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Button combo'),
+      content: SizedBox(
+        width: 480,
+        height: 480,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _label,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                labelText: 'Button label',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Steps, in order',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            Expanded(
+              child: _steps.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Add at least two steps.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: _steps.length,
+                      separatorBuilder: (context, index) => const Divider(),
+                      itemBuilder: (context, index) {
+                        final step = _steps[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            radius: 14,
+                            child: Text('${index + 1}'),
+                          ),
+                          title: Text(
+                            currentButtonSummary(step.action.stored) ??
+                                step.action.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: _NumberStepper(
+                            label: 'Wait before this step',
+                            value: step.delayMs,
+                            min: 0,
+                            max: 10000,
+                            step: 250,
+                            format: (v) => '${v}ms',
+                            onChanged: (v) => _setDelay(index, v),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'Move up',
+                                icon: const Icon(Icons.arrow_upward),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: index == 0
+                                    ? null
+                                    : () => _moveStep(index, -1),
+                              ),
+                              IconButton(
+                                tooltip: 'Move down',
+                                icon: const Icon(Icons.arrow_downward),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: index == _steps.length - 1
+                                    ? null
+                                    : () => _moveStep(index, 1),
+                              ),
+                              IconButton(
+                                tooltip: 'Remove',
+                                icon: const Icon(Icons.close),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => _removeStep(index),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _addStep,
+              icon: const Icon(Icons.add),
+              label: const Text('Add step...'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _valid ? _save : null,
+          child: const Text('Save'),
         ),
       ],
     );

@@ -20,6 +20,7 @@ IconData deckFallbackIcon(DeckItem item) => switch (item) {
   ShellItem() => Icons.terminal,
   KeyComboItem() => Icons.keyboard,
   ShortcutItem() => Icons.bolt,
+  ComboItem() => Icons.playlist_play,
   ActionItem(:final action) => switch (action) {
     DeckAction.playPause => Icons.play_arrow,
     DeckAction.next => Icons.skip_next,

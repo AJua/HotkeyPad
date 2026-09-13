@@ -15,6 +15,36 @@ import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'settings_store.dart';
 import 'unsupported_page.dart';
 
+/// What running one action came to — every `AppLauncher.open`-style helper
+/// already returns this shape, so a combo step and a top-level press report
+/// the same way.
+typedef ActionResult = ({bool ok, String message});
+
+/// Runs [steps] in order, waiting each step's declared delay first, and
+/// stopping at the first failure rather than plowing through the rest of a
+/// broken sequence.
+///
+/// [run] and [delay] are injected — normally [_HostPageState._runItem] and
+/// `Future.delayed` — so this can be tested without touching
+/// AppLauncher/CommandRunner or waiting on a real clock.
+Future<ActionResult> runComboSteps(
+  List<ComboStep> steps, {
+  required Future<ActionResult> Function(DeckItem item) run,
+  required Future<void> Function(Duration duration) delay,
+}) async {
+  for (var index = 0; index < steps.length; index++) {
+    final step = steps[index];
+    if (step.delayMs > 0) {
+      await delay(Duration(milliseconds: step.delayMs));
+    }
+    final result = await run(step.action);
+    if (!result.ok) {
+      return (ok: false, message: 'Step ${index + 1}: ${result.message}');
+    }
+  }
+  return (ok: true, message: 'Ran ${steps.length} steps');
+}
+
 /// A client that the host has seen. Centrals are only reported to us when
 /// they do something — connect, subscribe, read or write — so the list grows
 /// as clients interact rather than the moment they come into range.
@@ -373,21 +403,32 @@ class _HostPageState extends State<HostPage> {
     // Names the slot as well as what was in it: the client sends only a
     // number, and the log should not read as though it sent the action.
     _touch(central, 'slot $id -> ${item.label}');
-    final result = switch (item) {
-      AppItem(:final name) => await AppLauncher.open(name),
-      ActionItem(:final action) => await MediaControl.run(action),
-      ShellItem(:final command) => await CommandRunner.shell(command),
-      ShortcutItem(:final name) => await CommandRunner.shortcut(name),
-      KeyComboItem() => await CommandRunner.keyCombo(
-        modifiers: item.modifiers,
-        key: item.key,
-        special: item.special,
-        label: item.combination,
-      ),
-    };
+    final result = await _runItem(item);
     if (mounted) setState(() => _addLog(result.message));
     await _send(central, Ack(ok: result.ok, message: result.message));
   }
+
+  /// Runs whatever a single [DeckItem] means to run. Pulled out of
+  /// [_pressSlot] so a [ComboItem]'s steps can call back into it — a combo
+  /// step is never itself a combo (see [ComboStep.fromJson]), so this never
+  /// recurses more than one level deep.
+  Future<ActionResult> _runItem(DeckItem item) => switch (item) {
+    AppItem(:final name) => AppLauncher.open(name),
+    ActionItem(:final action) => MediaControl.run(action),
+    ShellItem(:final command) => CommandRunner.shell(command),
+    ShortcutItem(:final name) => CommandRunner.shortcut(name),
+    KeyComboItem() => CommandRunner.keyCombo(
+      modifiers: item.modifiers,
+      key: item.key,
+      special: item.special,
+      label: item.combination,
+    ),
+    ComboItem(:final steps) => runComboSteps(
+      steps,
+      run: _runItem,
+      delay: (duration) => Future<void>.delayed(duration),
+    ),
+  };
 
   /// Streams the layout: a header, one message per occupied cell, then an
   /// end marker. Empty cells are not sent — the header's dimensions are

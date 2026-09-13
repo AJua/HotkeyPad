@@ -302,6 +302,110 @@ void main() {
     });
   });
 
+  group('ComboItem', () {
+    test('round-trips its steps and delays', () {
+      const combo = ComboItem(
+        steps: [
+          ComboStep(action: ActionItem(DeckAction.mute), delayMs: 0),
+          ComboStep(action: AppItem('Safari'), delayMs: 500),
+        ],
+        label: 'Mute then Safari',
+      );
+
+      final decoded = DeckItem.parse(combo.stored) as ComboItem?;
+
+      expect(decoded!.label, 'Mute then Safari');
+      expect(decoded.steps, hasLength(2));
+      expect(decoded.steps[0].action, const ActionItem(DeckAction.mute));
+      expect(decoded.steps[0].delayMs, 0);
+      expect(decoded.steps[1].action, const AppItem('Safari'));
+      expect(decoded.steps[1].delayMs, 500);
+    });
+
+    test('always uses the long JSON form, even with two plain app steps', () {
+      const combo = ComboItem(
+        steps: [
+          ComboStep(action: AppItem('Safari'), delayMs: 0),
+          ComboStep(action: AppItem('Chrome'), delayMs: 0),
+        ],
+        label: 'Both browsers',
+      );
+
+      expect(combo.stored, startsWith('{'));
+    });
+
+    test('drops a step that fails to parse', () {
+      final decoded = DeckItem.parse(
+        jsonEncode({
+          't': 'combo',
+          'l': 'Partly broken',
+          'steps': [
+            {'v': 'app:Safari', 'd': 0},
+            {'v': 12345, 'd': 0}, // not a string: fails to parse
+            {'v': 'act:mute', 'd': 100},
+          ],
+        }),
+      );
+
+      expect(decoded, isA<ComboItem>());
+      expect((decoded as ComboItem).steps, hasLength(2));
+      expect(decoded.steps[0].action, const AppItem('Safari'));
+      expect(decoded.steps[1].action, const ActionItem(DeckAction.mute));
+    });
+
+    test('drops a step that is itself a combo — combos cannot nest', () {
+      const inner = ComboItem(
+        steps: [ComboStep(action: AppItem('Safari'), delayMs: 0)],
+        label: 'Inner',
+      );
+      final decoded = DeckItem.parse(
+        jsonEncode({
+          't': 'combo',
+          'l': 'Outer',
+          'steps': [
+            {'v': inner.stored, 'd': 0},
+            {'v': 'act:mute', 'd': 0},
+          ],
+        }),
+      );
+
+      expect(decoded, isA<ComboItem>());
+      expect((decoded as ComboItem).steps, hasLength(1));
+      expect(decoded.steps.single.action, const ActionItem(DeckAction.mute));
+    });
+
+    test('is invalid once dropping bad steps leaves nothing to run', () {
+      final decoded = DeckItem.parse(
+        jsonEncode({
+          't': 'combo',
+          'l': 'All broken',
+          'steps': [
+            {'v': 999, 'd': 0},
+          ],
+        }),
+      );
+
+      expect(decoded, isNull);
+    });
+
+    test('a missing steps list is invalid, not a crash', () {
+      expect(DeckItem.parse(jsonEncode({'t': 'combo', 'l': 'Empty'})), isNull);
+    });
+
+    test('an emoji and a custom icon id survive like any other item', () {
+      const combo = ComboItem(
+        steps: [
+          ComboStep(action: AppItem('Safari'), delayMs: 0),
+          ComboStep(action: AppItem('Chrome'), delayMs: 0),
+        ],
+        label: 'Browsers',
+        emoji: '🌐',
+      );
+
+      expect(DeckItem.parse(combo.stored)!.emoji, '🌐');
+    });
+  });
+
   group('DeckLayout', () {
     test('defaults to one 5x3 page of empty cells', () {
       final layout = DeckLayout.empty();

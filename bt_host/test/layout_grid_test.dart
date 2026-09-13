@@ -264,6 +264,17 @@ void main() {
         'Runs the "Start focus" Shortcut',
       );
     });
+
+    test('counts the steps for a combo button', () {
+      const item = ComboItem(
+        steps: [
+          ComboStep(action: AppItem('Safari'), delayMs: 0),
+          ComboStep(action: AppItem('Chrome'), delayMs: 0),
+        ],
+        label: 'Browsers',
+      );
+      expect(currentButtonSummary(item.stored), 'Runs 2 steps');
+    });
   });
 
   group('confirmResizeDrop', () {
@@ -336,6 +347,240 @@ void main() {
 
       expect(result, isTrue);
       expect(find.byType(AlertDialog), findsNothing);
+    });
+  });
+
+  group('ComboDialog', () {
+    const apps = [
+      (name: 'Safari', category: 'Apps', path: '/Applications/Safari.app'),
+      (name: 'Chrome', category: 'Apps', path: '/Applications/Chrome.app'),
+    ];
+
+    Future<ComboItem?> pumpAndSave(
+      WidgetTester tester, {
+      ComboItem? existing,
+      required Future<void> Function() interact,
+    }) async {
+      ComboItem? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  result = await showDialog<ComboItem>(
+                    context: context,
+                    builder: (context) => ComboDialog(
+                      apps: apps,
+                      shortcuts: const [],
+                      existing: existing,
+                      emoji: null,
+                      customIconId: null,
+                    ),
+                  );
+                },
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await interact();
+      return result;
+    }
+
+    /// Adds one app step through the reused picker.
+    Future<void> addAppStep(WidgetTester tester, String appName) async {
+      await tester.tap(find.text('Add step...'));
+      await tester.pumpAndSettle();
+      // The picker's Applications section is below several fixed items
+      // (Command, Media controls), so it is off the fixed-height dialog's
+      // initial viewport — scroll its list until the app is actually built.
+      await tester.scrollUntilVisible(
+        find.text(appName),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.text(appName));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Save is disabled with fewer than two steps', (tester) async {
+      await pumpAndSave(
+        tester,
+        interact: () async {
+          expect(find.widgetWithText(FilledButton, 'Save'), findsOneWidget);
+          final button = tester.widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Save'),
+          );
+          expect(button.onPressed, isNull);
+
+          await addAppStep(tester, 'Safari');
+
+          final afterOneStep = tester.widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Save'),
+          );
+          expect(afterOneStep.onPressed, isNull);
+        },
+      );
+    });
+
+    testWidgets("the step picker hides 'Button combo...'", (tester) async {
+      await pumpAndSave(
+        tester,
+        interact: () async {
+          await tester.tap(find.text('Add step...'));
+          await tester.pumpAndSettle();
+
+          expect(find.text('Button combo...'), findsNothing);
+          expect(find.text('Shell command...'), findsOneWidget);
+        },
+      );
+    });
+
+    testWidgets('adding two steps and a label enables Save and saves them '
+        'in order', (tester) async {
+      final result = await pumpAndSave(
+        tester,
+        interact: () async {
+          await addAppStep(tester, 'Safari');
+          await addAppStep(tester, 'Chrome');
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Button label'),
+            'Two browsers',
+          );
+          // Lets the label field's onChanged setState (which is what turns
+          // Save enabled) actually take effect before tapping it.
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+          await tester.pumpAndSettle();
+        },
+      );
+
+      expect(result, isNotNull);
+      expect(result!.label, 'Two browsers');
+      expect(result.steps.map((s) => s.action), [
+        const AppItem('Safari'),
+        const AppItem('Chrome'),
+      ]);
+    });
+
+    testWidgets('removing a step drops it from the list', (tester) async {
+      final result = await pumpAndSave(
+        tester,
+        interact: () async {
+          await addAppStep(tester, 'Safari');
+          await addAppStep(tester, 'Chrome');
+          // Both steps' remove buttons look the same; take the first one.
+          await tester.tap(find.byTooltip('Remove').first);
+          await tester.pumpAndSettle();
+          await addAppStep(tester, 'Safari');
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Button label'),
+            'Chrome then Safari',
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+          await tester.pumpAndSettle();
+        },
+      );
+
+      expect(result!.steps.map((s) => s.action), [
+        const AppItem('Chrome'),
+        const AppItem('Safari'),
+      ]);
+    });
+
+    testWidgets('moving a step down reorders it', (tester) async {
+      final result = await pumpAndSave(
+        tester,
+        interact: () async {
+          await addAppStep(tester, 'Safari');
+          await addAppStep(tester, 'Chrome');
+          // Move step 1 (Safari) down past step 2 (Chrome).
+          await tester.tap(find.byTooltip('Move down').first);
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Button label'),
+            'Reordered',
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+          await tester.pumpAndSettle();
+        },
+      );
+
+      expect(result!.steps.map((s) => s.action), [
+        const AppItem('Chrome'),
+        const AppItem('Safari'),
+      ]);
+    });
+
+    testWidgets('a new step defaults to a 500ms delay', (tester) async {
+      final result = await pumpAndSave(
+        tester,
+        interact: () async {
+          await addAppStep(tester, 'Safari');
+          await addAppStep(tester, 'Chrome');
+          // The second step's delay defaults to 500ms.
+          expect(find.text('500ms'), findsOneWidget);
+          // Tapping the text itself does nothing (only the +/- buttons do).
+          await tester.tap(find.text('500ms'));
+          await tester.pumpAndSettle();
+        },
+      );
+
+      expect(result, isNull);
+    });
+
+    testWidgets("the delay stepper adjusts a step's delay", (tester) async {
+      final adjusted = await pumpAndSave(
+        tester,
+        interact: () async {
+          await addAppStep(tester, 'Safari');
+          await addAppStep(tester, 'Chrome');
+          final plusButtons = find.byIcon(Icons.add_circle_outline);
+          // The first belongs to step 1's stepper, the second to step 2's.
+          await tester.tap(plusButtons.last);
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.widgetWithText(TextField, 'Button label'),
+            'Delayed',
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+          await tester.pumpAndSettle();
+        },
+      );
+
+      expect(adjusted!.steps[1].delayMs, 750);
+    });
+
+    testWidgets('editing an existing combo prefills its steps and label', (
+      tester,
+    ) async {
+      const existing = ComboItem(
+        steps: [
+          ComboStep(action: AppItem('Safari'), delayMs: 0),
+          ComboStep(action: AppItem('Chrome'), delayMs: 500),
+        ],
+        label: 'Existing combo',
+      );
+
+      await pumpAndSave(
+        tester,
+        existing: existing,
+        interact: () async {
+          final labelField = tester.widget<TextField>(
+            find.widgetWithText(TextField, 'Button label'),
+          );
+          expect(labelField.controller!.text, 'Existing combo');
+          expect(find.text('Opens Safari'), findsOneWidget);
+          expect(find.text('Opens Chrome'), findsOneWidget);
+        },
+      );
     });
   });
 }

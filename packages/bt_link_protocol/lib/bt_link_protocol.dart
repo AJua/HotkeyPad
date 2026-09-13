@@ -216,6 +216,12 @@ sealed class DeckItem {
           emoji: emoji,
           customIconId: customIconId,
         ),
+        'combo' => ComboItem.fromSteps(
+          json['steps'] as List? ?? const [],
+          label: json['l'] as String? ?? '',
+          emoji: emoji,
+          customIconId: customIconId,
+        ),
         _ => null,
       };
     } catch (_) {
@@ -456,6 +462,88 @@ final class ShortcutItem extends DeckItem {
     't': 'sc',
     'n': name,
     if (_label != null) 'l': _label,
+    if (emoji != null) 'e': emoji,
+    if (customIconId != null) 'ci': customIconId,
+  });
+}
+
+/// One action in a [ComboItem], run in sequence with the others.
+final class ComboStep {
+  const ComboStep({required this.action, required this.delayMs});
+
+  /// What this step does — never itself a [ComboItem]; combos cannot nest.
+  final DeckItem action;
+
+  /// Waited before running [action]. The first step's is typically 0; it is
+  /// "before", not "after", so there is nothing to wait for once the last
+  /// step has run.
+  final int delayMs;
+
+  Map<String, Object?> toJson() => {'v': action.stored, 'd': delayMs};
+
+  /// Returns null for anything that does not decode to a plain action, so a
+  /// bad or nested step is dropped rather than taking the whole combo with
+  /// it — see [ComboItem.fromSteps].
+  static ComboStep? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final stored = json['v'];
+    if (stored is! String) return null;
+    final action = DeckItem.parse(stored);
+    if (action == null || action is ComboItem) return null;
+    final delayMs = json['d'];
+    return ComboStep(action: action, delayMs: delayMs is int ? delayMs : 0);
+  }
+}
+
+/// Runs a fixed sequence of other buttons' actions, waiting between them.
+///
+/// Steps are copies taken when the combo was composed, not live references
+/// to other slots — editing or clearing whatever slot a step was originally
+/// picked from does not change this combo, and there is no reference to go
+/// stale or cycle back on itself.
+final class ComboItem extends DeckItem {
+  const ComboItem({
+    required this.steps,
+    required this.label,
+    this.emoji,
+    this.customIconId,
+  });
+
+  /// Never empty — see [fromSteps].
+  final List<ComboStep> steps;
+
+  @override
+  final String label;
+
+  @override
+  final String? emoji;
+
+  @override
+  final String? customIconId;
+
+  /// Drops any step that failed to parse or was itself a combo; null if
+  /// that leaves nothing to run.
+  static ComboItem? fromSteps(
+    List<Object?> rawSteps, {
+    required String label,
+    String? emoji,
+    String? customIconId,
+  }) {
+    final steps = [for (final raw in rawSteps) ?ComboStep.fromJson(raw)];
+    if (steps.isEmpty) return null;
+    return ComboItem(
+      steps: steps,
+      label: label,
+      emoji: emoji,
+      customIconId: customIconId,
+    );
+  }
+
+  @override
+  String get stored => jsonEncode({
+    't': 'combo',
+    'l': label,
+    'steps': [for (final step in steps) step.toJson()],
     if (emoji != null) 'e': emoji,
     if (customIconId != null) 'ci': customIconId,
   });
