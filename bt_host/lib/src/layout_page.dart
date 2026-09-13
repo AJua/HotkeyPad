@@ -353,7 +353,7 @@ class _Cell extends StatelessWidget {
                                       ),
                               ),
                       ),
-                      const Spacer(),
+                      SizedBox(height: margin * 0.05),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
@@ -361,10 +361,12 @@ class _Cell extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.labelSmall,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            height: 1.1,
+                          ),
                         ),
                       ),
-                      SizedBox(height: margin * 0.55),
+                      const Spacer(),
                     ],
                   );
                 },

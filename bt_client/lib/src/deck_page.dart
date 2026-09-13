@@ -592,7 +592,12 @@ class _DeckButton extends StatelessWidget {
                                     ),
                             ),
                     ),
-                    const Spacer(),
+                    // The label belongs to the icon, so it sits directly
+                    // under it; the leftover height falls below the text
+                    // instead, where it matches the margin at the icon's
+                    // sides. The gap is nearly nothing because the text's
+                    // own line height already provides the visible space.
+                    SizedBox(height: margin * 0.05),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       child: Text(
@@ -602,10 +607,13 @@ class _DeckButton extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.w600,
+                          // Trimmed so the label does not float away from
+                          // the icon on its own leading.
+                          height: 1.1,
                         ),
                       ),
                     ),
-                    SizedBox(height: margin * 0.55),
+                    const Spacer(),
                   ],
                 );
               },
