@@ -366,6 +366,12 @@ class _HostPageState extends State<HostPage> {
       ActionItem(:final action) => await MediaControl.run(action),
       ShellItem(:final command) => await CommandRunner.shell(command),
       ShortcutItem(:final name) => await CommandRunner.shortcut(name),
+      KeyComboItem() => await CommandRunner.keyCombo(
+        modifiers: item.modifiers,
+        key: item.key,
+        special: item.special,
+        label: item.combination,
+      ),
     };
     if (mounted) setState(() => _addLog(result.message));
     await _send(central, Ack(ok: result.ok, message: result.message));

@@ -199,6 +199,65 @@ void main() {
       expect(const ActionItem(DeckAction.mute).stored, 'act:mute');
     });
 
+    test('round-trips a key combination', () {
+      const item = KeyComboItem(
+        modifiers: [KeyModifier.command, KeyModifier.shift],
+        key: '4',
+        special: null,
+        label: 'Screenshot',
+        emoji: '📸',
+      );
+
+      final parsed = DeckItem.parse(item.stored) as KeyComboItem?;
+
+      expect(parsed!.modifiers, [KeyModifier.command, KeyModifier.shift]);
+      expect(parsed.key, '4');
+      expect(parsed.special, isNull);
+      expect(parsed.label, 'Screenshot');
+      expect(parsed.emoji, '📸');
+    });
+
+    test('round-trips a special key', () {
+      const item = KeyComboItem(
+        modifiers: [KeyModifier.option],
+        key: null,
+        special: SpecialKey.space,
+      );
+
+      final parsed = DeckItem.parse(item.stored) as KeyComboItem?;
+
+      expect(parsed!.special, SpecialKey.space);
+      expect(parsed.key, isNull);
+    });
+
+    test('reads as symbols, and labels itself when unnamed', () {
+      const combo = KeyComboItem(
+        modifiers: [KeyModifier.command, KeyModifier.shift],
+        key: '4',
+        special: null,
+      );
+
+      expect(combo.combination, '⌘⇧4');
+      // No label given, so the combination is the label.
+      expect(combo.label, '⌘⇧4');
+      expect(
+        const KeyComboItem(
+          modifiers: [KeyModifier.option],
+          key: null,
+          special: SpecialKey.space,
+        ).combination,
+        '⌥Space',
+      );
+    });
+
+    test('an unknown modifier is dropped, not fatal', () {
+      final parsed =
+          DeckItem.parse('{"t":"key","m":["cmd","hyper"],"k":"c"}')
+              as KeyComboItem?;
+
+      expect(parsed!.modifiers, [KeyModifier.command]);
+    });
+
     test('an app and an action never collide', () {
       expect(
         const AppItem('playpause').stored,

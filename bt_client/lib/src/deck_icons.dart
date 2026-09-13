@@ -9,6 +9,7 @@ import 'protocol.dart';
 IconData deckFallbackIcon(DeckItem item) => switch (item) {
   AppItem() => Icons.apps,
   ShellItem() => Icons.terminal,
+  KeyComboItem() => Icons.keyboard,
   ShortcutItem() => Icons.bolt,
   ActionItem(:final action) => switch (action) {
     DeckAction.playPause => Icons.play_arrow,

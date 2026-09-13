@@ -617,6 +617,21 @@ class _PickerDialogState extends State<_PickerDialog> {
   void _choose(DeckItem item) =>
       Navigator.of(context).pop(DeckItemChoice(item.stored));
 
+  Future<void> _composeKeyCombo() async {
+    final existing = widget.current == null
+        ? null
+        : DeckItem.parse(widget.current!);
+    final item = await showDialog<KeyComboItem>(
+      context: context,
+      builder: (context) => _KeyComboDialog(
+        existing: existing is KeyComboItem ? existing : null,
+        emoji: _chosenEmoji,
+      ),
+    );
+    if (item == null || !mounted) return;
+    _choose(item);
+  }
+
   Future<void> _composeShell() async {
     final existing = widget.current == null
         ? null
@@ -696,6 +711,12 @@ class _PickerDialogState extends State<_PickerDialog> {
                       title: const Text('Shell command...'),
                       subtitle: const Text('Runs on this Mac'),
                       onTap: _composeShell,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.keyboard),
+                      title: const Text('Key combination...'),
+                      subtitle: const Text('Sent to whatever is frontmost'),
+                      onTap: _composeKeyCombo,
                     ),
                     const _SectionLabel('Media controls'),
                     for (final action in DeckAction.values)
@@ -888,6 +909,176 @@ class _PageTab extends StatelessWidget {
           child: Text('Page ${index + 1}'),
         ),
       ),
+    );
+  }
+}
+
+/// Composes a keyboard combination: modifiers, a key, and what to call it.
+class _KeyComboDialog extends StatefulWidget {
+  const _KeyComboDialog({required this.existing, required this.emoji});
+
+  final KeyComboItem? existing;
+  final String? emoji;
+
+  @override
+  State<_KeyComboDialog> createState() => _KeyComboDialogState();
+}
+
+class _KeyComboDialogState extends State<_KeyComboDialog> {
+  late final Set<KeyModifier> _modifiers = {
+    ...?widget.existing?.modifiers,
+  };
+  late final _character = TextEditingController(
+    text: widget.existing?.key ?? '',
+  );
+  late final _label = TextEditingController(
+    text: widget.existing?.label ?? '',
+  );
+  late SpecialKey? _special = widget.existing?.special;
+
+  @override
+  void dispose() {
+    _character.dispose();
+    _label.dispose();
+    super.dispose();
+  }
+
+  /// Live preview of what will be sent, so the symbols are not a guess.
+  String get _preview => KeyComboItem(
+    modifiers: _modifiers.toList(),
+    key: _character.text.trim().isEmpty ? null : _character.text.trim(),
+    special: _special,
+  ).combination;
+
+  bool get _valid =>
+      _special != null || _character.text.trim().isNotEmpty;
+
+  void _save() {
+    if (!_valid) return;
+    final label = _label.text.trim();
+    Navigator.of(context).pop(
+      KeyComboItem(
+        // Stored in enum order so the symbols always read ⌃⌥⇧⌘-style.
+        modifiers: KeyModifier.values
+            .where(_modifiers.contains)
+            .toList(),
+        key: _special == null ? _character.text.trim() : null,
+        special: _special,
+        label: label.isEmpty ? null : label,
+        emoji: widget.emoji ?? widget.existing?.emoji,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Key combination'),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final modifier in KeyModifier.values)
+                  FilterChip(
+                    label: Text('${modifier.symbol} ${modifier.name}'),
+                    selected: _modifiers.contains(modifier),
+                    onSelected: (on) => setState(() {
+                      on
+                          ? _modifiers.add(modifier)
+                          : _modifiers.remove(modifier);
+                    }),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 110,
+                  child: TextField(
+                    controller: _character,
+                    enabled: _special == null,
+                    maxLength: 1,
+                    textAlign: TextAlign.center,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Key',
+                      hintText: 'c',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      counterText: '',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonFormField<SpecialKey?>(
+                    initialValue: _special,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'or a special key',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: [
+                      const DropdownMenuItem(child: Text('None')),
+                      for (final key in SpecialKey.values)
+                        DropdownMenuItem(value: key, child: Text(key.label)),
+                    ],
+                    onChanged: (key) => setState(() {
+                      _special = key;
+                      if (key != null) _character.clear();
+                    }),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _label,
+              onSubmitted: (_) => _save(),
+              decoration: const InputDecoration(
+                labelText: 'Button label',
+                hintText: 'defaults to the combination',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Text('Sends', style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(width: 8),
+                Text(
+                  _valid ? _preview : '—',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Needs Accessibility permission, the same as the media keys.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _valid ? _save : null,
+          child: const Text('Add'),
+        ),
+      ],
     );
   }
 }

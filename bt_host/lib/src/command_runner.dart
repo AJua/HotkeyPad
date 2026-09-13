@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'media_control.dart';
+import 'protocol.dart';
+
 /// Runs the host-side commands a deck button can hold.
 ///
 /// These only ever come from the host's own layout — a client presses a slot
@@ -102,6 +105,64 @@ abstract final class CommandRunner {
           .toList();
     } catch (_) {
       return const [];
+    }
+  }
+
+  /// Sends a keyboard combination to whatever is frontmost.
+  ///
+  /// Through System Events rather than CGEvent: AppleScript maps a character
+  /// to the right key for the current layout, which a virtual key code does
+  /// not. Keys with no character are sent by code instead. Either way macOS
+  /// requires Accessibility, and silently does nothing without it — so the
+  /// trust state is checked first and reported.
+  static Future<({bool ok, String message})> keyCombo({
+    required List<KeyModifier> modifiers,
+    String? key,
+    SpecialKey? special,
+    required String label,
+  }) async {
+    if (!supported) {
+      return (ok: false, message: 'Key combinations are macOS only');
+    }
+    if (!await MediaControl.trusted) {
+      return (
+        ok: false,
+        message:
+            'Grant this app Accessibility in System Settings > Privacy & '
+            'Security > Accessibility',
+      );
+    }
+
+    final using = modifiers.isEmpty
+        ? ''
+        : ' using {${modifiers.map((m) => m.appleScript).join(', ')}}';
+    final String action;
+    if (special != null) {
+      action = 'key code ${special.code}';
+    } else if (key != null && key.isNotEmpty) {
+      // Escape for AppleScript's string syntax, not the shell: the script is
+      // passed as one argument, never through a shell.
+      final escaped = key
+          .replaceAll(r'\', r'\\')
+          .replaceAll('"', r'\"');
+      action = 'keystroke "$escaped"';
+    } else {
+      return (ok: false, message: 'No key to send');
+    }
+
+    try {
+      final result = await Process.run('osascript', [
+        '-e',
+        'tell application "System Events" to $action$using',
+      ]).timeout(_timeout);
+      if (result.exitCode == 0) return (ok: true, message: 'Sent $label');
+      final error = '${result.stderr}'.trim();
+      return (
+        ok: false,
+        message: error.isEmpty ? 'Could not send $label' : _firstLine(error),
+      );
+    } catch (error) {
+      return (ok: false, message: '$error');
     }
   }
 

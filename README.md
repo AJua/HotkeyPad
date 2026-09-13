@@ -203,9 +203,17 @@ commands.
 
 ### Buttons
 
-Four kinds: an application, a media action, a shell command, or a macOS
-Shortcut. Any of them can carry an emoji, which replaces the app icon or the
-built-in glyph.
+Five kinds: an application, a media action, a shell command, a macOS
+Shortcut, or a keyboard combination. Any of them can carry an emoji, which
+replaces the app icon or the built-in glyph.
+
+Key combinations go through System Events rather than CGEvent key codes:
+AppleScript maps a character to the right key for whatever layout is active,
+which a hard-coded virtual key code does not. Keys with no character —
+Escape, arrows, the function row — are sent by code instead, since there is
+nothing to type. Either route needs Accessibility, the same as the media
+keys, and the host checks that first rather than letting a button appear to
+work.
 
 Shortcuts are *started* rather than awaited. One can legitimately run for
 minutes or put up its own interface — Shazam listens to the room — and a deck

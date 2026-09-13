@@ -178,6 +178,16 @@ sealed class DeckItem {
           label: json['l'] as String,
           emoji: emoji,
         ),
+        'key' => KeyComboItem(
+          modifiers: [
+            for (final wire in (json['m'] as List? ?? const []))
+              ?KeyModifier.fromWire('$wire'),
+          ],
+          key: json['k'] as String?,
+          special: SpecialKey.fromWire(json['s'] as String?),
+          label: json['l'] as String?,
+          emoji: emoji,
+        ),
         'sc' => ShortcutItem(
           name: json['n'] as String,
           label: json['l'] as String?,
@@ -256,6 +266,117 @@ final class ShellItem extends DeckItem {
     't': 'sh',
     'c': command,
     'l': label,
+    if (emoji != null) 'e': emoji,
+  });
+}
+
+/// A modifier key in a combination.
+enum KeyModifier {
+  command('cmd', '⌘', 'command down'),
+  shift('shift', '⇧', 'shift down'),
+  option('opt', '⌥', 'option down'),
+  control('ctrl', '⌃', 'control down');
+
+  const KeyModifier(this.wire, this.symbol, this.appleScript);
+
+  final String wire;
+  final String symbol;
+
+  /// How System Events names it.
+  final String appleScript;
+
+  static KeyModifier? fromWire(String wire) {
+    for (final modifier in values) {
+      if (modifier.wire == wire) return modifier;
+    }
+    return null;
+  }
+}
+
+/// Keys that have no character to type and must be sent by virtual key code.
+enum SpecialKey {
+  escape('escape', 'Escape', 53),
+  ret('return', 'Return', 36),
+  tab('tab', 'Tab', 48),
+  space('space', 'Space', 49),
+  delete('delete', 'Delete', 51),
+  left('left', 'Left', 123),
+  right('right', 'Right', 124),
+  down('down', 'Down', 125),
+  up('up', 'Up', 126),
+  f1('f1', 'F1', 122),
+  f2('f2', 'F2', 120),
+  f3('f3', 'F3', 99),
+  f4('f4', 'F4', 118),
+  f5('f5', 'F5', 96),
+  f6('f6', 'F6', 97),
+  f7('f7', 'F7', 98),
+  f8('f8', 'F8', 100),
+  f9('f9', 'F9', 101),
+  f10('f10', 'F10', 109),
+  f11('f11', 'F11', 103),
+  f12('f12', 'F12', 111);
+
+  const SpecialKey(this.wire, this.label, this.code);
+
+  final String wire;
+  final String label;
+
+  /// macOS virtual key code, for `key code` in System Events.
+  final int code;
+
+  static SpecialKey? fromWire(String? wire) {
+    for (final key in values) {
+      if (key.wire == wire) return key;
+    }
+    return null;
+  }
+}
+
+/// Sends a keyboard combination to whatever is frontmost on the host.
+final class KeyComboItem extends DeckItem {
+  const KeyComboItem({
+    required this.modifiers,
+    required this.key,
+    required this.special,
+    String? label,
+    this.emoji,
+  }) : _label = label;
+
+  /// Held while the key is pressed, in a stable order for display.
+  final List<KeyModifier> modifiers;
+
+  /// The character to type, when [special] is null.
+  final String? key;
+
+  /// A key with no character, sent by code instead.
+  final SpecialKey? special;
+
+  final String? _label;
+
+  @override
+  final String? emoji;
+
+  /// What the combination reads as: ⌘⇧4, ⌥Space.
+  String get combination {
+    final parts = [
+      for (final modifier in KeyModifier.values)
+        if (modifiers.contains(modifier)) modifier.symbol,
+      special?.label ?? (key ?? '').toUpperCase(),
+    ];
+    return parts.join();
+  }
+
+  @override
+  String get label => _label?.isNotEmpty == true ? _label! : combination;
+
+  @override
+  String get stored => jsonEncode({
+    't': 'key',
+    'm': [for (final modifier in modifiers) modifier.wire],
+    if (key != null) 'k': key,
+    if (special != null) 's': special!.wire,
+    if (_label != null) 'l': _label,
     if (emoji != null) 'e': emoji,
   });
 }
