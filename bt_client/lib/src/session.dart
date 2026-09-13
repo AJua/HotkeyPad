@@ -222,7 +222,10 @@ class BtLinkSession extends ChangeNotifier {
           _layout = incoming;
           _incoming = null;
           unawaited(DeckStore.save(hostId, incoming));
-          _append('layout: ${incoming.columns}x${incoming.rows}', inbound: true);
+          _append(
+            'layout: ${incoming.columns}x${incoming.rows}',
+            inbound: true,
+          );
         }
       case SetAppearance(:final theme, :final showLabels):
         _theme = theme;
@@ -237,10 +240,7 @@ class BtLinkSession extends ChangeNotifier {
       case IconUnavailable(:final name):
         _append('no icon for $name', inbound: true);
         _finishIconFetch(name);
-      case ListApps() ||
-          PressSlot() ||
-          RequestIcon() ||
-          RequestLayout():
+      case ListApps() || PressSlot() || RequestIcon() || RequestLayout():
         // Client-to-host shapes; a host has no business sending them.
         _append('ignored a ${message.runtimeType}', inbound: true);
     }
@@ -499,10 +499,10 @@ class BtLinkSession extends ChangeNotifier {
 
   /// Reports which slot was pressed and tracks it for feedback.
   ///
-  /// The index, not the contents: the host looks the slot up in its own
+  /// The id, not the contents: the host looks the slot up in its own
   /// layout, so a button holding a shell command cannot be conjured from
   /// this end of the link.
-  Future<void> press(int index, DeckItem item) async {
+  Future<void> press(int id, DeckItem item) async {
     _feedbackTimer?.cancel();
     _feedbackFor = null;
     _feedbackOk = null;
@@ -510,7 +510,7 @@ class BtLinkSession extends ChangeNotifier {
     _append(item.label, inbound: false);
     notifyListeners();
 
-    await _send(PressSlot(index: index));
+    await _send(PressSlot(id: id));
 
     // A host that never answers must not leave the button spinning.
     _feedbackTimer = Timer(const Duration(seconds: 12), () {

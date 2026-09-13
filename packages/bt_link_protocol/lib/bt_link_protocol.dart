@@ -68,7 +68,7 @@ sealed class BtMessage {
           category: json['c'] as String?,
         ),
         'end' => ListEnd(count: json['c'] as int? ?? 0),
-        'press' => PressSlot(index: json['i'] as int),
+        'press' => PressSlot(id: json['i'] as int),
         'thm' => SetAppearance(
           theme: DeckTheme.fromWire(json['v'] as String?),
           // Absent on an older host, which always drew labels.
@@ -244,14 +244,10 @@ final class ActionItem extends DeckItem {
 /// Runs a shell command on the host.
 ///
 /// The command lives only in the host's layout. A client presses a slot by
-/// index and the host looks up what that slot holds, so nothing a client
+/// id and the host looks up what that slot holds, so nothing a client
 /// sends can become a command — see [PressSlot].
 final class ShellItem extends DeckItem {
-  const ShellItem({
-    required this.command,
-    required this.label,
-    this.emoji,
-  });
+  const ShellItem({required this.command, required this.label, this.emoji});
 
   final String command;
 
@@ -404,6 +400,35 @@ final class ShortcutItem extends DeckItem {
   });
 }
 
+/// One occupied cell of a [DeckLayout]: a button's content, tagged with the
+/// id it is pressed by.
+///
+/// [id] starts out equal to the cell's own position in the host's layout and
+/// travels with the button verbatim through [DeckLayout.transposed] rather
+/// than being recomputed there — so a press never needs to invert whatever
+/// transform produced the view it was drawn in. It just reports the id
+/// already sitting on the button that was tapped.
+final class DeckSlot {
+  const DeckSlot({required this.id, required this.value});
+
+  /// The host's own index for this button. Opaque everywhere else: never
+  /// interpreted, only carried along and sent back with [PressSlot].
+  final int id;
+
+  /// A [DeckItem.stored] string.
+  final String value;
+
+  @override
+  bool operator ==(Object other) =>
+      other is DeckSlot && other.id == id && other.value == value;
+
+  @override
+  int get hashCode => Object.hash(id, value);
+
+  @override
+  String toString() => 'DeckSlot(id: $id, value: $value)';
+}
+
 /// The grid the client draws and the host edits.
 ///
 /// The host owns this: a phone screen is a poor place to arrange a grid, and
@@ -415,7 +440,6 @@ class DeckLayout {
     required this.rows,
     required this.pages,
     required this.slots,
-    this.isTurned = false,
   });
 
   /// An empty grid at the default size.
@@ -427,7 +451,7 @@ class DeckLayout {
     columns: columns,
     rows: rows,
     pages: pages,
-    slots: List<String?>.filled(columns * rows * pages, null),
+    slots: List<DeckSlot?>.filled(columns * rows * pages, null),
   );
 
   static const defaultColumns = 5;
@@ -438,18 +462,10 @@ class DeckLayout {
   final int rows;
   final int pages;
 
-  /// True when this is a turned view of the host's layout. Cell indices
-  /// here are not the host's, so [sourceIndex] must translate before one is
-  /// sent back.
-  final bool isTurned;
-
   /// One entry per cell across every page, in reading order, null where the
-  /// cell is empty. Flat rather than nested so an index identifies a cell
+  /// cell is empty. Flat rather than nested so a position identifies a cell
   /// globally and a drag between pages needs no special case.
-  ///
-  /// Values are [DeckItem] storage strings; the protocol does not interpret
-  /// them.
-  final List<String?> slots;
+  final List<DeckSlot?> slots;
 
   /// Cells on one page.
   int get pageCapacity => columns * rows;
@@ -461,28 +477,37 @@ class DeckLayout {
       page * pageCapacity + cell;
 
   /// The slots belonging to [page], in reading order.
-  List<String?> page(int index) =>
+  List<DeckSlot?> page(int index) =>
       slots.sublist(index * pageCapacity, (index + 1) * pageCapacity);
 
   DeckLayout resized({int? columns, int? rows, int? pages}) {
     final newColumns = columns ?? this.columns;
     final newRows = rows ?? this.rows;
     final newPages = pages ?? this.pages;
-    final resized = List<String?>.filled(
+    final resized = List<DeckSlot?>.filled(
       newColumns * newRows * newPages,
       null,
     );
     // Keep cells where they are on screen rather than where they are in the
     // list: a row of buttons should not shuffle sideways when a column is
-    // added, and a page should not absorb the next one's buttons.
+    // added, and a page should not absorb the next one's buttons. The id is
+    // re-stamped to the new position, same as every other host-side edit.
     for (var page = 0; page < newPages && page < this.pages; page++) {
       for (var row = 0; row < newRows && row < this.rows; row++) {
-        for (var column = 0;
-            column < newColumns && column < this.columns;
-            column++) {
-          resized[page * newColumns * newRows + row * newColumns + column] =
-              slots[page * this.columns * this.rows + row * this.columns +
+        for (
+          var column = 0;
+          column < newColumns && column < this.columns;
+          column++
+        ) {
+          final newIndex =
+              page * newColumns * newRows + row * newColumns + column;
+          final old =
+              slots[page * this.columns * this.rows +
+                  row * this.columns +
                   column];
+          resized[newIndex] = old == null
+              ? null
+              : DeckSlot(id: newIndex, value: old.value);
         }
       }
     }
@@ -494,31 +519,18 @@ class DeckLayout {
     );
   }
 
-  /// The index this cell has in the host's layout.
-  ///
-  /// A turned view renumbers every cell, and the host resolves a press
-  /// against its own unturned copy — so sending the on-screen index would
-  /// fire whichever button happens to sit at that number over there.
-  int sourceIndex(int index) {
-    if (!isTurned) return index;
-    final page = index ~/ pageCapacity;
-    final cell = index % pageCapacity;
-    final row = cell ~/ columns;
-    final column = cell % columns;
-    // Rows and columns are swapped relative to the source, so this view's
-    // column is the source's row. The source is `rows` wide.
-    return page * pageCapacity + column * rows + row;
-  }
-
   /// Swaps rows and columns, so a 5-wide grid becomes 5-tall.
   ///
   /// A transpose rather than a rotation: the first row becomes the first
   /// column, which is what "the wide one turned upright" looks like and
   /// keeps every button's neighbours the same. A rotation would also move
   /// buttons to the opposite edge, which is harder to predict.
+  ///
+  /// Cells are moved whole, [DeckSlot.id] included — a turned view renumbers
+  /// where a button sits in [slots], never what it reports when pressed.
   DeckLayout transposed() {
     if (columns == rows) return this;
-    final swapped = List<String?>.filled(slots.length, null);
+    final swapped = List<DeckSlot?>.filled(slots.length, null);
     for (var page = 0; page < pages; page++) {
       final offset = page * pageCapacity;
       for (var row = 0; row < rows; row++) {
@@ -533,8 +545,6 @@ class DeckLayout {
       rows: columns,
       pages: pages,
       slots: swapped,
-      // Turning twice returns to the host's numbering.
-      isTurned: !isTurned,
     );
   }
 
@@ -548,36 +558,38 @@ class DeckLayout {
   }
 
   DeckLayout withSlot(int index, String? value) {
-    final copy = List<String?>.of(slots);
-    copy[index] = value;
-    return DeckLayout(
-      columns: columns,
-      rows: rows,
-      pages: pages,
-      slots: copy,
-    );
+    final copy = List<DeckSlot?>.of(slots);
+    copy[index] = value == null ? null : DeckSlot(id: index, value: value);
+    return DeckLayout(columns: columns, rows: rows, pages: pages, slots: copy);
   }
 
   /// Moves the contents of [from] to [to], swapping if [to] is occupied.
+  ///
+  /// Whichever button ends up at a position takes that position's id — a
+  /// move always ships as a full layout resend, so there is no client with a
+  /// stale view of this cell to confuse.
   DeckLayout moved(int from, int to) {
     if (from == to) return this;
-    final copy = List<String?>.of(slots);
-    final moving = copy[from];
-    copy[from] = copy[to];
-    copy[to] = moving;
-    return DeckLayout(
-      columns: columns,
-      rows: rows,
-      pages: pages,
-      slots: copy,
-    );
+    final copy = List<DeckSlot?>.of(slots);
+    final movingValue = copy[from]?.value;
+    final displacedValue = copy[to]?.value;
+    copy[from] = displacedValue == null
+        ? null
+        : DeckSlot(id: from, value: displacedValue);
+    copy[to] = movingValue == null
+        ? null
+        : DeckSlot(id: to, value: movingValue);
+    return DeckLayout(columns: columns, rows: rows, pages: pages, slots: copy);
   }
 
   Map<String, Object?> toJson() => {
     'columns': columns,
     'rows': rows,
     'pages': pages,
-    'slots': slots,
+    // The id is not persisted: this is always the host's own canonical
+    // (untransposed) copy, where it is trivially the slot's own position —
+    // fromJson recreates it from that position on the way back in.
+    'slots': [for (final slot in slots) slot?.value],
   };
 
   static DeckLayout? fromJson(Object? json) {
@@ -597,7 +609,13 @@ class DeckLayout {
       columns: columns,
       rows: rows,
       pages: pages,
-      slots: slots.map((slot) => slot is String ? slot : null).toList(),
+      slots: [
+        for (var i = 0; i < slots.length; i++)
+          if (slots[i] case final String value)
+            DeckSlot(id: i, value: value)
+          else
+            null,
+      ],
     );
   }
 }
@@ -725,24 +743,25 @@ enum DeckAction {
     return null;
   }
 
-  bool get isVolume =>
-      this == volumeUp || this == volumeDown || this == mute;
+  bool get isVolume => this == volumeUp || this == volumeDown || this == mute;
 }
 
 /// Client -> host: the button in this slot was pressed.
 ///
-/// The only way a client asks for anything to happen. An index rather than a
+/// The only way a client asks for anything to happen. An id rather than a
 /// description of what to do: the host looks the slot up in its own layout
 /// and acts on what it finds there, so a client can only trigger what the
 /// host was already configured with. That matters once buttons can hold
 /// shell commands, and it keeps every kind of button on one path.
 final class PressSlot extends BtMessage {
-  const PressSlot({required this.index});
+  const PressSlot({required this.id});
 
-  final int index;
+  /// A [DeckSlot.id], carried unchanged from whatever [LayoutSlot] put it on
+  /// the button that was tapped.
+  final int id;
 
   @override
-  Map<String, Object?> toJson() => {'t': 'press', 'i': index};
+  Map<String, Object?> toJson() => {'t': 'press', 'i': id};
 }
 
 /// Client -> host: send me this app's icon.

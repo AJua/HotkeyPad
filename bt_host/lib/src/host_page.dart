@@ -172,52 +172,44 @@ class _HostPageState extends State<HostPage> {
       // Android reports connect/disconnect directly. Apple and the desktop
       // platforms do not, so the streams below are what keeps the list honest
       // there.
-      _listenSafely(
-        () => peripheral.connectionStateChanged,
-        (CentralConnectionStateChangedEventArgs event) {
-          if (event.state == ConnectionState.connected) {
-            _touch(event.central, 'connected');
-          } else {
-            _remove(event.central, 'disconnected');
-          }
-        },
-        'connection events',
-      );
+      _listenSafely(() => peripheral.connectionStateChanged, (
+        CentralConnectionStateChangedEventArgs event,
+      ) {
+        if (event.state == ConnectionState.connected) {
+          _touch(event.central, 'connected');
+        } else {
+          _remove(event.central, 'disconnected');
+        }
+      }, 'connection events');
 
-      _listenSafely(
-        () => peripheral.characteristicNotifyStateChanged,
-        (GATTCharacteristicNotifyStateChangedEventArgs event) {
-          _touch(
-            event.central,
-            event.state ? 'subscribed' : 'unsubscribed',
-            subscribed: event.state,
-          );
-        },
-        'subscription events',
-      );
+      _listenSafely(() => peripheral.characteristicNotifyStateChanged, (
+        GATTCharacteristicNotifyStateChangedEventArgs event,
+      ) {
+        _touch(
+          event.central,
+          event.state ? 'subscribed' : 'unsubscribed',
+          subscribed: event.state,
+        );
+      }, 'subscription events');
 
-      _listenSafely(
-        () => peripheral.characteristicReadRequested,
-        (GATTCharacteristicReadRequestedEventArgs event) async {
-          _touch(event.central, 'read');
-          await peripheral.respondReadRequestWithValue(
-            event.request,
-            value: const Ack(ok: true, message: 'ready').encode(),
-          );
-        },
-        'read requests',
-      );
+      _listenSafely(() => peripheral.characteristicReadRequested, (
+        GATTCharacteristicReadRequestedEventArgs event,
+      ) async {
+        _touch(event.central, 'read');
+        await peripheral.respondReadRequestWithValue(
+          event.request,
+          value: const Ack(ok: true, message: 'ready').encode(),
+        );
+      }, 'read requests');
 
-      _listenSafely(
-        () => peripheral.characteristicWriteRequested,
-        (GATTCharacteristicWriteRequestedEventArgs event) async {
-          // Respond first: the client is blocked on the ATT response, and
-          // launching an app takes far longer than the ATT timeout allows.
-          await peripheral.respondWriteRequest(event.request);
-          await _handleCommand(event.central, event.request.value);
-        },
-        'write requests',
-      );
+      _listenSafely(() => peripheral.characteristicWriteRequested, (
+        GATTCharacteristicWriteRequestedEventArgs event,
+      ) async {
+        // Respond first: the client is blocked on the ATT response, and
+        // launching an app takes far longer than the ATT timeout allows.
+        await peripheral.respondWriteRequest(event.request);
+        await _handleCommand(event.central, event.request.value);
+      }, 'write requests');
     } catch (error) {
       _initError = error;
     }
@@ -286,10 +278,10 @@ class _HostPageState extends State<HostPage> {
       case ListApps():
         _touch(central, 'requested the app list');
         await _queueTransfer(() => _sendCatalogue(central));
-      // Every button arrives the same way: a slot number the host resolves
+      // Every button arrives the same way: a slot id the host resolves
       // against its own layout.
-      case PressSlot(:final index):
-        await _pressSlot(central, index);
+      case PressSlot(:final id):
+        await _pressSlot(central, id);
       case RequestLayout():
         _touch(central, 'requested the layout');
         await _queueTransfer(() => _sendLayout(central));
@@ -351,33 +343,35 @@ class _HostPageState extends State<HostPage> {
     }
     await _send(central, ListEnd(count: apps.length));
     if (mounted) {
-      setState(() => _addLog('sent ${apps.length} apps to ${_short(
-        central.uuid.toString(),
-      )}'));
+      setState(
+        () => _addLog(
+          'sent ${apps.length} apps to ${_short(central.uuid.toString())}',
+        ),
+      );
     }
   }
 
-  /// Acts on the button in [index], whatever the host's own layout says is
+  /// Acts on the button [id] names, whatever the host's own layout says is
   /// there. The client sent only a number, so a shell command cannot be
   /// injected from the other end of the link.
-  Future<void> _pressSlot(Central central, int index) async {
+  Future<void> _pressSlot(Central central, int id) async {
     final layout = await LayoutStore.load();
-    if (index < 0 || index >= layout.slots.length) {
-      _touch(central, 'slot $index is outside the layout');
+    if (id < 0 || id >= layout.slots.length) {
+      _touch(central, 'slot $id is outside the layout');
       await _send(central, const Ack(ok: false, message: 'No such button'));
       return;
     }
-    final stored = layout.slots[index];
+    final stored = layout.slots[id]?.value;
     final item = stored == null ? null : DeckItem.parse(stored);
     if (item == null) {
-      _touch(central, 'slot $index is empty');
+      _touch(central, 'slot $id is empty');
       await _send(central, const Ack(ok: false, message: 'Empty button'));
       return;
     }
 
     // Names the slot as well as what was in it: the client sends only a
     // number, and the log should not read as though it sent the action.
-    _touch(central, 'slot $index -> ${item.label}');
+    _touch(central, 'slot $id -> ${item.label}');
     final result = switch (item) {
       AppItem(:final name) => await AppLauncher.open(name),
       ActionItem(:final action) => await MediaControl.run(action),
@@ -408,7 +402,7 @@ class _HostPageState extends State<HostPage> {
       ),
     );
     for (var index = 0; index < layout.slots.length; index++) {
-      final value = layout.slots[index];
+      final value = layout.slots[index]?.value;
       if (value == null) continue;
       await _send(central, LayoutSlot(index: index, value: value));
       await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -419,10 +413,7 @@ class _HostPageState extends State<HostPage> {
     final appearance = await SettingsStore.load();
     await _send(
       central,
-      SetAppearance(
-        theme: appearance.theme,
-        showLabels: appearance.showLabels,
-      ),
+      SetAppearance(theme: appearance.theme, showLabels: appearance.showLabels),
     );
     if (mounted) {
       setState(() {
@@ -686,93 +677,88 @@ class _HostPageState extends State<HostPage> {
     int subscribedCount,
   ) {
     return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (!_accessibility)
-            Card(
-              color: Theme.of(context).colorScheme.errorContainer,
-              child: ListTile(
-                leading: const Icon(Icons.lock_outline),
-                title: const Text('Accessibility is not granted'),
-                subtitle: const Text(
-                  'Media keys and key combinations will do nothing until '
-                  'this app is allowed in System Settings',
-                ),
-                trailing: FilledButton(
-                  onPressed: () async {
-                    await MediaControl.requestTrust();
-                    await _refreshAccessibility();
-                  },
-                  child: const Text('Grant'),
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (!_accessibility)
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Accessibility is not granted'),
+              subtitle: const Text(
+                'Media keys and key combinations will do nothing until '
+                'this app is allowed in System Settings',
+              ),
+              trailing: FilledButton(
+                onPressed: () async {
+                  await MediaControl.requestTrust();
+                  await _refreshAccessibility();
+                },
+                child: const Text('Grant'),
+              ),
+            ),
+          ),
+        _StatusCard(
+          state: _state,
+          appCount: _appCount,
+          advertising: _advertising,
+          busy: _busy,
+          onToggle: _state == BluetoothLowEnergyState.unsupported
+              ? null
+              : _toggleAdvertising,
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Connected clients (${clients.length})',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        if (clients.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text('No client has connected yet.')),
+          )
+        else
+          ...clients.map((client) => _ClientTile(client: client)),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _composer,
+                enabled: subscribedCount > 0,
+                onSubmitted: (_) => _broadcast(),
+                decoration: InputDecoration(
+                  hintText: subscribedCount > 0
+                      ? 'Notify $subscribedCount subscribed client(s)'
+                      : 'No subscribed client yet',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
                 ),
               ),
             ),
-          _StatusCard(
-            state: _state,
-            appCount: _appCount,
-            advertising: _advertising,
-            busy: _busy,
-            onToggle: _state == BluetoothLowEnergyState.unsupported
-                ? null
-                : _toggleAdvertising,
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Connected clients (${clients.length})',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          if (clients.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text('No client has connected yet.'),
-              ),
-            )
-          else
-            ...clients.map((client) => _ClientTile(client: client)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _composer,
-                  enabled: subscribedCount > 0,
-                  onSubmitted: (_) => _broadcast(),
-                  decoration: InputDecoration(
-                    hintText: subscribedCount > 0
-                        ? 'Notify $subscribedCount subscribed client(s)'
-                        : 'No subscribed client yet',
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filled(
-                onPressed: subscribedCount > 0 ? _broadcast : null,
-                icon: const Icon(Icons.send),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Text('Activity', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          if (_log.isEmpty)
-            const Text('Nothing yet.')
-          else
-            ..._log.map(
-              (line) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Text(
-                  line,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                  ),
-                ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              onPressed: subscribedCount > 0 ? _broadcast : null,
+              icon: const Icon(Icons.send),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Text('Activity', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (_log.isEmpty)
+          const Text('Nothing yet.')
+        else
+          ..._log.map(
+            (line) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(
+                line,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
               ),
             ),
+          ),
       ],
     );
   }

@@ -195,7 +195,7 @@ throttles an app that scans repeatedly, and both `authorize()` and
 `startDiscovery()` can then hang indefinitely; a timeout set after them would
 never be set at all.
 
-### A button press is an index, not an instruction
+### A button press is an id, not an instruction
 
 The client never says what to do — only which slot was pressed. The host
 looks that slot up in its own layout and acts on what it finds. Every kind of
@@ -204,12 +204,15 @@ the Mac was not already configured with. That distinction is academic while
 buttons only launch apps; it is the whole design once they can hold shell
 commands.
 
-**The index must be the host's, not the screen's.** A portrait deck is a
-transposed view of the host's grid, which renumbers every cell, so the client
-maps back through `DeckLayout.sourceIndex` before sending. Without that a
-press in portrait fires whichever button happens to sit at that number in the
-host's copy — an error invisible in landscape, where the two numberings
-coincide.
+**The id must be the host's, not the screen's.** A portrait deck is a
+transposed view of the host's grid, which renumbers where every button sits
+on screen. Each occupied cell is a `DeckSlot`, pairing the button with the
+id it had when the host sent it; `transposed()` carries that id along
+verbatim rather than recomputing it, so pressing a button just reports
+`slot.id` regardless of how the deck was turned to fit the screen. Without
+that indirection, a press in portrait would fire whichever button happens to
+sit at that screen position in the host's copy — an error invisible in
+landscape, where the two numberings coincide.
 
 ### Buttons
 

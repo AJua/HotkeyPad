@@ -19,7 +19,7 @@ void main() {
       await DeckStore.save('host-2', DeckLayout.empty(columns: 2, rows: 2));
 
       final loaded = await DeckStore.load('host-1');
-      expect(loaded!.slots[4], 'app:Safari');
+      expect(loaded!.slots[4]?.value, 'app:Safari');
       expect(loaded.columns, DeckLayout.defaultColumns);
       expect((await DeckStore.load('host-2'))!.columns, 2);
     });

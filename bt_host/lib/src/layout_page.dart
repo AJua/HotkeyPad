@@ -217,7 +217,7 @@ class _LayoutPageState extends State<LayoutPage> {
       builder: (context) => _PickerDialog(
         apps: _apps,
         shortcuts: _shortcuts,
-        current: _layout.slots[index],
+        current: _layout.slots[index]?.value,
       ),
     );
     if (chosen == null) return;
@@ -361,7 +361,7 @@ class LayoutGrid extends StatelessWidget {
               itemCount: layout.pageCapacity,
               itemBuilder: (context, cellIndex) {
                 final index = layout.indexOf(page: page, cell: cellIndex);
-                final stored = layout.slots[index];
+                final stored = layout.slots[index]?.value;
                 final item = stored == null ? null : DeckItem.parse(stored);
                 return _Cell(
                   index: index,
@@ -445,12 +445,7 @@ class _Cell extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (!filled)
-              Center(
-                child: Icon(
-                  Icons.add,
-                  color: theme.colorScheme.outline,
-                ),
-              )
+              Center(child: Icon(Icons.add, color: theme.colorScheme.outline))
             else
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -723,8 +718,7 @@ class _PickerDialogState extends State<_PickerDialog> {
                       ListTile(
                         leading: Icon(deckFallbackIcon(ActionItem(action))),
                         title: Text(action.label),
-                        selected:
-                            widget.current == ActionItem(action).stored,
+                        selected: widget.current == ActionItem(action).stored,
                         onTap: () =>
                             _choose(ActionItem(action, emoji: _chosenEmoji)),
                       ),
@@ -782,9 +776,7 @@ class _ShellDialogState extends State<_ShellDialog> {
   late final _command = TextEditingController(
     text: widget.existing?.command ?? '',
   );
-  late final _label = TextEditingController(
-    text: widget.existing?.label ?? '',
-  );
+  late final _label = TextEditingController(text: widget.existing?.label ?? '');
 
   @override
   void dispose() {
@@ -925,15 +917,11 @@ class _KeyComboDialog extends StatefulWidget {
 }
 
 class _KeyComboDialogState extends State<_KeyComboDialog> {
-  late final Set<KeyModifier> _modifiers = {
-    ...?widget.existing?.modifiers,
-  };
+  late final Set<KeyModifier> _modifiers = {...?widget.existing?.modifiers};
   late final _character = TextEditingController(
     text: widget.existing?.key ?? '',
   );
-  late final _label = TextEditingController(
-    text: widget.existing?.label ?? '',
-  );
+  late final _label = TextEditingController(text: widget.existing?.label ?? '');
   late SpecialKey? _special = widget.existing?.special;
 
   @override
@@ -950,8 +938,7 @@ class _KeyComboDialogState extends State<_KeyComboDialog> {
     special: _special,
   ).combination;
 
-  bool get _valid =>
-      _special != null || _character.text.trim().isNotEmpty;
+  bool get _valid => _special != null || _character.text.trim().isNotEmpty;
 
   void _save() {
     if (!_valid) return;
@@ -959,9 +946,7 @@ class _KeyComboDialogState extends State<_KeyComboDialog> {
     Navigator.of(context).pop(
       KeyComboItem(
         // Stored in enum order so the symbols always read ⌃⌥⇧⌘-style.
-        modifiers: KeyModifier.values
-            .where(_modifiers.contains)
-            .toList(),
+        modifiers: KeyModifier.values.where(_modifiers.contains).toList(),
         key: _special == null ? _character.text.trim() : null,
         special: _special,
         label: label.isEmpty ? null : label,

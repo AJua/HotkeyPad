@@ -71,7 +71,7 @@ void main() {
     });
 
     test('does not mistake a JSON message for a frame', () {
-      final json = utf8.encode(jsonEncode(const PressSlot(index: 3)));
+      final json = utf8.encode(jsonEncode(const PressSlot(id: 3)));
 
       expect(IconFrame.looksLikeFrame(json), isFalse);
       expect(IconFrame.decode(json), isNull);
@@ -109,7 +109,7 @@ void main() {
         ListApps(),
         AppEntry(name: 'Safari', category: 'Apps'),
         ListEnd(count: 96),
-        PressSlot(index: 3),
+        PressSlot(id: 3),
         RequestIcon(name: 'Safari'),
         IconUnavailable(name: 'Safari'),
         Ack(ok: true, message: 'Opened Safari'),
@@ -153,11 +153,7 @@ void main() {
     });
 
     test('round-trips a shell command', () {
-      const item = ShellItem(
-        command: 'say hello',
-        label: 'Greet',
-        emoji: '👋',
-      );
+      const item = ShellItem(command: 'say hello', label: 'Greet', emoji: '👋');
 
       final parsed = DeckItem.parse(item.stored) as ShellItem?;
 
@@ -287,23 +283,23 @@ void main() {
     });
 
     test('page() returns just that page', () {
-      final layout = DeckLayout.empty(pages: 2)
-          .withSlot(0, 'app:First')
-          .withSlot(15, 'app:Second');
+      final layout = DeckLayout.empty(
+        pages: 2,
+      ).withSlot(0, 'app:First').withSlot(15, 'app:Second');
 
-      expect(layout.page(0).first, 'app:First');
+      expect(layout.page(0).first?.value, 'app:First');
       expect(layout.page(0).length, 15);
-      expect(layout.page(1).first, 'app:Second');
+      expect(layout.page(1).first?.value, 'app:Second');
     });
 
     test('moving works across pages', () {
       // A drag from page 0 to page 1 is an ordinary index move.
-      final moved = DeckLayout.empty(pages: 2)
-          .withSlot(0, 'app:A')
-          .moved(0, 20);
+      final moved = DeckLayout.empty(
+        pages: 2,
+      ).withSlot(0, 'app:A').moved(0, 20);
 
       expect(moved.slots[0], isNull);
-      expect(moved.slots[20], 'app:A');
+      expect(moved.slots[20]?.value, 'app:A');
     });
 
     test('adding a page leaves existing pages untouched', () {
@@ -312,19 +308,19 @@ void main() {
       final grown = layout.resized(pages: 2);
 
       expect(grown.capacity, 30);
-      expect(grown.slots[14], 'app:Last');
+      expect(grown.slots[14]?.value, 'app:Last');
       expect(grown.page(1).every((slot) => slot == null), isTrue);
     });
 
     test('removing a page drops only that page', () {
-      final layout = DeckLayout.empty(pages: 2)
-          .withSlot(0, 'app:Keep')
-          .withSlot(15, 'app:Drop');
+      final layout = DeckLayout.empty(
+        pages: 2,
+      ).withSlot(0, 'app:Keep').withSlot(15, 'app:Drop');
 
       final shrunk = layout.resized(pages: 1);
 
-      expect(shrunk.slots.contains('app:Keep'), isTrue);
-      expect(shrunk.slots.contains('app:Drop'), isFalse);
+      expect(shrunk.slots.any((slot) => slot?.value == 'app:Keep'), isTrue);
+      expect(shrunk.slots.any((slot) => slot?.value == 'app:Drop'), isFalse);
     });
 
     test('reads a layout written before pages existed', () {
@@ -335,7 +331,7 @@ void main() {
       });
 
       expect(decoded!.pages, 1);
-      expect(decoded.slots[1], 'app:A');
+      expect(decoded.slots[1]?.value, 'app:A');
     });
 
     test('moving swaps the two cells', () {
@@ -345,15 +341,19 @@ void main() {
 
       final moved = layout.moved(0, 1);
 
-      expect(moved.slots[0], 'app:B');
-      expect(moved.slots[1], 'app:A');
+      expect(moved.slots[0]?.value, 'app:B');
+      expect(moved.slots[1]?.value, 'app:A');
+      // Whichever button ends up at a position takes that position's id —
+      // this is a host-side edit, always followed by a full layout resend.
+      expect(moved.slots[0]!.id, 0);
+      expect(moved.slots[1]!.id, 1);
     });
 
     test('moving into an empty cell leaves the source empty', () {
       final moved = DeckLayout.empty().withSlot(0, 'app:A').moved(0, 7);
 
       expect(moved.slots[0], isNull);
-      expect(moved.slots[7], 'app:A');
+      expect(moved.slots[7]?.value, 'app:A');
     });
 
     test('resizing keeps cells in the same screen position', () {
@@ -364,8 +364,10 @@ void main() {
 
       // Still second row, first column — index 6 in a 6-wide grid. A naive
       // copy would leave it at index 5, sliding it up a row.
-      expect(wider.slots[6], 'app:A');
+      expect(wider.slots[6]?.value, 'app:A');
       expect(wider.slots[5], isNull);
+      // Re-stamped to the new position, same as every other host-side edit.
+      expect(wider.slots[6]!.id, 6);
     });
 
     test('shrinking drops cells that fall outside', () {
@@ -374,7 +376,7 @@ void main() {
       final narrower = layout.resized(columns: 3);
 
       expect(narrower.capacity, 9);
-      expect(narrower.slots.contains('app:Edge'), isFalse);
+      expect(narrower.slots.any((slot) => slot?.value == 'app:Edge'), isFalse);
     });
 
     test('rejects json that does not describe a grid', () {
@@ -391,8 +393,10 @@ void main() {
     });
 
     test('round-trips through json', () {
-      final layout = DeckLayout.empty(columns: 2, rows: 2)
-          .withSlot(3, 'act:mute');
+      final layout = DeckLayout.empty(
+        columns: 2,
+        rows: 2,
+      ).withSlot(3, 'act:mute');
 
       final decoded = DeckLayout.fromJson(layout.toJson());
 
@@ -404,10 +408,9 @@ void main() {
   group('PressSlot', () {
     test('round-trips', () {
       final decoded =
-          BtMessage.decode(const PressSlot(index: 12).encode())
-              as PressSlot?;
+          BtMessage.decode(const PressSlot(id: 12).encode()) as PressSlot?;
 
-      expect(decoded!.index, 12);
+      expect(decoded!.id, 12);
     });
   });
 
@@ -450,15 +453,15 @@ void main() {
 
       // Now reading down the first column of a 3-wide grid.
       for (var row = 0; row < 5; row++) {
-        expect(turned.slots[row * 3], 'app:$row');
+        expect(turned.slots[row * 3]?.value, 'app:$row');
       }
     });
 
     test('transposing twice returns the original', () {
-      final layout = DeckLayout.empty(columns: 5, rows: 3)
-          .withSlot(0, 'app:A')
-          .withSlot(7, 'app:B')
-          .withSlot(14, 'app:C');
+      final layout = DeckLayout.empty(
+        columns: 5,
+        rows: 3,
+      ).withSlot(0, 'app:A').withSlot(7, 'app:B').withSlot(14, 'app:C');
 
       expect(layout.transposed().transposed().slots, layout.slots);
     });
@@ -471,8 +474,8 @@ void main() {
       final turned = layout.transposed();
 
       // Top-right of a 5x3 is index 4; in a 3x5 it is row 4, column 0.
-      expect(turned.slots[4 * 3], 'app:FirstPageTopRight');
-      expect(turned.slots[turned.pageCapacity], 'app:SecondPageTopLeft');
+      expect(turned.slots[4 * 3]?.value, 'app:FirstPageTopRight');
+      expect(turned.slots[turned.pageCapacity]?.value, 'app:SecondPageTopLeft');
     });
 
     test('orients to match the screen', () {
@@ -487,43 +490,46 @@ void main() {
       expect(tall.orientedFor(portrait: false).columns, 5);
     });
 
-    test('a turned cell maps back to the host index', () {
+    test('a turned cell keeps the id it had before turning', () {
       // Host layout: 5 wide, 3 tall. Top-right is 4; second row start is 5.
-      final source = DeckLayout.empty(columns: 5, rows: 3)
-          .withSlot(4, 'app:TopRight')
-          .withSlot(5, 'app:SecondRowStart');
+      final source = DeckLayout.empty(
+        columns: 5,
+        rows: 3,
+      ).withSlot(4, 'app:TopRight').withSlot(5, 'app:SecondRowStart');
       final turned = source.transposed();
 
-      for (var index = 0; index < turned.capacity; index++) {
-        final stored = turned.slots[index];
-        if (stored == null) continue;
-        // Whatever a cell shows, its mapped index holds the same thing in
-        // the host's copy — which is what makes a press land correctly.
-        expect(source.slots[turned.sourceIndex(index)], stored);
+      for (final slot in turned.slots) {
+        if (slot == null) continue;
+        // Wherever a button ends up on screen, its id still names the cell
+        // it occupies in the host's own (unturned) copy — which is what
+        // makes a press land correctly without any translation on this end.
+        expect(source.slots[slot.id], slot);
       }
     });
 
-    test('an unturned layout maps indices to themselves', () {
-      final layout = DeckLayout.empty();
+    test('a freshly placed slot is its own id', () {
+      final layout = DeckLayout.empty().withSlot(7, 'app:A');
 
-      for (var index = 0; index < layout.capacity; index++) {
-        expect(layout.sourceIndex(index), index);
-      }
+      expect(layout.slots[7]!.id, 7);
     });
 
-    test('mapping works across pages', () {
-      final source = DeckLayout.empty(columns: 5, rows: 3, pages: 2)
-          .withSlot(16, 'app:SecondPage');
+    test('an id survives transposing across pages', () {
+      final source = DeckLayout.empty(
+        columns: 5,
+        rows: 3,
+        pages: 2,
+      ).withSlot(16, 'app:SecondPage');
       final turned = source.transposed();
 
-      final shown = turned.slots.indexOf('app:SecondPage');
+      final shown = turned.slots.indexWhere(
+        (slot) => slot?.value == 'app:SecondPage',
+      );
       expect(shown, greaterThanOrEqualTo(turned.pageCapacity));
-      expect(turned.sourceIndex(shown), 16);
+      expect(turned.slots[shown]!.id, 16);
     });
 
     test('a square grid is never turned', () {
-      final square = DeckLayout.empty(columns: 3, rows: 3)
-          .withSlot(1, 'app:A');
+      final square = DeckLayout.empty(columns: 3, rows: 3).withSlot(1, 'app:A');
 
       expect(square.orientedFor(portrait: true).slots, square.slots);
       expect(square.orientedFor(portrait: false).slots, square.slots);
@@ -537,8 +543,10 @@ void main() {
         for (final showLabels in [true, false]) {
           final decoded =
               BtMessage.decode(
-                    SetAppearance(theme: theme, showLabels: showLabels)
-                        .encode(),
+                    SetAppearance(
+                      theme: theme,
+                      showLabels: showLabels,
+                    ).encode(),
                   )
                   as SetAppearance?;
           expect(decoded!.theme, theme);
@@ -563,10 +571,11 @@ void main() {
     });
 
     test('is offered as system, light, dark', () {
-      expect(
-        DeckTheme.values.map((theme) => theme.label),
-        ['System', 'Light', 'Dark'],
-      );
+      expect(DeckTheme.values.map((theme) => theme.label), [
+        'System',
+        'Light',
+        'Dark',
+      ]);
     });
   });
 }

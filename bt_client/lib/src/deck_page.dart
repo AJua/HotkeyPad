@@ -128,7 +128,6 @@ class _DeckPageState extends State<DeckPage> {
     _searchTimeout = Timer(const Duration(seconds: 20), _giveUp);
 
     try {
-
       // Deliberately not filtering the scan on the service UUID: a host
       // whose advertisement puts it in the scan response would be missed
       // entirely, and the check below costs nothing.
@@ -183,20 +182,21 @@ class _DeckPageState extends State<DeckPage> {
     _stopSearch();
     if (!mounted) return;
     setState(() {
-      _session = BtLinkSession(
-        peripheral: peripheral,
-        name: name?.isNotEmpty == true ? name! : BtLink.advertisedName,
-      )
-        ..onTheme = widget.onTheme
-        ..start();
+      _session =
+          BtLinkSession(
+              peripheral: peripheral,
+              name: name?.isNotEmpty == true ? name! : BtLink.advertisedName,
+            )
+            ..onTheme = widget.onTheme
+            ..start();
     });
   }
 
-  Future<void> _press(BtLinkSession session, int index, DeckItem item) async {
+  Future<void> _press(BtLinkSession session, int id, DeckItem item) async {
     // Fires before the round trip: the deck should feel like a button, not
     // like a form that submits.
     unawaited(HapticFeedback.selectionClick());
-    await session.press(index, item);
+    await session.press(id, item);
   }
 
   @override
@@ -337,9 +337,7 @@ class _DeckPageState extends State<DeckPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                session.loadingLayout
-                    ? 'Loading the deck...'
-                    : 'No deck yet.',
+                session.loadingLayout ? 'Loading the deck...' : 'No deck yet.',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
@@ -402,10 +400,7 @@ class _DeckPageState extends State<DeckPage> {
           // the grid's width above, so applying it here as well would just
           // narrow the swipe area — and the edges are exactly where a thumb
           // starts a swipe from.
-          padding: EdgeInsets.only(
-            top: padding.top,
-            bottom: padding.bottom,
-          ),
+          padding: EdgeInsets.only(top: padding.top, bottom: padding.bottom),
           child: Column(
             children: [
               Expanded(
@@ -429,20 +424,19 @@ class _DeckPageState extends State<DeckPage> {
                       child: GridView.builder(
                         padding: EdgeInsets.zero,
                         physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: layout.columns,
-                              mainAxisSpacing: spacing,
-                              crossAxisSpacing: spacing,
-                              childAspectRatio: cellRatio,
-                            ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: layout.columns,
+                          mainAxisSpacing: spacing,
+                          crossAxisSpacing: spacing,
+                          childAspectRatio: cellRatio,
+                        ),
                         itemCount: layout.pageCapacity,
                         itemBuilder: (context, cell) {
                           final index = layout.indexOf(page: page, cell: cell);
-                          final stored = layout.slots[index];
-                          final item = stored == null
+                          final slot = layout.slots[index];
+                          final item = slot == null
                               ? null
-                              : DeckItem.parse(stored);
+                              : DeckItem.parse(slot.value);
                           if (item == null) return const _EmptyCell();
                           if (item is AppItem && item.emoji == null) {
                             unawaited(session.ensureIcon(item.name));
@@ -455,14 +449,11 @@ class _DeckPageState extends State<DeckPage> {
                             showLabel: labels,
                             pressing: session.isPressing(item),
                             outcome: session.feedbackFor(item),
-                            // The host numbers cells its own way; a
-                            // turned deck must translate before telling it
-                            // which one was pressed.
-                            onPressed: () => _press(
-                              session,
-                              layout.sourceIndex(index),
-                              item,
-                            ),
+                            // slot.id is the host's own index for this
+                            // button, carried unchanged however the deck is
+                            // turned to fit the screen — nothing here needs
+                            // to translate it back.
+                            onPressed: () => _press(session, slot!.id, item),
                           );
                         },
                       ),
@@ -525,9 +516,9 @@ class _EmptyCell extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        color: Theme.of(context).colorScheme.surfaceContainerLow.withValues(
-          alpha: 0.4,
-        ),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerLow.withValues(alpha: 0.4),
       ),
     );
   }
