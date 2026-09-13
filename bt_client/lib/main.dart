@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'src/deck_page.dart';
-import 'src/protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 void main() {
   runApp(const BtClientApp());

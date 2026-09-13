@@ -10,7 +10,7 @@ import 'debug_page.dart';
 import 'edge_bar.dart';
 import 'safe_insets.dart';
 import 'deck_icons.dart';
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'session.dart';
 
 /// The app's home. Finds a host by itself rather than making the user pick

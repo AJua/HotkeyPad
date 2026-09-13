@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 /// Performs the non-launch deck actions on the host machine.
 ///

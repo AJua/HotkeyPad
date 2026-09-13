@@ -5,9 +5,9 @@ import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 
 /// The contract shared by the host service and the client app.
 ///
-/// Both projects keep an identical copy of this file. If you change a UUID or
-/// a message shape here, change it in the other project too or they will stop
-/// understanding each other.
+/// Both projects depend on this package by path (`packages/bt_link_protocol`)
+/// rather than keeping their own copy, so a UUID or message shape changed
+/// here reaches both sides at once.
 abstract final class BtLink {
   /// Advertised primary service. The client filters discovery on this so a
   /// host is distinguishable from every other BLE device in the room.

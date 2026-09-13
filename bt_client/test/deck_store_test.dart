@@ -1,5 +1,5 @@
 import 'package:bt_client/src/deck_store.dart';
-import 'package:bt_client/src/protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

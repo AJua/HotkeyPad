@@ -4,7 +4,7 @@ import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'safe_insets.dart';
 import 'unsupported_page.dart';
 

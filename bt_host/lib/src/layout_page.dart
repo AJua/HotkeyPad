@@ -9,7 +9,7 @@ import 'command_runner.dart';
 import 'deck_icons.dart';
 import 'layout_store.dart';
 import 'settings_store.dart';
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 /// Edits the grid the client will draw.
 ///

@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 /// Stores app icons so they are fetched over BLE once, not on every launch.
 /// A 64px PNG is ~5KB and takes a dozen notifications to transfer.

@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 /// Caches the layout the host sent, per host.
 ///

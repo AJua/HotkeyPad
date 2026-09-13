@@ -1,5 +1,5 @@
 import 'package:bt_host/src/layout_page.dart';
-import 'package:bt_host/src/protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

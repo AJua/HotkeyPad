@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 /// Persists the deck layout on the host.
 ///

@@ -10,7 +10,7 @@ import 'command_runner.dart';
 import 'layout_page.dart';
 import 'layout_store.dart';
 import 'media_control.dart';
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'settings_store.dart';
 import 'unsupported_page.dart';
 

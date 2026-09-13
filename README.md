@@ -73,8 +73,9 @@ folders/pages of buttons, reconnect on wake, and bonding.
 
 ## Message protocol
 
-`protocol.dart` (identical in both projects) defines a sealed `BtMessage`
-hierarchy encoded as single-line JSON, one message per ATT operation:
+`protocol.dart` (in the shared `bt_link_protocol` package, see below) defines
+a sealed `BtMessage` hierarchy encoded as single-line JSON, one message per
+ATT operation:
 
 | Message     | Direction       | Purpose                          |
 | ----------- | --------------- | -------------------------------- |
@@ -319,9 +320,11 @@ is centrals attached to this app's GATT server.
 
 ## The shared contract
 
-`lib/src/protocol.dart` is duplicated verbatim in both projects. Change a UUID
-in one and you must change it in the other. If this grows, promote it to a
-shared package under `packages/bt_link_protocol` and depend on it by path.
+`protocol.dart` lives in `packages/bt_link_protocol`, a small Dart package
+both apps depend on by path. Change a UUID or a message shape once and it
+reaches both sides — this used to be a file duplicated verbatim in both
+projects, which is also why the package's own tests are the original
+`protocol_test.dart` unchanged, just moved.
 
 ## Android permission flow
 

@@ -1,0 +1,9 @@
+.dart_tool/
+.packages
+.flutter-plugins-dependencies
+build/
+
+# A library, not an app: the lockfile pins exact versions for a deployable
+# product, which this is not. Leaving it out lets the two apps' own lockfiles
+# be the source of truth for which version of every transitive dep is used.
+pubspec.lock

@@ -1,0 +1,21 @@
+name: bt_link_protocol
+description: >
+  The message protocol shared by the BTLink host and client. A single source
+  of truth for the GATT UUIDs, the BtMessage wire format, deck items and
+  DeckLayout — previously duplicated verbatim in both apps.
+publish_to: 'none'
+version: 1.0.0
+
+environment:
+  sdk: ^3.10.4
+  flutter: '>=3.7.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  bluetooth_low_energy: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

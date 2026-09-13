@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:bt_client/src/protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

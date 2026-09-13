@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'src/host_page.dart';
-import 'src/protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'src/settings_store.dart';
 
 void main() {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 /// Glyph shown for a deck item that has neither a custom emoji nor an app
 /// icon of its own.

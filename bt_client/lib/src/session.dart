@@ -9,7 +9,7 @@ import 'dart:typed_data';
 
 import 'deck_store.dart';
 import 'icon_cache.dart';
-import 'protocol.dart';
+import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 /// Where the link is in the connect -> discover -> subscribe sequence.
 enum LinkStage {
