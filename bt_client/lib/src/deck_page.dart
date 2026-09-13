@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'debug_page.dart';
+import 'edge_bar.dart';
 import 'safe_insets.dart';
 import 'deck_icons.dart';
 import 'protocol.dart';
@@ -200,22 +201,19 @@ class _DeckPageState extends State<DeckPage> {
     return ListenableBuilder(
       listenable: session,
       builder: (context, _) {
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(session.name),
-            actions: [
-              IconButton(
-                tooltip: 'Debug console',
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => DebugPage(session: session),
-                  ),
-                ),
-                icon: const Icon(Icons.bug_report_outlined),
+        return EdgeBarScaffold(
+          side: barSideFor(context),
+          title: session.name,
+          actions: [
+            IconButton(
+              tooltip: 'Debug console',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => DebugPage(session: session)),
               ),
-            ],
-          ),
-          body: Stack(
+              icon: const Icon(Icons.bug_report_outlined),
+            ),
+          ],
+          child: Stack(
             children: [
               Positioned.fill(child: _body(session)),
               // Built only while the link is unusable, so a connected deck
@@ -245,20 +243,19 @@ class _DeckPageState extends State<DeckPage> {
 
   Widget _searchScaffold(BuildContext context) {
     final error = _searchError;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('BTLink'),
-        actions: [
-          IconButton(
-            tooltip: 'Debug console',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const DebugPage(session: null)),
-            ),
-            icon: const Icon(Icons.bug_report_outlined),
+    return EdgeBarScaffold(
+      side: barSideFor(context),
+      title: 'BTLink',
+      actions: [
+        IconButton(
+          tooltip: 'Debug console',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const DebugPage(session: null)),
           ),
-        ],
-      ),
-      body: Center(
+          icon: const Icon(Icons.bug_report_outlined),
+        ),
+      ],
+      child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(

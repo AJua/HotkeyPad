@@ -128,6 +128,26 @@ immediately on open rather than after the link comes up, and a brief drop does
 not blank the screen. It is a cache, never an authority: the host's copy wins
 on every connect.
 
+### The app bar follows the device edge
+
+Rotating the phone moves the app bar to whichever edge used to be the top:
+left when turned anticlockwise, right when clockwise. It is not a decoration
+— reaching for the deck is a one-handed gesture, and a bar that jumps to the
+far side of the screen puts the debug button under the hand holding the
+phone.
+
+Flutter reports only portrait or landscape, never which way the device was
+turned, so `edge_bar.dart` infers it from where the system insets moved.
+What that implies depends on which inset it is: on Android the horizontal
+inset is the navigation bar, which sits at the bottom when upright, so the
+old top is on the **opposite** side; on iOS it is the notch, which sits at
+the top, so the bar belongs on the **same** side. A device with neither —
+gesture navigation and no cutout — leaves nothing to infer from and defaults
+to the left.
+
+Only the client does this. The host is a desktop window and has no
+orientation to follow.
+
 ### Finding the host
 
 The search is driven by the adapter's state, not by asking for permission and
