@@ -19,6 +19,7 @@ class LayoutPage extends StatefulWidget {
     super.key,
     required this.onChanged,
     required this.onThemeChanged,
+    required this.onShowService,
   });
 
   /// Called after every edit so the service can push the new layout to
@@ -28,6 +29,10 @@ class LayoutPage extends StatefulWidget {
   /// Called when the appearance is changed, so it can be applied here and
   /// pushed to the phone.
   final ValueChanged<DeckTheme> onThemeChanged;
+
+  /// Opens the service view, which is reached from the settings dialog now
+  /// that there are no tabs.
+  final VoidCallback onShowService;
 
   @override
   State<LayoutPage> createState() => _LayoutPageState();
@@ -89,6 +94,95 @@ class _LayoutPageState extends State<LayoutPage> {
     if (_page >= _layout.pages) _page = _layout.pages - 1;
   }
 
+  /// Grid size, appearance and the service view all live behind the gear,
+  /// so the window is the deck and nothing else.
+  Future<void> _openSettings() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Settings'),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Appearance',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<DeckTheme>(
+                  segments: [
+                    for (final theme in DeckTheme.values)
+                      ButtonSegment(value: theme, label: Text(theme.label)),
+                  ],
+                  selected: {_theme},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (selection) {
+                    setDialogState(() {});
+                    _setTheme(selection.first);
+                  },
+                ),
+                const SizedBox(height: 20),
+                Text('Grid', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 4),
+                _SizeStepper(
+                  label: 'Columns',
+                  value: _layout.columns,
+                  onChanged: (value) {
+                    setDialogState(() {});
+                    _apply(_layout.resized(columns: value));
+                  },
+                ),
+                _SizeStepper(
+                  label: 'Rows',
+                  value: _layout.rows,
+                  onChanged: (value) {
+                    setDialogState(() {});
+                    _apply(_layout.resized(rows: value));
+                  },
+                ),
+                _SizeStepper(
+                  label: 'Pages',
+                  value: _layout.pages,
+                  max: DeckLayout.maxPages,
+                  onChanged: (value) {
+                    setDialogState(() {});
+                    _apply(_layout.resized(pages: value));
+                  },
+                ),
+                const Divider(height: 32),
+                // A diagnostic, like the client's debug console: for
+                // working out why the deck is misbehaving, not for daily use.
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.bug_report_outlined),
+                  title: const Text('Service details'),
+                  subtitle: const Text(
+                    'Advertising state, connected clients, activity log',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    widget.onShowService();
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _setTheme(DeckTheme theme) async {
     setState(() => _theme = theme);
     await SettingsStore.saveTheme(theme);
@@ -117,7 +211,7 @@ class _LayoutPageState extends State<LayoutPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
           child: Row(
             children: [
               Text(
@@ -125,35 +219,10 @@ class _LayoutPageState extends State<LayoutPage> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const Spacer(),
-              _SizeStepper(
-                label: 'Columns',
-                value: _layout.columns,
-                onChanged: (value) =>
-                    _apply(_layout.resized(columns: value)),
-              ),
-              const SizedBox(width: 16),
-              _SizeStepper(
-                label: 'Rows',
-                value: _layout.rows,
-                onChanged: (value) => _apply(_layout.resized(rows: value)),
-              ),
-              const SizedBox(width: 24),
-              SegmentedButton<DeckTheme>(
-                segments: [
-                  for (final theme in DeckTheme.values)
-                    ButtonSegment(value: theme, label: Text(theme.label)),
-                ],
-                selected: {_theme},
-                showSelectedIcon: false,
-                onSelectionChanged: (selection) =>
-                    _setTheme(selection.first),
-              ),
-              const SizedBox(width: 16),
-              _SizeStepper(
-                label: 'Pages',
-                value: _layout.pages,
-                max: DeckLayout.maxPages,
-                onChanged: (value) => _apply(_layout.resized(pages: value)),
+              IconButton(
+                tooltip: 'Settings',
+                onPressed: _openSettings,
+                icon: const Icon(Icons.settings_outlined),
               ),
             ],
           ),
@@ -435,9 +504,10 @@ class _SizeStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: Theme.of(context).textTheme.labelMedium),
+        Expanded(
+          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        ),
         IconButton(
           onPressed: value > 1 ? () => onChanged(value - 1) : null,
           icon: const Icon(Icons.remove_circle_outline),

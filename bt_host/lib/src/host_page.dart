@@ -64,6 +64,10 @@ class _HostPageState extends State<HostPage> {
   bool _advertising = false;
   bool _busy = false;
   bool _autoStarted = false;
+
+  /// The service view is a detour from the deck, reached from settings,
+  /// rather than a tab competing with it for attention.
+  bool _showingService = false;
   int _appCount = 0;
 
   /// App name -> bundle path, filled when the catalogue is built so an icon
@@ -594,32 +598,30 @@ class _HostPageState extends State<HostPage> {
       ..sort((a, b) => a.since.compareTo(b.since));
     final subscribedCount = clients.where((c) => c.subscribed).length;
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
+    if (_showingService) {
+      return Scaffold(
         appBar: AppBar(
-          title: const Text('BTLink host'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Deck', icon: Icon(Icons.grid_view)),
-              Tab(text: 'Service', icon: Icon(Icons.bluetooth)),
-            ],
+          title: const Text('Service'),
+          leading: IconButton(
+            tooltip: 'Back to the deck',
+            onPressed: () => setState(() => _showingService = false),
+            icon: const Icon(Icons.arrow_back),
           ),
         ),
-        body: TabBarView(
-          children: [
-            // Editing the grid is the everyday job; the service details are
-            // for when something is wrong.
-            LayoutPage(
-              onChanged: _broadcastLayout,
-              onThemeChanged: (theme) {
-                widget.onThemeChanged(theme);
-                _broadcastTheme(theme);
-              },
-            ),
-            _serviceTab(context, clients, subscribedCount),
-          ],
-        ),
+        body: _serviceTab(context, clients, subscribedCount),
+      );
+    }
+
+    // The window is the deck. Everything else — grid size, appearance, the
+    // service details — lives behind the gear.
+    return Scaffold(
+      body: LayoutPage(
+        onChanged: _broadcastLayout,
+        onThemeChanged: (theme) {
+          widget.onThemeChanged(theme);
+          _broadcastTheme(theme);
+        },
+        onShowService: () => setState(() => _showingService = true),
       ),
     );
   }

@@ -25,10 +25,15 @@ service, and the buttons launch applications over BLE.
 - On connect the client asks for the layout and the app catalogue; the host
   streams both back.
 - **The host owns the layout.** Arranging a grid on a phone screen is
-  miserable, and the host is where the app list already lives, so the editor
-  is a tab in the host window: a grid of cells, click one to choose what it
-  does, drag a button to move it. Columns and rows are adjustable; the
-  default is 5 x 3.
+  miserable, and the host is where the app list already lives, so the host
+  window *is* the editor: a grid of cells, click one to choose what it does,
+  drag a button to move it. Grid size, appearance and the service details
+  live behind a gear, so the window shows the deck and little else. The
+  default grid is 5 x 3.
+- **Service details are a diagnostic**, reached from that gear — the host's
+  equivalent of the client's debug console. Advertising state, connected
+  clients and the activity log are for working out why the deck is
+  misbehaving, not for daily use.
 - **The client renders what it is sent.** It has no settings of its own. The
   host pushes the layout on connect and again after every edit, so the phone
   updates while you arrange the grid.
