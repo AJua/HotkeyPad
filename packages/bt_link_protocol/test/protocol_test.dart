@@ -195,6 +195,46 @@ void main() {
       expect(const ActionItem(DeckAction.mute).stored, 'act:mute');
     });
 
+    test('a custom icon id survives on any item kind', () {
+      for (final item in const [
+        AppItem('Safari', customIconId: 'img_1'),
+        ActionItem(DeckAction.mute, customIconId: 'img_2'),
+        ShellItem(command: 'say hi', label: 'Hi', customIconId: 'img_3'),
+        ShortcutItem(name: 'Start focus', customIconId: 'img_4'),
+        KeyComboItem(
+          modifiers: [],
+          key: '4',
+          special: null,
+          customIconId: 'img_5',
+        ),
+      ]) {
+        expect(DeckItem.parse(item.stored)!.customIconId, item.customIconId);
+      }
+    });
+
+    test('a custom icon id forces the long JSON form', () {
+      // Same reason an emoji does: the short form has nowhere to put it.
+      expect(
+        const AppItem('Safari', customIconId: 'img_1').stored,
+        isNot('app:Safari'),
+      );
+      expect(
+        DeckItem.parse('{"t":"app","n":"Safari","ci":"img_1"}'),
+        const AppItem('Safari', customIconId: 'img_1'),
+      );
+    });
+
+    test('emoji and a custom icon id can be set independently', () {
+      const bothUnset = AppItem('Safari');
+      const emojiOnly = AppItem('Safari', emoji: '🧭');
+      const imageOnly = AppItem('Safari', customIconId: 'img_1');
+
+      expect(bothUnset.emoji, isNull);
+      expect(bothUnset.customIconId, isNull);
+      expect(emojiOnly.customIconId, isNull);
+      expect(imageOnly.emoji, isNull);
+    });
+
     test('round-trips a key combination', () {
       const item = KeyComboItem(
         modifiers: [KeyModifier.command, KeyModifier.shift],

@@ -2,8 +2,17 @@ import 'package:flutter/material.dart';
 
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 
-/// Glyph shown for a deck item that has neither a custom emoji nor an app
-/// icon of its own.
+/// The key to fetch a rendered icon for, or null when nothing overrides the
+/// built-in glyph — an emoji, checked separately by the caller, always wins.
+///
+/// A custom image takes priority over an app's own icon, matching how
+/// [DeckItem.emoji] already takes priority over both. Presentation, so it
+/// lives outside the protocol, same as [deckFallbackIcon].
+String? iconKeyFor(DeckItem item) =>
+    item.customIconId ?? (item is AppItem ? item.name : null);
+
+/// Glyph shown for a deck item that has neither a custom emoji, a custom
+/// image, nor an app icon of its own.
 ///
 /// Presentation, so it lives outside the protocol.
 IconData deckFallbackIcon(DeckItem item) => switch (item) {

@@ -137,9 +137,9 @@ final class ListEnd extends BtMessage {
 ///
 /// Stored as a string in the layout. Simple items keep their original
 /// prefixed form (`app:Safari`, `act:mute`) so a layout written by an older
-/// build still loads; anything carrying extra fields — a custom emoji, a
-/// command — is stored as JSON, which the parser recognises by its leading
-/// brace.
+/// build still loads; anything carrying extra fields — a custom emoji or
+/// image, a command — is stored as JSON, which the parser recognises by its
+/// leading brace.
 sealed class DeckItem {
   const DeckItem();
 
@@ -147,7 +147,18 @@ sealed class DeckItem {
   String get label;
 
   /// Shown instead of an app icon or a built-in glyph when set.
+  ///
+  /// Mutually exclusive with [customIconId] by construction of the picker
+  /// UI that sets them — a button is either given a glyph or a picture, not
+  /// both. If somehow both are set, rendering prefers this one, matching
+  /// the priority that already existed before [customIconId] did.
   String? get emoji;
+
+  /// An id naming an image the host rendered from a file the user picked,
+  /// fetched and cached the same way an app's own icon is — see
+  /// [RequestIcon] and [IconFrame]. Shown instead of an app icon or built-in
+  /// glyph when set, unless [emoji] is also set.
+  String? get customIconId;
 
   /// Returns null for a stored value this build does not understand, so an
   /// item written by a newer peer is skipped rather than shown as a button
@@ -167,16 +178,26 @@ sealed class DeckItem {
       final json = jsonDecode(stored);
       if (json is! Map) return null;
       final emoji = json['e'] as String?;
+      final customIconId = json['ci'] as String?;
       return switch (json['t']) {
-        'app' => AppItem(json['n'] as String, emoji: emoji),
+        'app' => AppItem(
+          json['n'] as String,
+          emoji: emoji,
+          customIconId: customIconId,
+        ),
         'act' => switch (DeckAction.fromWire(json['a'] as String? ?? '')) {
-          final action? => ActionItem(action, emoji: emoji),
+          final action? => ActionItem(
+            action,
+            emoji: emoji,
+            customIconId: customIconId,
+          ),
           null => null,
         },
         'sh' => ShellItem(
           command: json['c'] as String,
           label: json['l'] as String,
           emoji: emoji,
+          customIconId: customIconId,
         ),
         'key' => KeyComboItem(
           modifiers: [
@@ -187,11 +208,13 @@ sealed class DeckItem {
           special: SpecialKey.fromWire(json['s'] as String?),
           label: json['l'] as String?,
           emoji: emoji,
+          customIconId: customIconId,
         ),
         'sc' => ShortcutItem(
           name: json['n'] as String,
           label: json['l'] as String?,
           emoji: emoji,
+          customIconId: customIconId,
         ),
         _ => null,
       };
@@ -208,7 +231,7 @@ sealed class DeckItem {
 }
 
 final class AppItem extends DeckItem {
-  const AppItem(this.name, {this.emoji});
+  const AppItem(this.name, {this.emoji, this.customIconId});
 
   final String name;
 
@@ -216,16 +239,24 @@ final class AppItem extends DeckItem {
   final String? emoji;
 
   @override
-  String get stored => emoji == null
+  final String? customIconId;
+
+  @override
+  String get stored => emoji == null && customIconId == null
       ? 'app:$name'
-      : jsonEncode({'t': 'app', 'n': name, 'e': emoji});
+      : jsonEncode({
+          't': 'app',
+          'n': name,
+          if (emoji != null) 'e': emoji,
+          if (customIconId != null) 'ci': customIconId,
+        });
 
   @override
   String get label => name;
 }
 
 final class ActionItem extends DeckItem {
-  const ActionItem(this.action, {this.emoji});
+  const ActionItem(this.action, {this.emoji, this.customIconId});
 
   final DeckAction action;
 
@@ -233,9 +264,17 @@ final class ActionItem extends DeckItem {
   final String? emoji;
 
   @override
-  String get stored => emoji == null
+  final String? customIconId;
+
+  @override
+  String get stored => emoji == null && customIconId == null
       ? 'act:${action.wire}'
-      : jsonEncode({'t': 'act', 'a': action.wire, 'e': emoji});
+      : jsonEncode({
+          't': 'act',
+          'a': action.wire,
+          if (emoji != null) 'e': emoji,
+          if (customIconId != null) 'ci': customIconId,
+        });
 
   @override
   String get label => action.label;
@@ -247,7 +286,12 @@ final class ActionItem extends DeckItem {
 /// id and the host looks up what that slot holds, so nothing a client
 /// sends can become a command — see [PressSlot].
 final class ShellItem extends DeckItem {
-  const ShellItem({required this.command, required this.label, this.emoji});
+  const ShellItem({
+    required this.command,
+    required this.label,
+    this.emoji,
+    this.customIconId,
+  });
 
   final String command;
 
@@ -258,11 +302,15 @@ final class ShellItem extends DeckItem {
   final String? emoji;
 
   @override
+  final String? customIconId;
+
+  @override
   String get stored => jsonEncode({
     't': 'sh',
     'c': command,
     'l': label,
     if (emoji != null) 'e': emoji,
+    if (customIconId != null) 'ci': customIconId,
   });
 }
 
@@ -337,6 +385,7 @@ final class KeyComboItem extends DeckItem {
     required this.special,
     String? label,
     this.emoji,
+    this.customIconId,
   }) : _label = label;
 
   /// Held while the key is pressed, in a stable order for display.
@@ -352,6 +401,9 @@ final class KeyComboItem extends DeckItem {
 
   @override
   final String? emoji;
+
+  @override
+  final String? customIconId;
 
   /// What the combination reads as: ⌘⇧4, ⌥Space.
   String get combination {
@@ -374,13 +426,18 @@ final class KeyComboItem extends DeckItem {
     if (special != null) 's': special!.wire,
     if (_label != null) 'l': _label,
     if (emoji != null) 'e': emoji,
+    if (customIconId != null) 'ci': customIconId,
   });
 }
 
 /// Runs a macOS Shortcut by name.
 final class ShortcutItem extends DeckItem {
-  const ShortcutItem({required this.name, String? label, this.emoji})
-    : _label = label;
+  const ShortcutItem({
+    required this.name,
+    String? label,
+    this.emoji,
+    this.customIconId,
+  }) : _label = label;
 
   final String name;
   final String? _label;
@@ -392,11 +449,15 @@ final class ShortcutItem extends DeckItem {
   final String? emoji;
 
   @override
+  final String? customIconId;
+
+  @override
   String get stored => jsonEncode({
     't': 'sc',
     'n': name,
     if (_label != null) 'l': _label,
     if (emoji != null) 'e': emoji,
+    if (customIconId != null) 'ci': customIconId,
   });
 }
 

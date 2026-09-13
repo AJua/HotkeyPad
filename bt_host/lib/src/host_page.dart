@@ -7,6 +7,7 @@ import 'package:flutter/material.dart' hide ConnectionState;
 
 import 'app_launcher.dart';
 import 'command_runner.dart';
+import 'custom_icon_store.dart';
 import 'layout_page.dart';
 import 'layout_store.dart';
 import 'media_control.dart';
@@ -443,21 +444,22 @@ class _HostPageState extends State<HostPage> {
     }
   }
 
-  /// Renders an app's icon and streams it as binary frames sized to the
-  /// link's MTU.
-  Future<void> _sendIcon(Central central, String appName) async {
+  /// Renders an app's icon, or reads back a user-picked custom one, and
+  /// streams it as binary frames sized to the link's MTU either way — the
+  /// transfer itself does not care which [id] names.
+  Future<void> _sendIcon(Central central, String id) async {
     final peripheral = _peripheral;
     if (peripheral == null) return;
 
     // The client restores its deck from local storage and can ask for an
     // icon before it has asked for the catalogue.
     await _ensureAppPaths();
-    final path = _appPaths[appName];
-    final png = path == null
-        ? null
-        : await AppLauncher.icon(path, size: BtLink.iconSize);
+    final path = _appPaths[id];
+    final png = path != null
+        ? await AppLauncher.icon(path, size: BtLink.iconSize)
+        : await CustomIconStore.read(id);
     if (png == null) {
-      await _send(central, IconUnavailable(name: appName));
+      await _send(central, IconUnavailable(name: id));
       return;
     }
 
@@ -469,11 +471,11 @@ class _HostPageState extends State<HostPage> {
       return;
     }
 
-    final capacity = IconFrame.payloadCapacity(maximum, appName);
+    final capacity = IconFrame.payloadCapacity(maximum, id);
     if (capacity <= 0) {
       // A name long enough to fill the MTU on its own leaves nowhere to put
       // the image.
-      await _send(central, IconUnavailable(name: appName));
+      await _send(central, IconUnavailable(name: id));
       return;
     }
 
@@ -486,7 +488,7 @@ class _HostPageState extends State<HostPage> {
           central,
           _notifyCharacteristic,
           value: IconFrame.encode(
-            name: appName,
+            name: id,
             index: index,
             total: total,
             payload: png.sublist(start, end),
@@ -501,7 +503,7 @@ class _HostPageState extends State<HostPage> {
 
     if (mounted) {
       setState(() {
-        _addLog('sent $appName icon (${png.length}B in $total frames)');
+        _addLog('sent $id icon (${png.length}B in $total frames)');
       });
     }
   }

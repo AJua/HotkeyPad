@@ -461,14 +461,17 @@ class _DeckPageState extends State<DeckPage> {
                               ? null
                               : DeckItem.parse(slot.value);
                           if (item == null) return const _EmptyCell();
-                          if (item is AppItem && item.emoji == null) {
-                            unawaited(session.ensureIcon(item.name));
+                          final iconKey = item.emoji == null
+                              ? iconKeyFor(item)
+                              : null;
+                          if (iconKey != null) {
+                            unawaited(session.ensureIcon(iconKey));
                           }
                           return _DeckButton(
                             item: item,
-                            icon: item is AppItem
-                                ? session.iconFor(item.name)
-                                : null,
+                            icon: iconKey == null
+                                ? null
+                                : session.iconFor(iconKey),
                             showLabel: labels,
                             pressing: session.isPressing(item),
                             outcome: session.feedbackFor(item),
