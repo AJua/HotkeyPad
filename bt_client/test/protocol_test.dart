@@ -71,7 +71,7 @@ void main() {
     });
 
     test('does not mistake a JSON message for a frame', () {
-      final json = utf8.encode(jsonEncode(const OpenApp(name: 'Safari')));
+      final json = utf8.encode(jsonEncode(const PressSlot(index: 3)));
 
       expect(IconFrame.looksLikeFrame(json), isFalse);
       expect(IconFrame.decode(json), isNull);
@@ -109,7 +109,7 @@ void main() {
         ListApps(),
         AppEntry(name: 'Safari', category: 'Apps'),
         ListEnd(count: 96),
-        OpenApp(name: 'Safari'),
+        PressSlot(index: 3),
         RequestIcon(name: 'Safari'),
         IconUnavailable(name: 'Safari'),
         Ack(ok: true, message: 'Opened Safari'),
@@ -150,6 +150,53 @@ void main() {
     test('skips an item this build does not know', () {
       expect(DeckItem.parse('act:teleport'), isNull);
       expect(DeckItem.parse(''), isNull);
+    });
+
+    test('round-trips a shell command', () {
+      const item = ShellItem(
+        command: 'say hello',
+        label: 'Greet',
+        emoji: '👋',
+      );
+
+      final parsed = DeckItem.parse(item.stored) as ShellItem?;
+
+      expect(parsed!.command, 'say hello');
+      expect(parsed.label, 'Greet');
+      expect(parsed.emoji, '👋');
+    });
+
+    test('a command containing punctuation survives', () {
+      // The old colon-prefixed format would have split this apart.
+      const command = r'''osascript -e 'display notification "a: b"' ''';
+      const item = ShellItem(command: command, label: 'Notify');
+
+      expect((DeckItem.parse(item.stored) as ShellItem).command, command);
+    });
+
+    test('round-trips a shortcut, falling back to its name', () {
+      const named = ShortcutItem(name: 'Start focus', label: 'Focus');
+      const bare = ShortcutItem(name: 'Start focus');
+
+      expect((DeckItem.parse(named.stored) as ShortcutItem).label, 'Focus');
+      expect(
+        (DeckItem.parse(bare.stored) as ShortcutItem).label,
+        'Start focus',
+      );
+    });
+
+    test('an emoji survives on an app or an action', () {
+      const app = AppItem('Safari', emoji: '🧭');
+      const action = ActionItem(DeckAction.mute, emoji: '🔇');
+
+      expect(DeckItem.parse(app.stored)!.emoji, '🧭');
+      expect(DeckItem.parse(action.stored)!.emoji, '🔇');
+    });
+
+    test('an item without an emoji keeps the short legacy form', () {
+      // Readable in the layout file, and loadable by an older build.
+      expect(const AppItem('Safari').stored, 'app:Safari');
+      expect(const ActionItem(DeckAction.mute).stored, 'act:mute');
     });
 
     test('an app and an action never collide', () {
@@ -292,6 +339,16 @@ void main() {
 
       expect(decoded!.slots, layout.slots);
       expect(decoded.columns, 2);
+    });
+  });
+
+  group('PressSlot', () {
+    test('round-trips', () {
+      final decoded =
+          BtMessage.decode(const PressSlot(index: 12).encode())
+              as PressSlot?;
+
+      expect(decoded!.index, 12);
     });
   });
 

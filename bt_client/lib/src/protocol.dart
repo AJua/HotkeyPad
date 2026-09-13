@@ -68,12 +68,7 @@ sealed class BtMessage {
           category: json['c'] as String?,
         ),
         'end' => ListEnd(count: json['c'] as int? ?? 0),
-        'open' => OpenApp(name: json['n'] as String),
-        'act' => switch (DeckAction.fromWire(json['a'] as String? ?? '')) {
-          final action? => RunAction(action: action),
-          // An action this build does not know about.
-          null => null,
-        },
+        'press' => PressSlot(index: json['i'] as int),
         'thm' => SetAppearance(
           theme: DeckTheme.fromWire(json['v'] as String?),
           // Absent on an older host, which always drew labels.
@@ -138,26 +133,61 @@ final class ListEnd extends BtMessage {
   Map<String, Object?> toJson() => {'t': 'end', 'c': count};
 }
 
-/// One button on the deck: either an app to launch or an action to perform.
+/// One button on the deck.
 ///
-/// Stored as a prefixed string so a layout saved by an older build — which
-/// only ever held bare app names — still loads.
+/// Stored as a string in the layout. Simple items keep their original
+/// prefixed form (`app:Safari`, `act:mute`) so a layout written by an older
+/// build still loads; anything carrying extra fields — a custom emoji, a
+/// command — is stored as JSON, which the parser recognises by its leading
+/// brace.
 sealed class DeckItem {
   const DeckItem();
 
   String get stored;
   String get label;
 
+  /// Shown instead of an app icon or a built-in glyph when set.
+  String? get emoji;
+
   /// Returns null for a stored value this build does not understand, so an
-  /// action added by a newer peer is skipped rather than shown as a button
+  /// item written by a newer peer is skipped rather than shown as a button
   /// that does nothing.
   static DeckItem? parse(String stored) {
+    if (stored.startsWith('{')) return _fromJson(stored);
     if (stored.startsWith('act:')) {
       final action = DeckAction.fromWire(stored.substring(4));
       return action == null ? null : ActionItem(action);
     }
     final name = stored.startsWith('app:') ? stored.substring(4) : stored;
     return name.isEmpty ? null : AppItem(name);
+  }
+
+  static DeckItem? _fromJson(String stored) {
+    try {
+      final json = jsonDecode(stored);
+      if (json is! Map) return null;
+      final emoji = json['e'] as String?;
+      return switch (json['t']) {
+        'app' => AppItem(json['n'] as String, emoji: emoji),
+        'act' => switch (DeckAction.fromWire(json['a'] as String? ?? '')) {
+          final action? => ActionItem(action, emoji: emoji),
+          null => null,
+        },
+        'sh' => ShellItem(
+          command: json['c'] as String,
+          label: json['l'] as String,
+          emoji: emoji,
+        ),
+        'sc' => ShortcutItem(
+          name: json['n'] as String,
+          label: json['l'] as String?,
+          emoji: emoji,
+        ),
+        _ => null,
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -168,27 +198,89 @@ sealed class DeckItem {
 }
 
 final class AppItem extends DeckItem {
-  const AppItem(this.name);
+  const AppItem(this.name, {this.emoji});
 
   final String name;
 
   @override
-  String get stored => 'app:$name';
+  final String? emoji;
+
+  @override
+  String get stored => emoji == null
+      ? 'app:$name'
+      : jsonEncode({'t': 'app', 'n': name, 'e': emoji});
 
   @override
   String get label => name;
 }
 
 final class ActionItem extends DeckItem {
-  const ActionItem(this.action);
+  const ActionItem(this.action, {this.emoji});
 
   final DeckAction action;
 
   @override
-  String get stored => 'act:${action.wire}';
+  final String? emoji;
+
+  @override
+  String get stored => emoji == null
+      ? 'act:${action.wire}'
+      : jsonEncode({'t': 'act', 'a': action.wire, 'e': emoji});
 
   @override
   String get label => action.label;
+}
+
+/// Runs a shell command on the host.
+///
+/// The command lives only in the host's layout. A client presses a slot by
+/// index and the host looks up what that slot holds, so nothing a client
+/// sends can become a command — see [PressSlot].
+final class ShellItem extends DeckItem {
+  const ShellItem({
+    required this.command,
+    required this.label,
+    this.emoji,
+  });
+
+  final String command;
+
+  @override
+  final String label;
+
+  @override
+  final String? emoji;
+
+  @override
+  String get stored => jsonEncode({
+    't': 'sh',
+    'c': command,
+    'l': label,
+    if (emoji != null) 'e': emoji,
+  });
+}
+
+/// Runs a macOS Shortcut by name.
+final class ShortcutItem extends DeckItem {
+  const ShortcutItem({required this.name, String? label, this.emoji})
+    : _label = label;
+
+  final String name;
+  final String? _label;
+
+  @override
+  String get label => _label?.isNotEmpty == true ? _label! : name;
+
+  @override
+  final String? emoji;
+
+  @override
+  String get stored => jsonEncode({
+    't': 'sc',
+    'n': name,
+    if (_label != null) 'l': _label,
+    if (emoji != null) 'e': emoji,
+  });
 }
 
 /// The grid the client draws and the host edits.
@@ -492,14 +584,20 @@ enum DeckAction {
       this == volumeUp || this == volumeDown || this == mute;
 }
 
-/// Client -> host: perform an action that is not an app launch.
-final class RunAction extends BtMessage {
-  const RunAction({required this.action});
+/// Client -> host: the button in this slot was pressed.
+///
+/// The only way a client asks for anything to happen. An index rather than a
+/// description of what to do: the host looks the slot up in its own layout
+/// and acts on what it finds there, so a client can only trigger what the
+/// host was already configured with. That matters once buttons can hold
+/// shell commands, and it keeps every kind of button on one path.
+final class PressSlot extends BtMessage {
+  const PressSlot({required this.index});
 
-  final DeckAction action;
+  final int index;
 
   @override
-  Map<String, Object?> toJson() => {'t': 'act', 'a': action.wire};
+  Map<String, Object?> toJson() => {'t': 'press', 'i': index};
 }
 
 /// Client -> host: send me this app's icon.
@@ -520,16 +618,6 @@ final class IconUnavailable extends BtMessage {
 
   @override
   Map<String, Object?> toJson() => {'t': 'ico!', 'n': name};
-}
-
-/// Client -> host: launch this app.
-final class OpenApp extends BtMessage {
-  const OpenApp({required this.name});
-
-  final String name;
-
-  @override
-  Map<String, Object?> toJson() => {'t': 'open', 'n': name};
 }
 
 /// Host -> client: the result of the last command.

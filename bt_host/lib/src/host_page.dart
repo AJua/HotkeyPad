@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 
 import 'app_launcher.dart';
+import 'command_runner.dart';
 import 'layout_page.dart';
 import 'layout_store.dart';
 import 'media_control.dart';
@@ -272,16 +273,10 @@ class _HostPageState extends State<HostPage> {
       case ListApps():
         _touch(central, 'requested the app list');
         await _queueTransfer(() => _sendCatalogue(central));
-      case OpenApp(:final name):
-        _touch(central, 'open $name');
-        final result = await AppLauncher.open(name);
-        if (mounted) setState(() => _addLog(result.message));
-        await _send(central, Ack(ok: result.ok, message: result.message));
-      case RunAction(:final action):
-        _touch(central, action.label);
-        final result = await MediaControl.run(action);
-        if (mounted) setState(() => _addLog(result.message));
-        await _send(central, Ack(ok: result.ok, message: result.message));
+      // Every button arrives the same way: a slot number the host resolves
+      // against its own layout.
+      case PressSlot(:final index):
+        await _pressSlot(central, index);
       case RequestLayout():
         _touch(central, 'requested the layout');
         await _queueTransfer(() => _sendLayout(central));
@@ -292,6 +287,7 @@ class _HostPageState extends State<HostPage> {
         _touch(central, 'said: $text');
       case Ack() ||
           SetAppearance() ||
+          PressSlot() ||
           AppEntry() ||
           ListEnd() ||
           IconUnavailable() ||
@@ -346,6 +342,33 @@ class _HostPageState extends State<HostPage> {
         central.uuid.toString(),
       )}'));
     }
+  }
+
+  /// Acts on the button in [index], whatever the host's own layout says is
+  /// there. The client sent only a number, so a shell command cannot be
+  /// injected from the other end of the link.
+  Future<void> _pressSlot(Central central, int index) async {
+    final layout = await LayoutStore.load();
+    if (index < 0 || index >= layout.slots.length) {
+      await _send(central, const Ack(ok: false, message: 'No such button'));
+      return;
+    }
+    final stored = layout.slots[index];
+    final item = stored == null ? null : DeckItem.parse(stored);
+    if (item == null) {
+      await _send(central, const Ack(ok: false, message: 'Empty button'));
+      return;
+    }
+
+    _touch(central, item.label);
+    final result = switch (item) {
+      AppItem(:final name) => await AppLauncher.open(name),
+      ActionItem(:final action) => await MediaControl.run(action),
+      ShellItem(:final command) => await CommandRunner.shell(command),
+      ShortcutItem(:final name) => await CommandRunner.shortcut(name),
+    };
+    if (mounted) setState(() => _addLog(result.message));
+    await _send(central, Ack(ok: result.ok, message: result.message));
   }
 
   /// Streams the layout: a header, one message per occupied cell, then an

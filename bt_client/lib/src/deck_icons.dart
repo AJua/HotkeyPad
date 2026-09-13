@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'protocol.dart';
 
-/// Glyph shown for a deck item that has no icon of its own.
+/// Glyph shown for a deck item that has neither a custom emoji nor an app
+/// icon of its own.
 ///
-/// Presentation, so it lives outside the protocol: an app falls back to its
-/// initial, while an action has a real glyph.
+/// Presentation, so it lives outside the protocol.
 IconData deckFallbackIcon(DeckItem item) => switch (item) {
   AppItem() => Icons.apps,
+  ShellItem() => Icons.terminal,
+  ShortcutItem() => Icons.bolt,
   ActionItem(:final action) => switch (action) {
     DeckAction.playPause => Icons.play_arrow,
     DeckAction.next => Icons.skip_next,

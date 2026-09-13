@@ -86,7 +86,7 @@ hierarchy encoded as single-line JSON, one message per ATT operation:
 | `lay`       | host -> client  | layout header (columns, rows)    |
 | `slot`      | host -> client  | contents of one cell             |
 | `laye`      | host -> client  | layout complete                  |
-| `act`       | client -> host  | perform a media action           |
+| `press`     | client -> host  | the button in slot N was pressed |
 | `ico`       | client -> host  | send this app's icon             |
 | `ico!`      | host -> client  | there is no icon, stop waiting   |
 
@@ -191,6 +191,31 @@ Every step is behind a timeout armed *before* the first `await`. Android
 throttles an app that scans repeatedly, and both `authorize()` and
 `startDiscovery()` can then hang indefinitely; a timeout set after them would
 never be set at all.
+
+### A button press is an index, not an instruction
+
+The client never says what to do — only which slot was pressed. The host
+looks that slot up in its own layout and acts on what it finds. Every kind of
+button travels the same path, and a phone cannot ask the Mac to run something
+the Mac was not already configured with. That distinction is academic while
+buttons only launch apps; it is the whole design once they can hold shell
+commands.
+
+### Buttons
+
+Four kinds: an application, a media action, a shell command, or a macOS
+Shortcut. Any of them can carry an emoji, which replaces the app icon or the
+built-in glyph.
+
+Shortcuts are *started* rather than awaited. One can legitimately run for
+minutes or put up its own interface — Shazam listens to the room — and a deck
+button should report that it fired, not spin until the work finishes. Only a
+failure to launch comes back as an error. Shell commands are awaited, with a
+timeout, because their output is worth reporting and they are usually short.
+
+Items with extra fields — a custom emoji, a command — are stored as JSON in
+the layout; simple ones keep their short prefixed form (`app:Safari`), which
+stays readable in the file and loadable by an older build.
 
 ### Media actions
 

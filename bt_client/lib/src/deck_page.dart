@@ -192,11 +192,11 @@ class _DeckPageState extends State<DeckPage> {
     });
   }
 
-  Future<void> _press(BtLinkSession session, DeckItem item) async {
+  Future<void> _press(BtLinkSession session, int index, DeckItem item) async {
     // Fires before the round trip: the deck should feel like a button, not
     // like a form that submits.
     unawaited(HapticFeedback.selectionClick());
-    await session.press(item);
+    await session.press(index, item);
   }
 
   @override
@@ -438,13 +438,13 @@ class _DeckPageState extends State<DeckPage> {
                             ),
                         itemCount: layout.pageCapacity,
                         itemBuilder: (context, cell) {
-                          final stored = layout
-                              .slots[layout.indexOf(page: page, cell: cell)];
+                          final index = layout.indexOf(page: page, cell: cell);
+                          final stored = layout.slots[index];
                           final item = stored == null
                               ? null
                               : DeckItem.parse(stored);
                           if (item == null) return const _EmptyCell();
-                          if (item is AppItem) {
+                          if (item is AppItem && item.emoji == null) {
                             unawaited(session.ensureIcon(item.name));
                           }
                           return _DeckButton(
@@ -455,7 +455,7 @@ class _DeckPageState extends State<DeckPage> {
                             showLabel: labels,
                             pressing: session.isPressing(item),
                             outcome: session.feedbackFor(item),
-                            onPressed: () => _press(session, item),
+                            onPressed: () => _press(session, index, item),
                           );
                         },
                       ),
@@ -589,7 +589,22 @@ class _DeckButton extends StatelessWidget {
                     SizedBox(
                       width: iconSize,
                       height: iconSize,
-                      child: icon != null
+                      child: item.emoji != null
+                          // Sized explicitly rather than with a FittedBox:
+                          // an emoji's advance box is wider than its glyph,
+                          // so fitting the box leaves the glyph small and
+                          // off to one side.
+                          ? Center(
+                              child: Text(
+                                item.emoji!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: iconSize * 0.78,
+                                  height: 1,
+                                ),
+                              ),
+                            )
+                          : icon != null
                           ? Image.memory(
                               icon!,
                               fit: BoxFit.contain,

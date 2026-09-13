@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import 'app_launcher.dart';
+import 'command_runner.dart';
 import 'deck_icons.dart';
 import 'layout_store.dart';
 import 'settings_store.dart';
@@ -44,6 +45,7 @@ class _LayoutPageState extends State<LayoutPage> {
   bool _showLabels = true;
   int _page = 0;
   var _apps = <({String name, String category, String path})>[];
+  var _shortcuts = <String>[];
   final _icons = <String, Uint8List?>{};
   bool _loading = true;
 
@@ -57,12 +59,14 @@ class _LayoutPageState extends State<LayoutPage> {
     final layout = await LayoutStore.load();
     final appearance = await SettingsStore.load();
     final apps = await AppLauncher.list();
+    final shortcuts = await CommandRunner.listShortcuts();
     if (!mounted) return;
     setState(() {
       _layout = layout;
       _theme = appearance.theme;
       _showLabels = appearance.showLabels;
       _apps = apps;
+      _shortcuts = shortcuts;
       _loading = false;
     });
   }
@@ -212,6 +216,7 @@ class _LayoutPageState extends State<LayoutPage> {
       context: context,
       builder: (context) => _PickerDialog(
         apps: _apps,
+        shortcuts: _shortcuts,
         current: _layout.slots[index],
       ),
     );
@@ -361,7 +366,9 @@ class LayoutGrid extends StatelessWidget {
                 return _Cell(
                   index: index,
                   item: item,
-                  icon: item is AppItem ? iconFor(item.name) : null,
+                  icon: item is AppItem && item.emoji == null
+                      ? iconFor(item.name)
+                      : null,
                   onTap: () => onPick(index),
                   onClear: stored == null ? null : () => onClear(index),
                   onMoved: (from) => onMove(from, index),
@@ -456,17 +463,30 @@ class _Cell extends StatelessWidget {
                       SizedBox(
                         width: iconSize,
                         height: iconSize,
-                        child: icon != null
+                        child: item!.emoji != null
+                            // Sized explicitly: an emoji's advance box is
+                            // wider than its glyph, so fitting the box
+                            // leaves it small and off centre.
+                            ? Center(
+                                child: Text(
+                                  item!.emoji!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: iconSize * 0.78,
+                                    height: 1,
+                                  ),
+                                ),
+                              )
+                            : icon != null
                             ? Image.memory(icon!, fit: BoxFit.contain)
                             : FittedBox(
-                                child: item is ActionItem
-                                    ? Icon(deckFallbackIcon(item!))
-                                    : Text(
+                                child: item is AppItem
+                                    ? Text(
                                         item!.label.characters.first
                                             .toUpperCase(),
-                                        style:
-                                            theme.textTheme.headlineMedium,
-                                      ),
+                                        style: theme.textTheme.headlineMedium,
+                                      )
+                                    : Icon(deckFallbackIcon(item!)),
                               ),
                       ),
                       SizedBox(height: margin * 0.05),
@@ -549,9 +569,14 @@ class DeckItemChoice {
 }
 
 class _PickerDialog extends StatefulWidget {
-  const _PickerDialog({required this.apps, required this.current});
+  const _PickerDialog({
+    required this.apps,
+    required this.shortcuts,
+    required this.current,
+  });
 
   final List<({String name, String category, String path})> apps;
+  final List<String> shortcuts;
   final String? current;
 
   @override
@@ -560,18 +585,51 @@ class _PickerDialog extends StatefulWidget {
 
 class _PickerDialogState extends State<_PickerDialog> {
   final _search = TextEditingController();
+  final _emoji = TextEditingController();
   String _query = '';
 
   @override
   void initState() {
     super.initState();
     _search.addListener(() => setState(() => _query = _search.text.trim()));
+    // Prefill with whatever this slot already shows, so reopening the picker
+    // does not silently drop a custom icon.
+    final existing = widget.current == null
+        ? null
+        : DeckItem.parse(widget.current!);
+    _emoji.text = existing?.emoji ?? '';
   }
 
   @override
   void dispose() {
     _search.dispose();
+    _emoji.dispose();
     super.dispose();
+  }
+
+  /// The emoji field applies to whatever is picked; blank means "use the
+  /// app's own icon or the built-in glyph".
+  String? get _chosenEmoji {
+    final text = _emoji.text.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  void _choose(DeckItem item) =>
+      Navigator.of(context).pop(DeckItemChoice(item.stored));
+
+  Future<void> _composeShell() async {
+    final existing = widget.current == null
+        ? null
+        : DeckItem.parse(widget.current!);
+    final item = await showDialog<ShellItem>(
+      context: context,
+      builder: (context) => _ShellDialog(
+        existing: existing is ShellItem ? existing : null,
+        emoji: _chosenEmoji,
+      ),
+    );
+    if (item == null || !mounted) return;
+    _choose(item);
   }
 
   @override
@@ -582,29 +640,63 @@ class _PickerDialogState extends State<_PickerDialog> {
         : widget.apps
               .where((app) => app.name.toLowerCase().contains(needle))
               .toList();
+    final shortcuts = _query.isEmpty
+        ? widget.shortcuts
+        : widget.shortcuts
+              .where((name) => name.toLowerCase().contains(needle))
+              .toList();
 
     return AlertDialog(
       title: const Text('Choose a button'),
       content: SizedBox(
-        width: 420,
-        height: 520,
+        width: 440,
+        height: 560,
         child: Column(
           children: [
-            TextField(
-              controller: _search,
-              autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Search apps',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
+            Row(
+              children: [
+                SizedBox(
+                  width: 96,
+                  child: TextField(
+                    controller: _emoji,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 22),
+                    decoration: const InputDecoration(
+                      hintText: '🙂',
+                      labelText: 'Emoji',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      helperText: 'optional',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _search,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: 'Search apps and shortcuts',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Expanded(
               child: ListView(
                 children: [
                   if (_query.isEmpty) ...[
+                    const _SectionLabel('Command'),
+                    ListTile(
+                      leading: const Icon(Icons.terminal),
+                      title: const Text('Shell command...'),
+                      subtitle: const Text('Runs on this Mac'),
+                      onTap: _composeShell,
+                    ),
                     const _SectionLabel('Media controls'),
                     for (final action in DeckAction.values)
                       ListTile(
@@ -612,8 +704,18 @@ class _PickerDialogState extends State<_PickerDialog> {
                         title: Text(action.label),
                         selected:
                             widget.current == ActionItem(action).stored,
-                        onTap: () => Navigator.of(context).pop(
-                          DeckItemChoice(ActionItem(action).stored),
+                        onTap: () =>
+                            _choose(ActionItem(action, emoji: _chosenEmoji)),
+                      ),
+                  ],
+                  if (shortcuts.isNotEmpty) ...[
+                    const _SectionLabel('Shortcuts'),
+                    for (final name in shortcuts)
+                      ListTile(
+                        leading: const Icon(Icons.bolt),
+                        title: Text(name),
+                        onTap: () => _choose(
+                          ShortcutItem(name: name, emoji: _chosenEmoji),
                         ),
                       ),
                   ],
@@ -624,9 +726,8 @@ class _PickerDialogState extends State<_PickerDialog> {
                       title: Text(app.name),
                       subtitle: Text(app.category),
                       selected: widget.current == AppItem(app.name).stored,
-                      onTap: () => Navigator.of(
-                        context,
-                      ).pop(DeckItemChoice(AppItem(app.name).stored)),
+                      onTap: () =>
+                          _choose(AppItem(app.name, emoji: _chosenEmoji)),
                     ),
                 ],
               ),
@@ -639,6 +740,99 @@ class _PickerDialogState extends State<_PickerDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
+      ],
+    );
+  }
+}
+
+/// Composes a shell button: the command, what to call it, and an optional
+/// emoji carried over from the picker.
+class _ShellDialog extends StatefulWidget {
+  const _ShellDialog({required this.existing, required this.emoji});
+
+  final ShellItem? existing;
+  final String? emoji;
+
+  @override
+  State<_ShellDialog> createState() => _ShellDialogState();
+}
+
+class _ShellDialogState extends State<_ShellDialog> {
+  late final _command = TextEditingController(
+    text: widget.existing?.command ?? '',
+  );
+  late final _label = TextEditingController(
+    text: widget.existing?.label ?? '',
+  );
+
+  @override
+  void dispose() {
+    _command.dispose();
+    _label.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final command = _command.text.trim();
+    if (command.isEmpty) return;
+    final label = _label.text.trim();
+    Navigator.of(context).pop(
+      ShellItem(
+        command: command,
+        // Falling back to the command keeps the button identifiable when
+        // the user cannot think of a name.
+        label: label.isEmpty ? command : label,
+        emoji: widget.emoji ?? widget.existing?.emoji,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Shell command'),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _command,
+              autofocus: true,
+              maxLines: 3,
+              minLines: 1,
+              style: const TextStyle(fontFamily: 'monospace'),
+              decoration: const InputDecoration(
+                labelText: 'Command',
+                hintText: 'osascript -e \'display notification "hi"\'',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _label,
+              onSubmitted: (_) => _save(),
+              decoration: const InputDecoration(
+                labelText: 'Button label',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Runs with /bin/sh on this Mac. Phones can only press the '
+              'button, never send a command.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Add')),
       ],
     );
   }
