@@ -4,7 +4,6 @@ import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'deck_page.dart';
 import 'protocol.dart';
 import 'safe_insets.dart';
 import 'unsupported_page.dart';
@@ -29,6 +28,9 @@ class DiscoveredDevice {
   String get id => peripheral.uuid.toString();
 }
 
+/// A diagnostic: what this radio can see, and which of it speaks BTLink.
+/// Connecting happens automatically on the deck; this is for working out why
+/// it did not.
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
 
@@ -158,21 +160,6 @@ class _ScanPageState extends State<ScanPage> {
     }
   }
 
-  Future<void> _openDevice(DiscoveredDevice device) async {
-    if (_discovering) await _toggleDiscovery();
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => DeckPage(
-          peripheral: device.peripheral,
-          name: device.name?.isNotEmpty == true
-              ? device.name!
-              : 'Unknown device',
-        ),
-      ),
-    );
-  }
-
   void _showMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(
@@ -251,13 +238,8 @@ class _ScanPageState extends State<ScanPage> {
                       itemCount: devices.length,
                       separatorBuilder:
                           (_, _) => const Divider(height: 1, indent: 72),
-                      itemBuilder: (context, index) {
-                        final device = devices[index];
-                        return _DeviceTile(
-                          device: device,
-                          onTap: () => _openDevice(device),
-                        );
-                      },
+                      itemBuilder: (context, index) =>
+                          _DeviceTile(device: devices[index]),
                     ),
           ),
         ],
@@ -277,10 +259,9 @@ class _ScanPageState extends State<ScanPage> {
 }
 
 class _DeviceTile extends StatelessWidget {
-  const _DeviceTile({required this.device, required this.onTap});
+  const _DeviceTile({required this.device});
 
   final DiscoveredDevice device;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -291,8 +272,6 @@ class _DeviceTile extends StatelessWidget {
     return Opacity(
       opacity: stale ? 0.45 : 1,
       child: ListTile(
-        onTap: onTap,
-        trailing: const Icon(Icons.chevron_right),
         leading: _SignalIcon(rssi: device.rssi),
         title: Row(
           children: [

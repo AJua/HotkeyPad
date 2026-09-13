@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'src/scan_page.dart';
+import 'src/deck_page.dart';
 
 void main() {
   runApp(const BtClientApp());
@@ -22,7 +22,7 @@ class BtClientApp extends StatelessWidget {
         colorSchemeSeed: Colors.indigo,
         brightness: Brightness.dark,
       ),
-      home: const ScanPage(),
+      home: const DeckPage(),
     );
   }
 }

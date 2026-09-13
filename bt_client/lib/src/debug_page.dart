@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'safe_insets.dart';
+import 'scan_page.dart';
 import 'session.dart';
 
 /// The old chat screen, kept as a diagnostic tool: it shows every message on
@@ -8,7 +9,9 @@ import 'session.dart';
 class DebugPage extends StatefulWidget {
   const DebugPage({super.key, required this.session});
 
-  final BtLinkSession session;
+  /// Null while the app is still looking for a host — the device scanner is
+  /// useful precisely then.
+  final BtLinkSession? session;
 
   @override
   State<DebugPage> createState() => _DebugPageState();
@@ -25,10 +28,11 @@ class _DebugPageState extends State<DebugPage> {
   }
 
   Future<void> _send() async {
+    final session = widget.session;
     final text = _composer.text.trim();
-    if (text.isEmpty || _sending) return;
+    if (session == null || text.isEmpty || _sending) return;
     setState(() => _sending = true);
-    await widget.session.sendDebugText(text);
+    await session.sendDebugText(text);
     if (!mounted) return;
     setState(() {
       _composer.clear();
@@ -38,23 +42,34 @@ class _DebugPageState extends State<DebugPage> {
 
   @override
   Widget build(BuildContext context) {
+    final session = widget.session;
+    if (session == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Debug console'),
+          actions: [_scanAction(context)],
+        ),
+        body: const Center(child: Text('Not connected to a host yet.')),
+      );
+    }
+
     return ListenableBuilder(
-      listenable: widget.session,
+      listenable: session,
       builder: (context, _) {
-        final log = widget.session.log;
-        final ready = widget.session.ready;
+        final log = session.log;
+        final ready = session.ready;
 
         return Scaffold(
           appBar: AppBar(
             title: const Text('Debug console'),
+            actions: [_scanAction(context)],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(24),
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
-                  '${widget.session.stage.label}'
-                  '${widget.session.mtu != null ? ' · MTU ${widget.session.mtu}' : ''}'
-                  ' · ${widget.session.apps.length} apps',
+                  '${session.stage.label}'
+                  '${session.mtu != null ? ' · MTU ${session.mtu}' : ''}',
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
               ),
@@ -108,6 +123,16 @@ class _DebugPageState extends State<DebugPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _scanAction(BuildContext context) {
+    return IconButton(
+      tooltip: 'Nearby devices',
+      onPressed: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ScanPage())),
+      icon: const Icon(Icons.bluetooth_searching),
     );
   }
 }

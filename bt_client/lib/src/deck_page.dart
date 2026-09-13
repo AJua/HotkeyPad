@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,56 +11,204 @@ import 'deck_icons.dart';
 import 'protocol.dart';
 import 'session.dart';
 
+/// The app's home. Finds a host by itself rather than making the user pick
+/// one: there is normally exactly one Mac to talk to, and choosing it from a
+/// list of every radio in the room is a chore, not a feature.
 class DeckPage extends StatefulWidget {
-  const DeckPage({super.key, required this.peripheral, required this.name});
-
-  final Peripheral peripheral;
-  final String name;
+  const DeckPage({super.key});
 
   @override
   State<DeckPage> createState() => _DeckPageState();
 }
 
 class _DeckPageState extends State<DeckPage> {
-  late final BtLinkSession _session;
   final _pages = PageController();
   int _page = 0;
+
+  CentralManager? _central;
+  BtLinkSession? _session;
+  StreamSubscription? _discovery;
+  StreamSubscription? _stateChanges;
+  var _state = BluetoothLowEnergyState.unknown;
+  bool _askedForPermission = false;
+  Timer? _searchTimeout;
+  Object? _searchError;
+  bool _searching = false;
 
   @override
   void initState() {
     super.initState();
-    _session = BtLinkSession(peripheral: widget.peripheral, name: widget.name)
-      ..start();
+    try {
+      final central = CentralManager();
+      _central = central;
+      _state = central.state;
+      _stateChanges = central.stateChanged.listen((event) {
+        if (!mounted) return;
+        setState(() => _state = event.state);
+        _onState(event.state);
+      });
+    } catch (error) {
+      // No Bluetooth implementation on this platform.
+      _searchError = error;
+    }
+    // After the first frame: authorize() goes through the plugin's Activity,
+    // which is not attached yet during initState.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_central != null) _onState(_state);
+    });
   }
 
   @override
   void dispose() {
+    _searchTimeout?.cancel();
+    _stateChanges?.cancel();
+    _discovery?.cancel();
+    if (_searching) _central?.stopDiscovery();
     _pages.dispose();
-    _session.dispose();
+    _session?.dispose();
     super.dispose();
   }
 
-  Future<void> _press(DeckItem item) async {
+  /// The adapter's state decides what happens next. Requesting permission
+  /// unconditionally was wrong: `authorize()` re-requests through the
+  /// plugin's Activity even when the permission is already held, and on a
+  /// cold start that call can simply never return.
+  void _onState(BluetoothLowEnergyState state) {
+    switch (state) {
+      case BluetoothLowEnergyState.poweredOn:
+        _search();
+      case BluetoothLowEnergyState.unauthorized:
+        _requestPermission();
+      case BluetoothLowEnergyState.poweredOff:
+        _fail('Bluetooth is turned off.');
+      case BluetoothLowEnergyState.unsupported:
+        _fail('This device does not support Bluetooth Low Energy.');
+      case BluetoothLowEnergyState.unknown:
+        // The plugin has not reported yet; the next event will arrive.
+        break;
+    }
+  }
+
+  void _fail(String message) {
+    _stopSearch();
+    if (mounted) setState(() => _searchError = StateError(message));
+  }
+
+  Future<void> _requestPermission() async {
+    final central = _central;
+    // Once per run: a denied prompt should not loop.
+    if (central == null || _askedForPermission) return;
+    _askedForPermission = true;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      // Granting arrives as a state change, which re-enters _onState.
+      await central.authorize();
+    } catch (error) {
+      if (mounted) setState(() => _searchError = error);
+    }
+  }
+
+  Future<void> _search() async {
+    final central = _central;
+    if (central == null || _searching || _session != null) return;
+
+    setState(() {
+      _searching = true;
+      _searchError = null;
+    });
+
+    // Armed before anything that can await: Android throttles an app that
+    // scans repeatedly, and startDiscovery can then never return. A timeout
+    // set afterwards would never be set at all.
+    _searchTimeout = Timer(const Duration(seconds: 20), _giveUp);
+
+    try {
+
+      // Deliberately not filtering the scan on the service UUID: a host
+      // whose advertisement puts it in the scan response would be missed
+      // entirely, and the check below costs nothing.
+      _discovery = central.discovered.listen((event) {
+        if (!event.advertisement.serviceUUIDs.contains(BtLink.serviceUuid)) {
+          return;
+        }
+        _adopt(event.peripheral, _nameOf(event.advertisement));
+      });
+
+      await central.startDiscovery();
+    } catch (error) {
+      _stopSearch();
+      if (mounted) setState(() => _searchError = error);
+    }
+  }
+
+  void _giveUp() {
+    if (_session != null) return;
+    _stopSearch();
+    if (!mounted) return;
+    setState(() {
+      _searchError = StateError(
+        'No BTLink host is advertising nearby. Check that the host is '
+        'running on your Mac. Scanning repeatedly in a short time can also '
+        'make Android stop reporting results for a minute.',
+      );
+    });
+  }
+
+  String? _nameOf(Advertisement advertisement) {
+    try {
+      return advertisement.name;
+    } on UnsupportedError {
+      return null;
+    }
+  }
+
+  void _stopSearch() {
+    _searchTimeout?.cancel();
+    _searchTimeout = null;
+    _discovery?.cancel();
+    _discovery = null;
+    if (_searching) _central?.stopDiscovery();
+    if (mounted) setState(() => _searching = false);
+  }
+
+  /// Takes the first host that answers. With one Mac in the room there is
+  /// nothing to choose between, and a picker would just be a step to dismiss.
+  void _adopt(Peripheral peripheral, String? name) {
+    if (_session != null) return;
+    _stopSearch();
+    if (!mounted) return;
+    setState(() {
+      _session = BtLinkSession(
+        peripheral: peripheral,
+        name: name?.isNotEmpty == true ? name! : BtLink.advertisedName,
+      )..start();
+    });
+  }
+
+  Future<void> _press(BtLinkSession session, DeckItem item) async {
     // Fires before the round trip: the deck should feel like a button, not
     // like a form that submits.
     unawaited(HapticFeedback.selectionClick());
-    await _session.press(item);
+    await session.press(item);
   }
 
   @override
   Widget build(BuildContext context) {
+    final session = _session;
+    if (session == null) return _searchScaffold(context);
+
     return ListenableBuilder(
-      listenable: _session,
+      listenable: session,
       builder: (context, _) {
         return Scaffold(
           appBar: AppBar(
-            title: Text(widget.name),
+            title: Text(session.name),
             actions: [
               IconButton(
                 tooltip: 'Debug console',
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => DebugPage(session: _session),
+                    builder: (_) => DebugPage(session: session),
                   ),
                 ),
                 icon: const Icon(Icons.bug_report_outlined),
@@ -68,15 +217,15 @@ class _DeckPageState extends State<DeckPage> {
           ),
           body: Stack(
             children: [
-              Positioned.fill(child: _body()),
+              Positioned.fill(child: _body(session)),
               // Built only while the link is unusable, so a connected deck
               // has nothing layered over it to absorb taps.
-              if (_session.stage != LinkStage.ready)
+              if (session.stage != LinkStage.ready)
                 Positioned.fill(
                   child: _ConnectionOverlay(
-                    session: _session,
-                    deviceName: widget.name,
-                    onBack: () => Navigator.of(context).maybePop(),
+                    session: session,
+                    deviceName: session.name,
+                    onBack: _forget,
                   ),
                 ),
             ],
@@ -86,8 +235,85 @@ class _DeckPageState extends State<DeckPage> {
     );
   }
 
-  Widget _body() {
-    final stored = _session.layout;
+  /// Drops the current host and looks again — the only way back to a
+  /// different Mac now that there is no picker.
+  void _forget() {
+    _session?.dispose();
+    setState(() => _session = null);
+    _search();
+  }
+
+  Widget _searchScaffold(BuildContext context) {
+    final error = _searchError;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('BTLink'),
+        actions: [
+          IconButton(
+            tooltip: 'Debug console',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const DebugPage(session: null)),
+            ),
+            icon: const Icon(Icons.bug_report_outlined),
+          ),
+        ],
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (error == null) ...[
+                const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Looking for a host',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Start the BTLink host on your Mac.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ] else ...[
+                Icon(
+                  Icons.bluetooth_disabled,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No host found',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  error is StateError ? error.message : '$error',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: _search,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Search again'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _body(BtLinkSession session) {
+    final stored = session.layout;
     // The host edits one shape; the deck turns it to fit the screen it is
     // actually on, so a 5x3 landscape grid becomes 3x5 upright.
     final layout = stored?.orientedFor(
@@ -108,7 +334,7 @@ class _DeckPageState extends State<DeckPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                _session.loadingLayout
+                session.loadingLayout
                     ? 'Loading the deck...'
                     : 'No deck yet.',
                 style: Theme.of(context).textTheme.titleMedium,
@@ -168,16 +394,16 @@ class _DeckPageState extends State<DeckPage> {
                         : DeckItem.parse(stored);
                     if (item == null) return const _EmptyCell();
                     if (item is AppItem) {
-                      unawaited(_session.ensureIcon(item.name));
+                      unawaited(session.ensureIcon(item.name));
                     }
                     return _DeckButton(
                       item: item,
                       icon: item is AppItem
-                          ? _session.iconFor(item.name)
+                          ? session.iconFor(item.name)
                           : null,
-                      pressing: _session.isPressing(item),
-                      outcome: _session.feedbackFor(item),
-                      onPressed: () => _press(item),
+                      pressing: session.isPressing(item),
+                      outcome: session.feedbackFor(item),
+                      onPressed: () => _press(session, item),
                     );
                   },
                 ),

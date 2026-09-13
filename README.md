@@ -15,10 +15,15 @@ lists what it finds, tagging anything that advertises the BTLink service.
 A Stream Deck Mobile for your Mac: the phone is the deck, the Mac runs the
 service, and the buttons launch applications over BLE.
 
-- The client scans, lists nearby devices, and tags BTLink hosts.
-- Tapping a host connects, discovers GATT and subscribes.
-- On connect the client asks for the app catalogue; the host scans its
-  application directories and streams the names back.
+- **The client opens straight onto the deck.** It scans in the background,
+  takes the first host that advertises the BTLink service, and connects. With
+  one Mac in the room there is nothing to choose between, so a device picker
+  was a step to dismiss rather than a feature.
+- The scanner survives as a diagnostic under the debug console: what this
+  radio can see, and which of it speaks BTLink. It is for working out why the
+  automatic connection did not happen, not for making it happen.
+- On connect the client asks for the layout and the app catalogue; the host
+  streams both back.
 - **The host owns the layout.** Arranging a grid on a phone screen is
   miserable, and the host is where the app list already lives, so the editor
   is a tab in the host window: a grid of cells, click one to choose what it
@@ -122,6 +127,24 @@ The client caches the layout it was sent (`deck_store.dart`) so the deck draws
 immediately on open rather than after the link comes up, and a brief drop does
 not blank the screen. It is a cache, never an authority: the host's copy wins
 on every connect.
+
+### Finding the host
+
+The search is driven by the adapter's state, not by asking for permission and
+hoping. `authorize()` re-requests through the plugin's Activity even when the
+permission is already held, and on a cold start that call can never return —
+which showed up as a spinner that never resolved. The deck now listens to
+`stateChanged`: `poweredOn` starts the scan, `unauthorized` asks once,
+`poweredOff` and `unsupported` say so.
+
+The scan is not filtered on the service UUID, deliberately. A host whose
+advertisement puts the UUID in the scan response would be missed entirely,
+and checking each result costs nothing.
+
+Every step is behind a timeout armed *before* the first `await`. Android
+throttles an app that scans repeatedly, and both `authorize()` and
+`startDiscovery()` can then hang indefinitely; a timeout set after them would
+never be set at all.
 
 ### Media actions
 
