@@ -361,21 +361,31 @@ class _DeckPageState extends State<DeckPage> {
     // Pulling down retries any icon that never arrived (see
     // BtLinkSession.refreshIcons) — a dropped frame otherwise has no way to
     // recover on its own. The grid itself never scrolls, so this needs its
-    // own vertical scrollable to detect the pull; SliverFillRemaining keeps
-    // it filling the screen without becoming scrollable content in its own
-    // right. Vertical pull and the PageView's horizontal swipe are different
-    // axes, so neither steals gestures from the other.
-    return RefreshIndicator(
-      onRefresh: session.refreshIcons,
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: _deck(session, layout),
+    // own vertical scrollable to detect the pull. A Sliver-based
+    // SliverFillRemaining did that once, but RenderSliverFillRemaining can
+    // query its child's *intrinsic* height, and _deck's own LayoutBuilder
+    // throws rather than answer that (a LayoutBuilder cannot run its builder
+    // speculatively) — a crash that only some constraint shapes hit, which
+    // is how it passed earlier Android testing but broke on iPhone.
+    // SingleChildScrollView never asks for intrinsics, so it sidesteps the
+    // conflict entirely; the outer LayoutBuilder just pins the child to
+    // exactly the viewport height, since a scroll view otherwise hands its
+    // child unbounded height and _deck needs a bounded one to size cells.
+    // Vertical pull and the PageView's horizontal swipe are different axes,
+    // so neither steals gestures from the other.
+    return LayoutBuilder(
+      builder: (context, outer) {
+        return RefreshIndicator(
+          onRefresh: session.refreshIcons,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: SizedBox(
+              height: outer.maxHeight,
+              child: _deck(session, layout),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
