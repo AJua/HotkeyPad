@@ -87,7 +87,12 @@ class _DeckPageState extends State<DeckPage> {
   }
 
   Widget _body() {
-    final layout = _session.layout;
+    final stored = _session.layout;
+    // The host edits one shape; the deck turns it to fit the screen it is
+    // actually on, so a 5x3 landscape grid becomes 3x5 upright.
+    final layout = stored?.orientedFor(
+      portrait: MediaQuery.orientationOf(context) == Orientation.portrait,
+    );
 
     if (layout == null) {
       return Center(

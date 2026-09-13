@@ -311,4 +311,73 @@ void main() {
       }
     });
   });
+
+  group('orientation', () {
+    test('transposing swaps the dimensions', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3);
+
+      final turned = layout.transposed();
+
+      expect(turned.columns, 3);
+      expect(turned.rows, 5);
+      expect(turned.capacity, 15);
+    });
+
+    test('the first row becomes the first column', () {
+      // A 5x3 grid with the top row filled left to right.
+      var layout = DeckLayout.empty(columns: 5, rows: 3);
+      for (var column = 0; column < 5; column++) {
+        layout = layout.withSlot(column, 'app:$column');
+      }
+
+      final turned = layout.transposed();
+
+      // Now reading down the first column of a 3-wide grid.
+      for (var row = 0; row < 5; row++) {
+        expect(turned.slots[row * 3], 'app:$row');
+      }
+    });
+
+    test('transposing twice returns the original', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3)
+          .withSlot(0, 'app:A')
+          .withSlot(7, 'app:B')
+          .withSlot(14, 'app:C');
+
+      expect(layout.transposed().transposed().slots, layout.slots);
+    });
+
+    test('every page is transposed', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3, pages: 2)
+          .withSlot(4, 'app:FirstPageTopRight')
+          .withSlot(15, 'app:SecondPageTopLeft');
+
+      final turned = layout.transposed();
+
+      // Top-right of a 5x3 is index 4; in a 3x5 it is row 4, column 0.
+      expect(turned.slots[4 * 3], 'app:FirstPageTopRight');
+      expect(turned.slots[turned.pageCapacity], 'app:SecondPageTopLeft');
+    });
+
+    test('orients to match the screen', () {
+      final wide = DeckLayout.empty(columns: 5, rows: 3);
+
+      expect(wide.orientedFor(portrait: false).columns, 5);
+      expect(wide.orientedFor(portrait: true).columns, 3);
+      expect(wide.orientedFor(portrait: true).rows, 5);
+      // Already tall: portrait leaves it alone.
+      final tall = wide.transposed();
+      expect(tall.orientedFor(portrait: true).columns, 3);
+      expect(tall.orientedFor(portrait: false).columns, 5);
+    });
+
+    test('a square grid is never turned', () {
+      final square = DeckLayout.empty(columns: 3, rows: 3)
+          .withSlot(1, 'app:A');
+
+      expect(square.orientedFor(portrait: true).slots, square.slots);
+      expect(square.orientedFor(portrait: false).slots, square.slots);
+      expect(square.transposed().slots, square.slots);
+    });
+  });
 }

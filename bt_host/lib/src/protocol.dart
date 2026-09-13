@@ -270,6 +270,41 @@ class DeckLayout {
     );
   }
 
+  /// Swaps rows and columns, so a 5-wide grid becomes 5-tall.
+  ///
+  /// A transpose rather than a rotation: the first row becomes the first
+  /// column, which is what "the wide one turned upright" looks like and
+  /// keeps every button's neighbours the same. A rotation would also move
+  /// buttons to the opposite edge, which is harder to predict.
+  DeckLayout transposed() {
+    if (columns == rows) return this;
+    final swapped = List<String?>.filled(slots.length, null);
+    for (var page = 0; page < pages; page++) {
+      final offset = page * pageCapacity;
+      for (var row = 0; row < rows; row++) {
+        for (var column = 0; column < columns; column++) {
+          swapped[offset + column * rows + row] =
+              slots[offset + row * columns + column];
+        }
+      }
+    }
+    return DeckLayout(
+      columns: rows,
+      rows: columns,
+      pages: pages,
+      slots: swapped,
+    );
+  }
+
+  /// The layout oriented to match the screen: wider than tall in landscape,
+  /// taller than wide in portrait. The host edits one shape; the client
+  /// turns it to fit whatever it is running on.
+  DeckLayout orientedFor({required bool portrait}) {
+    if (columns == rows) return this;
+    final isTaller = rows > columns;
+    return isTaller == portrait ? this : transposed();
+  }
+
   DeckLayout withSlot(int index, String? value) {
     final copy = List<String?>.of(slots);
     copy[index] = value;
