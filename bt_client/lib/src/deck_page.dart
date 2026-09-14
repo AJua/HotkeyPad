@@ -16,6 +16,20 @@ import 'deck_icons.dart';
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'session.dart';
 
+/// What port a manually-entered host address should be dialed on: the
+/// typed value if it parses to a positive integer, [WifiLink.tcpPort] (the
+/// only port a real BTLink host ever listens on) otherwise — so leaving
+/// the field blank, or mistyping it, still gets you the one port that
+/// could possibly work rather than a client-side error before the app
+/// ever reaches the network.
+///
+/// A pure function of the raw field text so it is testable without a
+/// widget.
+int resolveManualPort(String input) {
+  final parsed = int.tryParse(input.trim());
+  return (parsed != null && parsed > 0) ? parsed : WifiLink.tcpPort;
+}
+
 /// The app's home. Finds a host by itself rather than making the user pick
 /// one: there is normally exactly one Mac to talk to, and choosing it from a
 /// list of every radio in the room is a chore, not a feature.
@@ -320,6 +334,39 @@ class _DeckPageState extends State<DeckPage> {
     _session?.dispose();
     setState(() => _session = null);
     _search();
+    unawaited(_startWifiDiscovery());
+  }
+
+  /// The fallback for when discovery cannot reach the host at all — an
+  /// emulator's isolated network, or AP client isolation on the real one
+  /// (see [manualWifiHostId]'s doc comment) — typed in by hand instead of
+  /// learned from a beacon.
+  void _connectManually(String address, int port) {
+    if (_session != null) return;
+    _stopSearch();
+    _stopWifiDiscovery();
+    if (!mounted) return;
+    setState(() {
+      _session =
+          BtLinkSession(
+              target: WifiTarget(
+                hostId: manualWifiHostId(address: address, port: port),
+                address: address,
+                port: port,
+              ),
+              name: BtLink.advertisedName,
+            )
+            ..onTheme = widget.onTheme
+            ..start();
+    });
+  }
+
+  Future<void> _showManualEntryDialog() async {
+    final result = await showDialog<({String address, int port})>(
+      context: context,
+      builder: (_) => const _ManualHostDialog(),
+    );
+    if (result != null) _connectManually(result.address, result.port);
   }
 
   Widget _searchScaffold(BuildContext context) {
@@ -383,6 +430,12 @@ class _DeckPageState extends State<DeckPage> {
                   label: const Text('Search again'),
                 ),
               ],
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: _showManualEntryDialog,
+                icon: const Icon(Icons.keyboard_outlined),
+                label: const Text('Enter host IP manually'),
+              ),
             ],
           ),
         ),
@@ -1018,6 +1071,96 @@ class _ConnectionOverlay extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Fallback for when discovery cannot reach the host — see
+/// [_DeckPageState._connectManually]'s doc comment. Asks for just the
+/// address; the port is a collapsed "Advanced" field defaulting to the
+/// one real port ([WifiLink.tcpPort]) so the common case is one line.
+class _ManualHostDialog extends StatefulWidget {
+  const _ManualHostDialog();
+
+  @override
+  State<_ManualHostDialog> createState() => _ManualHostDialogState();
+}
+
+class _ManualHostDialogState extends State<_ManualHostDialog> {
+  final _address = TextEditingController();
+  final _port = TextEditingController();
+  bool _showPort = false;
+
+  @override
+  void dispose() {
+    _address.dispose();
+    _port.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final address = _address.text.trim();
+    if (address.isEmpty) return;
+    Navigator.of(
+      context,
+    ).pop((address: address, port: resolveManualPort(_port.text)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Enter host IP'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Shown on the host itself, under WiFi in its status card.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _address,
+            autofocus: true,
+            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            onSubmitted: (_) => _submit(),
+            decoration: const InputDecoration(
+              labelText: 'IP address',
+              hintText: '192.168.1.23',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          if (_showPort) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _port,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                labelText: 'Port',
+                hintText: '${WifiLink.tcpPort}',
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ] else
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => setState(() => _showPort = true),
+                child: const Text('Advanced: custom port'),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Connect')),
       ],
     );
   }

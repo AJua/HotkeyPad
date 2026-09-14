@@ -203,6 +203,14 @@ class _HostPageState extends State<HostPage> {
 
   String? _wifiError;
 
+  /// Shown in the status card so a client that cannot discover the host
+  /// automatically (AP client isolation, an emulator's isolated network)
+  /// has something to type into its own manual-entry field. Fetched once
+  /// when WiFi starts rather than on every build — interfaces essentially
+  /// never change mid-run, same reasoning as [WifiServer]'s own
+  /// broadcast-target list.
+  List<String> _localAddresses = [];
+
   /// Every WiFi client id the host has ever decided about — loaded once at
   /// startup, kept in memory, and written through to [WifiTrustStore] on
   /// every decision so it never falls out of sync with the file. See
@@ -418,9 +426,11 @@ class _HostPageState extends State<HostPage> {
         onMessage: _onWifiMessage,
         onDisconnected: _onWifiDisconnected,
       );
+      final addresses = await WifiServer.localAddresses();
       if (mounted) {
         setState(() {
           _wifiError = null;
+          _localAddresses = addresses;
           _addLog('WiFi listening on port ${WifiLink.tcpPort}');
         });
       }
@@ -1005,6 +1015,7 @@ class _HostPageState extends State<HostPage> {
       setState(() {
         _advertising = false;
         _wifiError = null;
+        _localAddresses = [];
         _clients.clear();
         _addLog('stopped');
       });
@@ -1254,6 +1265,7 @@ class _HostPageState extends State<HostPage> {
           onToggle: _toggleAdvertising,
           wifiRunning: _wifiServer.running,
           wifiError: _wifiError,
+          localAddresses: _localAddresses,
         ),
         const SizedBox(height: 24),
         Text(
@@ -1340,6 +1352,7 @@ class _StatusCard extends StatelessWidget {
     required this.onToggle,
     required this.wifiRunning,
     required this.wifiError,
+    required this.localAddresses,
   });
 
   final BluetoothLowEnergyState state;
@@ -1349,6 +1362,10 @@ class _StatusCard extends StatelessWidget {
   final VoidCallback? onToggle;
   final bool wifiRunning;
   final String? wifiError;
+
+  /// For a client whose own discovery cannot reach this host — see its use
+  /// in the "WiFi" row below.
+  final List<String> localAddresses;
 
   @override
   Widget build(BuildContext context) {
@@ -1388,6 +1405,30 @@ class _StatusCard extends StatelessWidget {
                   ? 'listening on port ${WifiLink.tcpPort}'
                   : wifiError ?? 'not running',
             ),
+            if (wifiRunning)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(width: 90, child: Text('Address')),
+                    Expanded(
+                      // Selectable rather than plain Text specifically so
+                      // this can be copied straight into the client's
+                      // manual-entry field — see WifiServer.localAddresses.
+                      child: SelectableText(
+                        localAddresses.isEmpty
+                            ? 'none found'
+                            : localAddresses.join(', '),
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

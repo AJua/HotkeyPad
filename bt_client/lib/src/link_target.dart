@@ -31,3 +31,17 @@ final class WifiTarget extends LinkTarget {
   final String address;
   final int port;
 }
+
+/// The synthetic host id a manually-typed WiFi target gets, since there is
+/// no beacon to learn the real one (see [WifiTarget.hostId]'s doc comment)
+/// from when discovery cannot reach the host — a client on an emulator or
+/// a network with AP client isolation, say. Stable for as long as the same
+/// address:port is entered again, which is exactly what layout/icon
+/// caching (`BtLinkSession.hostId`) needs; if the host's address changes
+/// later (a DHCP lease renewing, say) this becomes a distinct cache entry
+/// rather than a merged one — an acceptable rough edge for a fallback
+/// path that beacon discovery makes unnecessary the rest of the time.
+///
+/// A pure function of the two inputs so it is testable without a widget.
+String manualWifiHostId({required String address, required int port}) =>
+    'manual:$address:$port';
