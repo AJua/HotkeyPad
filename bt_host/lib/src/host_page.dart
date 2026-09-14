@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
@@ -18,6 +19,7 @@ import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'settings_store.dart';
 import 'unsupported_page.dart';
 import 'wifi_server.dart';
+import 'wifi_trust_store.dart';
 
 /// What running one action came to — every `AppLauncher.open`-style helper
 /// already returns this shape, so a combo step and a top-level press report
@@ -96,6 +98,15 @@ typedef ClientSource = ({
   LinkTransport transport,
   Future<void> Function(Uint8List bytes) send,
   Future<int> Function() maxFrameSize,
+});
+
+/// A WiFi connection waiting on its [SubmitPin] — see
+/// [_HostPageState._pendingWifiPins].
+typedef _PendingWifiPin = ({
+  WifiClient client,
+  String pin,
+  String clientId,
+  String? name,
 });
 
 /// A client that the host has seen. A BLE central is only reported to us
@@ -191,6 +202,17 @@ class _HostPageState extends State<HostPage> {
   static const _wifiMaxFrameSize = 8 * 1024 * 1024;
 
   String? _wifiError;
+
+  /// Every WiFi client id the host has ever decided about — loaded once at
+  /// startup, kept in memory, and written through to [WifiTrustStore] on
+  /// every decision so it never falls out of sync with the file. See
+  /// [wifiTrustFor]/[_onWifiMessage].
+  var _wifiTrust = <String, bool>{};
+
+  /// A WiFi connection mid PIN challenge, keyed by [WifiClient.id] — the
+  /// [SubmitPin] this is waiting on has nowhere else to be routed to yet,
+  /// since [_clients] does not get an entry for it until the PIN is right.
+  final _pendingWifiPins = <String, _PendingWifiPin>{};
 
   final _clients = <String, ConnectedClient>{};
   final _log = <String>[];
@@ -381,21 +403,20 @@ class _HostPageState extends State<HostPage> {
 
   Future<void> _startWifi() async {
     try {
+      _wifiTrust = await WifiTrustStore.load();
       final hostId = await HostIdentity.id();
       await _wifiServer.start(
         hostId: hostId,
         hostName: Platform.localHostname,
-        onConnected: (client) {
-          // A WiFi connection has no separate "subscribe" step the way a
-          // BLE central does — the TCP connection itself is the
-          // subscription, so this client is ready to be broadcast to the
-          // moment it is accepted.
-          _touch(_wifiSource(client), 'connected', subscribed: true);
-        },
-        onMessage: (client, bytes) {
-          unawaited(_handleCommand(_wifiSource(client), bytes));
-        },
-        onDisconnected: (client) => _remove(client.id, 'disconnected'),
+        // Not touched into _clients here the way a BLE central is on
+        // connect — unlike Bluetooth, which needs physical proximity to
+        // even discover the host, anyone on the same network can open a
+        // WiFi connection, so this waits for Hello (see _onWifiMessage)
+        // to learn *which* client this is before deciding whether it is
+        // already trusted or needs a PIN.
+        onConnected: (_) {},
+        onMessage: _onWifiMessage,
+        onDisconnected: _onWifiDisconnected,
       );
       if (mounted) {
         setState(() {
@@ -411,6 +432,110 @@ class _HostPageState extends State<HostPage> {
         });
       }
     }
+  }
+
+  /// Routes a WiFi client's message depending on how far it has got:
+  /// already trusted and fully connected (normal [_handleCommand], same
+  /// as any BLE central), mid PIN challenge (only a [SubmitPin] means
+  /// anything), or not yet identified at all (only a [Hello] means
+  /// anything — see [_onWifiHello]). Security, not just bookkeeping:
+  /// unlike Bluetooth, which needs physical proximity to even discover
+  /// the host, anyone on the same network can open a WiFi connection, so
+  /// nothing from one is acted on until it has answered a PIN correctly.
+  void _onWifiMessage(WifiClient client, Uint8List bytes) {
+    if (_clients.containsKey(client.id)) {
+      unawaited(_handleCommand(_wifiSource(client), bytes));
+      return;
+    }
+    final pending = _pendingWifiPins[client.id];
+    if (pending != null) {
+      final message = BtMessage.decode(bytes);
+      if (message is SubmitPin) unawaited(_verifyWifiPin(pending, message.pin));
+      return;
+    }
+    final message = BtMessage.decode(bytes);
+    if (message is Hello) unawaited(_onWifiHello(client, message));
+  }
+
+  /// A first message from a WiFi connection is only ever meaningful if it
+  /// is a [Hello] — everything else from an unidentified connection is
+  /// silently ignored (see [_onWifiMessage]) — and [Hello.clientId] is
+  /// what decides what happens next.
+  Future<void> _onWifiHello(WifiClient client, Hello hello) async {
+    final clientId = hello.clientId;
+    if (clientId.isEmpty) {
+      // An old client build, or a malformed one — either way there is no
+      // id to remember a decision against, so this fails closed rather
+      // than treating it as trusted.
+      if (mounted) {
+        setState(() => _addLog('WiFi client sent no id; connection closed'));
+      }
+      await client.socket.close();
+      return;
+    }
+    switch (wifiTrustFor(clientId, _wifiTrust)) {
+      case WifiTrust.trusted:
+        _touch(
+          _wifiSource(client),
+          'said hello as ${hello.name}',
+          name: hello.name,
+        );
+      case WifiTrust.blocked:
+        if (mounted) {
+          setState(
+            () => _addLog('WiFi client $clientId rejected (blocked)'),
+          );
+        }
+        await client.socket.close();
+      case WifiTrust.unknown:
+        final pin = _generatePin();
+        if (mounted) {
+          setState(() {
+            _pendingWifiPins[client.id] = (
+              client: client,
+              pin: pin,
+              clientId: clientId,
+              name: hello.name,
+            );
+            _addLog('WiFi device ${hello.name} needs a PIN: $pin');
+          });
+        }
+        await client.send(const RequestPin().encode());
+    }
+  }
+
+  /// Six digits — enough that guessing is not practical over the handful
+  /// of tries a single TCP connection allows before [_onWifiMessage]'s
+  /// wrong-PIN handling below closes it, short enough to comfortably read
+  /// off a screen and type into a phone.
+  String _generatePin() => (Random().nextInt(900000) + 100000).toString();
+
+  Future<void> _verifyWifiPin(_PendingWifiPin pending, String submitted) async {
+    _pendingWifiPins.remove(pending.client.id);
+    final ok = submitted.trim() == pending.pin;
+    await pending.client.send(PinResult(ok: ok).encode());
+    if (!ok) {
+      if (mounted) {
+        setState(
+          () => _addLog('WiFi PIN rejected for ${pending.clientId}'),
+        );
+      }
+      await pending.client.socket.close();
+      return;
+    }
+    await WifiTrustStore.setDecision(pending.clientId, true);
+    if (mounted) setState(() => _wifiTrust[pending.clientId] = true);
+    _touch(
+      _wifiSource(pending.client),
+      'said hello as ${pending.name}',
+      name: pending.name,
+    );
+  }
+
+  void _onWifiDisconnected(WifiClient client) {
+    // _remove's own setState below covers this mutation too.
+    _pendingWifiPins.remove(client.id);
+    _remove(client.id, 'disconnected');
   }
 
   /// Subscribes to a stream that some platforms refuse to provide, recording
@@ -526,6 +651,12 @@ class _HostPageState extends State<HostPage> {
         await _queueTransfer(() => _sendIcon(source.id, name));
       case DebugText(:final text):
         _touch(source, 'said: $text');
+      case SubmitPin():
+        // Only meaningful from a connection _onWifiMessage still has
+        // pending — one that has already reached _handleCommand (this
+        // method) is, by definition, already trusted and has nothing
+        // left to submit a PIN for.
+        _touch(source, 'submitted a PIN after already being trusted');
       case Ack() ||
           SetAppearance() ||
           PressSlot() ||
@@ -534,7 +665,9 @@ class _HostPageState extends State<HostPage> {
           IconUnavailable() ||
           LayoutStart() ||
           LayoutSlot() ||
-          LayoutEnd():
+          LayoutEnd() ||
+          RequestPin() ||
+          PinResult():
         // Host-to-client shapes; a client has no business sending them.
         _touch(source, 'ignored a ${message.runtimeType}');
     }
@@ -967,32 +1100,119 @@ class _HostPageState extends State<HostPage> {
             icon: const Icon(Icons.arrow_back),
           ),
         ),
-        body: _serviceTab(context, clients, subscribedCount),
+        body: Column(
+          children: [
+            _wifiPinBanner(context),
+            Expanded(child: _serviceTab(context, clients, subscribedCount)),
+          ],
+        ),
       );
     }
 
     // The window is the deck. Everything else — grid size, appearance, the
     // service details — lives behind the gear.
     return Scaffold(
-      body: LayoutPage(
-        onChanged: _broadcastLayout,
-        onAppearanceChanged: (theme, showLabels) {
-          widget.onThemeChanged(theme);
-          _broadcastAppearance();
-        },
-        onShowService: () => setState(() => _showingService = true),
-        connectedClients: [
-          for (final client in clients) (id: client.id, label: _labelFor(client)),
+      body: Column(
+        children: [
+          _wifiPinBanner(context),
+          Expanded(
+            child: LayoutPage(
+              onChanged: _broadcastLayout,
+              onAppearanceChanged: (theme, showLabels) {
+                widget.onThemeChanged(theme);
+                _broadcastAppearance();
+              },
+              onShowService: () => setState(() => _showingService = true),
+              connectedClients: [
+                for (final client in clients)
+                  (id: client.id, label: _labelFor(client)),
+              ],
+              lockedClientId: _lockedClientId,
+              onLockChanged: (value) => setState(() => _lockedClientId = value),
+              // Only meaningful once a lock names one unambiguous device to
+              // match — see LayoutPage's own doc comment on this field.
+              lockedClientPortrait: _lockedClientId == null
+                  ? null
+                  : _clients[_lockedClientId]?.portrait,
+            ),
+          ),
         ],
-        lockedClientId: _lockedClientId,
-        onLockChanged: (value) => setState(() => _lockedClientId = value),
-        // Only meaningful once a lock names one unambiguous device to
-        // match — see LayoutPage's own doc comment on this field.
-        lockedClientPortrait: _lockedClientId == null
-            ? null
-            : _clients[_lockedClientId]?.portrait,
       ),
     );
+  }
+
+  /// A device that has never connected over WiFi before needs a PIN read
+  /// off this screen and typed into it — see `_onWifiHello`. Shown above
+  /// whichever screen the host is already looking at (the deck or the
+  /// service tab) rather than as a blocking dialog, since there is no
+  /// decision for the host user to make here beyond reading a number: the
+  /// PIN itself is the security boundary, not a separate accept/reject
+  /// click. The (X) is for a device the user does not recognize at all.
+  Widget _wifiPinBanner(BuildContext context) {
+    if (_pendingWifiPins.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final onContainer = theme.colorScheme.onPrimaryContainer;
+    return Material(
+      color: theme.colorScheme.primaryContainer,
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            for (final pending in _pendingWifiPins.values)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.pin_outlined, color: onContainer),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          style: TextStyle(color: onContainer),
+                          children: [
+                            TextSpan(
+                              text:
+                                  '${pending.name?.isNotEmpty == true ? pending.name : 'A new device'} '
+                                  'wants to connect over WiFi — code: ',
+                            ),
+                            TextSpan(
+                              text: pending.pin,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: "Reject — don't let this device connect",
+                      icon: Icon(Icons.close, color: onContainer),
+                      onPressed: () => _rejectPendingWifiPin(pending),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Closes a still-pending WiFi connection without recording a decision —
+  /// the device is free to try again (and get a fresh PIN) rather than
+  /// being permanently blocked, the same leniency a wrong PIN gets in
+  /// [_verifyWifiPin].
+  void _rejectPendingWifiPin(_PendingWifiPin pending) {
+    setState(() {
+      _pendingWifiPins.remove(pending.client.id);
+      _addLog('WiFi device ${pending.clientId} rejected');
+    });
+    unawaited(pending.client.socket.close());
   }
 
   Widget _serviceTab(

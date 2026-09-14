@@ -63,8 +63,14 @@ sealed class BtMessage {
       if (json is! Map<String, Object?>) return null;
       return switch (json['t']) {
         'ls' => const ListApps(),
-        'hi' => Hello(name: json['n'] as String? ?? ''),
+        'hi' => Hello(
+          name: json['n'] as String? ?? '',
+          clientId: json['c'] as String? ?? '',
+        ),
         'ori' => SetOrientation(portrait: json['p'] as bool? ?? false),
+        'pin?' => const RequestPin(),
+        'pin' => SubmitPin(pin: json['v'] as String? ?? ''),
+        'pin!' => PinResult(ok: json['ok'] as bool? ?? false),
         'app' => AppEntry(
           name: json['n'] as String,
           category: json['c'] as String?,
@@ -120,12 +126,21 @@ final class ListApps extends BtMessage {
 /// a friendlier name than a bare central id when more than one device is
 /// connected at once — see [PressSlot] and the host's device lock.
 final class Hello extends BtMessage {
-  const Hello({required this.name});
+  const Hello({required this.name, required this.clientId});
 
   final String name;
 
+  /// Generated once per install and persisted (see `bt_client`'s
+  /// `ClientIdentity`), unrelated to any transport-level id — a BLE
+  /// central's uuid or a WiFi socket's address:port are both scoped to
+  /// one connection, but the WiFi PIN-pairing flow (`RequestPin`/
+  /// `SubmitPin`/`PinResult`) needs an identity that survives a
+  /// reconnect, which is what this is for. BLE ignores it entirely; it
+  /// travels regardless since both transports share this one message.
+  final String clientId;
+
   @override
-  Map<String, Object?> toJson() => {'t': 'hi', 'n': name};
+  Map<String, Object?> toJson() => {'t': 'hi', 'n': name, 'c': clientId};
 }
 
 /// Client -> host: sent at connect and again whenever it changes, so the
@@ -139,6 +154,42 @@ final class SetOrientation extends BtMessage {
 
   @override
   Map<String, Object?> toJson() => {'t': 'ori', 'p': portrait};
+}
+
+/// Host -> client, WiFi only: this is the first time the host has seen
+/// this [Hello.clientId], so it needs a PIN — displayed on the host's own
+/// screen for the user to read off and type into the client — before
+/// anything else from this connection is acted on. Bluetooth never sends
+/// this: physical proximity to discover the host at all is already a
+/// meaningfully higher bar than being on the same WiFi network.
+final class RequestPin extends BtMessage {
+  const RequestPin();
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'pin?'};
+}
+
+/// Client -> host: the user's answer to [RequestPin].
+final class SubmitPin extends BtMessage {
+  const SubmitPin({required this.pin});
+
+  final String pin;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'pin', 'v': pin};
+}
+
+/// Host -> client: whether [SubmitPin] matched. `true` means this
+/// [Hello.clientId] is now remembered and will not be asked again; `false`
+/// means the host is about to close the connection — trying again means a
+/// fresh connection and a fresh PIN, not another guess on this one.
+final class PinResult extends BtMessage {
+  const PinResult({required this.ok});
+
+  final bool ok;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'pin!', 'ok': ok};
 }
 
 /// Host -> client: one entry of the catalogue.

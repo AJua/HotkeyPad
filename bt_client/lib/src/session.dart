@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart' hide ConnectionState;
 
 import 'dart:typed_data';
 
+import 'client_identity.dart';
 import 'deck_store.dart';
 import 'device_info.dart';
 import 'icon_cache.dart';
@@ -19,6 +20,11 @@ enum LinkStage {
   connecting('Connecting'),
   discovering('Discovering services'),
   subscribing('Subscribing'),
+
+  /// WiFi only: the host does not recognize this install yet and is
+  /// waiting on [BtLinkSession.submitPin] — see [RequestPin]. Bluetooth
+  /// never enters this stage.
+  awaitingPin('Enter the code shown on the host'),
   ready('Connected'),
   disconnected('Disconnected'),
   failed('Failed');
@@ -78,6 +84,11 @@ class BtLinkSession extends ChangeNotifier {
 
   LinkStage _stage = LinkStage.connecting;
   String? _error;
+
+  /// Set only after a wrong [PinResult] arrives during [LinkStage.awaitingPin]
+  /// — cleared by the next [RequestPin] (a fresh attempt) or a successful
+  /// [PinResult].
+  String? _pinError;
   GATTCharacteristic? _notifyCharacteristic;
   GATTCharacteristic? _writeCharacteristic;
 
@@ -161,6 +172,7 @@ class BtLinkSession extends ChangeNotifier {
 
   LinkStage get stage => _stage;
   String? get error => _error;
+  String? get pinError => _pinError;
   bool get ready => _stage == LinkStage.ready;
   List<DeckApp> get apps => List.unmodifiable(_apps);
   DeckTheme get theme => _theme;
@@ -331,12 +343,33 @@ class BtLinkSession extends ChangeNotifier {
       case IconUnavailable(:final name):
         _append('no icon for $name', inbound: true);
         _finishIconFetch(name);
+      case RequestPin():
+        _stage = LinkStage.awaitingPin;
+        _pinError = null;
+        _append('host asked for a pairing PIN', inbound: true);
+      case PinResult(:final ok):
+        if (ok) {
+          _stage = LinkStage.ready;
+          _pinError = null;
+          _append('PIN accepted', inbound: true);
+          // Whatever this session's own connect() sent right after Hello
+          // was ignored by the host while this connection was still
+          // unrecognized — ask again now that it is trusted.
+          unawaited(requestLayout());
+        } else {
+          _pinError = 'Incorrect PIN';
+          _append('PIN rejected', inbound: true);
+          // The host closes the connection shortly; the existing
+          // reconnect flow (a fresh attempt, a fresh PIN) takes it from
+          // here rather than this offering its own retry path.
+        }
       case Hello() ||
           SetOrientation() ||
           ListApps() ||
           PressSlot() ||
           RequestIcon() ||
-          RequestLayout():
+          RequestLayout() ||
+          SubmitPin():
         // Client-to-host shapes; a host has no business sending them.
         _append('ignored a ${message.runtimeType}', inbound: true);
     }
@@ -557,6 +590,7 @@ class BtLinkSession extends ChangeNotifier {
     _cancelReconnect();
     _stage = LinkStage.connecting;
     _error = null;
+    _pinError = null;
     // A drop mid-catalogue leaves this set; clear it so the retry can ask.
     _loadingApps = false;
     // A fresh link is a host that knows nothing about this device yet,
@@ -578,8 +612,11 @@ class BtLinkSession extends ChangeNotifier {
       notifyListeners();
 
       // So the host can tell this device apart from any other connected at
-      // the same time — see its device lock.
-      await _send(Hello(name: await DeviceInfo.name()));
+      // the same time — see its device lock. clientId is what a WiFi
+      // host's PIN-pairing remembers across reconnects; see RequestPin.
+      await _send(
+        Hello(name: await DeviceInfo.name(), clientId: await ClientIdentity.id()),
+      );
       await requestLayout();
     } catch (error) {
       // A newer attempt owns the state now; this one just goes quiet.
@@ -765,6 +802,13 @@ class BtLinkSession extends ChangeNotifier {
     _loadingLayout = true;
     notifyListeners();
     await _send(const RequestLayout());
+  }
+
+  /// Answers a [RequestPin] — see [LinkStage.awaitingPin]. Whether it was
+  /// right or wrong arrives later as a [PinResult].
+  Future<void> submitPin(String pin) async {
+    if (_stage != LinkStage.awaitingPin) return;
+    await _send(SubmitPin(pin: pin));
   }
 
   /// Reports which slot was pressed and tracks it for feedback.

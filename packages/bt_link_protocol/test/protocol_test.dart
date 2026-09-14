@@ -107,9 +107,13 @@ void main() {
   group('BtMessage', () {
     test('round-trips every message shape', () {
       const messages = <BtMessage>[
-        Hello(name: 'Pixel 7'),
+        Hello(name: 'Pixel 7', clientId: 'client_abc123'),
         SetOrientation(portrait: true),
         SetOrientation(portrait: false),
+        RequestPin(),
+        SubmitPin(pin: '482913'),
+        PinResult(ok: true),
+        PinResult(ok: false),
         ListApps(),
         AppEntry(name: 'Safari', category: 'Apps'),
         ListEnd(count: 96),
@@ -136,10 +140,11 @@ void main() {
       expect(BtMessage.decode(const [0xff, 0xfe]), isNull);
     });
 
-    test('Hello defaults to an empty name rather than crashing', () {
+    test('Hello defaults to an empty name and clientId rather than crashing', () {
       final decoded = BtMessage.decode(utf8.encode('{"t":"hi"}'));
       expect(decoded, isA<Hello>());
       expect((decoded as Hello).name, '');
+      expect(decoded.clientId, '');
     });
   });
 

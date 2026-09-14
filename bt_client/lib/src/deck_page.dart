@@ -904,6 +904,7 @@ class _ConnectionOverlay extends StatelessWidget {
         stage == LinkStage.connecting ||
         stage == LinkStage.discovering ||
         stage == LinkStage.subscribing;
+    final awaitingPin = stage == LinkStage.awaitingPin;
     final waiting = session.reconnectIn;
 
     return Stack(
@@ -930,6 +931,12 @@ class _ConnectionOverlay extends StatelessWidget {
                           height: 28,
                           child: CircularProgressIndicator(strokeWidth: 3),
                         )
+                      else if (awaitingPin)
+                        Icon(
+                          Icons.pin_outlined,
+                          size: 32,
+                          color: theme.colorScheme.primary,
+                        )
                       else
                         Icon(
                           stage == LinkStage.failed
@@ -949,6 +956,8 @@ class _ConnectionOverlay extends StatelessWidget {
                                 : 'Connecting to $deviceName',
                           LinkStage.discovering => 'Discovering services',
                           LinkStage.subscribing => 'Subscribing',
+                          LinkStage.awaitingPin =>
+                            'Enter the code shown on $deviceName',
                           LinkStage.disconnected => 'Disconnected',
                           LinkStage.failed => 'Could not connect',
                           LinkStage.ready => '',
@@ -956,7 +965,10 @@ class _ConnectionOverlay extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleMedium,
                       ),
-                      if (!working) ...[
+                      if (awaitingPin) ...[
+                        const SizedBox(height: 16),
+                        _PinEntryForm(session: session),
+                      ] else if (!working) ...[
                         const SizedBox(height: 8),
                         Flexible(
                           child: SingleChildScrollView(
@@ -1005,6 +1017,62 @@ class _ConnectionOverlay extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The PIN entry box shown while [LinkStage.awaitingPin] — its own small
+/// [StatefulWidget] purely to own a [TextEditingController]; everything it
+/// actually needs to know (whether the last attempt was wrong) comes
+/// straight from [session] rather than being duplicated in local state.
+class _PinEntryForm extends StatefulWidget {
+  const _PinEntryForm({required this.session});
+
+  final BtLinkSession session;
+
+  @override
+  State<_PinEntryForm> createState() => _PinEntryFormState();
+}
+
+class _PinEntryFormState extends State<_PinEntryForm> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final pin = _controller.text.trim();
+    if (pin.isEmpty) return;
+    unawaited(widget.session.submitPin(pin));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          textAlign: TextAlign.center,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onSubmitted: (_) => _submit(),
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            hintText: '000000',
+            errorText: widget.session.pinError,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(onPressed: _submit, child: const Text('Connect')),
         ),
       ],
     );
