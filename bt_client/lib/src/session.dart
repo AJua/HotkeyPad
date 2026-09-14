@@ -70,6 +70,12 @@ class BtLinkSession extends ChangeNotifier {
   /// Labels off means icons alone, with square cells the icon fills.
   bool _showLabels = true;
 
+  /// Names an image behind the deck's button grid — fetched the same way an
+  /// app icon is (see [ensureIcon]), null meaning no custom background.
+  String? _backgroundImageId;
+  double _backgroundOpacity = 1.0;
+  BackgroundFit _backgroundFit = BackgroundFit.cover;
+
   /// Notified when the host changes the appearance.
   ValueChanged<DeckTheme>? onTheme;
 
@@ -124,6 +130,14 @@ class BtLinkSession extends ChangeNotifier {
   DeckTheme get theme => _theme;
   bool get showLabels => _showLabels;
   DeckLayout? get layout => _layout;
+
+  /// Null when the host has no custom background set, or its bytes have
+  /// not arrived yet — either way the deck falls back to its ordinary
+  /// theme-derived background.
+  Uint8List? get backgroundImage =>
+      _backgroundImageId == null ? null : _icons[_backgroundImageId];
+  double get backgroundOpacity => _backgroundOpacity;
+  BackgroundFit get backgroundFit => _backgroundFit;
 
   /// True while this button's command is in flight.
   bool isPressing(DeckItem item) => _pressing == item.stored;
@@ -232,10 +246,29 @@ class BtLinkSession extends ChangeNotifier {
             inbound: true,
           );
         }
-      case SetAppearance(:final theme, :final showLabels):
+      case SetAppearance(
+          :final theme,
+          :final showLabels,
+          :final backgroundImageId,
+          :final backgroundOpacity,
+          :final backgroundFit,
+        ):
         _theme = theme;
         _showLabels = showLabels;
-        unawaited(DeckStore.saveAppearance(hostId, theme, showLabels));
+        _backgroundImageId = backgroundImageId;
+        _backgroundOpacity = backgroundOpacity;
+        _backgroundFit = backgroundFit;
+        unawaited(
+          DeckStore.saveAppearance(
+            hostId,
+            theme,
+            showLabels,
+            backgroundImageId: backgroundImageId,
+            backgroundOpacity: backgroundOpacity,
+            backgroundFit: backgroundFit,
+          ),
+        );
+        if (backgroundImageId != null) unawaited(ensureIcon(backgroundImageId));
         onTheme?.call(theme);
         _append(
           'appearance: ${theme.label.toLowerCase()}, '
@@ -547,10 +580,18 @@ class BtLinkSession extends ChangeNotifier {
   Future<void> _loadLayout() async {
     final cached = await DeckStore.loadAppearance(hostId);
     _showLabels = cached.showLabels;
+    _backgroundImageId = cached.backgroundImageId;
+    _backgroundOpacity = cached.backgroundOpacity;
+    _backgroundFit = cached.backgroundFit;
     if (cached.theme != _theme) {
       _theme = cached.theme;
       onTheme?.call(cached.theme);
     }
+    // Prefer the disk-cached bytes so the background is already there on
+    // the first frame; ensureIcon only reaches for the link when the cache
+    // misses.
+    final backgroundId = _backgroundImageId;
+    if (backgroundId != null) unawaited(ensureIcon(backgroundId));
     final cachedLayout = await DeckStore.load(hostId);
     if (cachedLayout == null || _layout != null) return;
     _layout = cachedLayout;

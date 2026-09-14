@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'app_launcher.dart';
 import 'backup_store.dart';
+import 'background_image_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
 import 'deck_icons.dart';
@@ -313,6 +314,9 @@ class _LayoutPageState extends State<LayoutPage> {
   DeckLayout _layout = DeckLayout.empty();
   DeckTheme _theme = DeckTheme.system;
   bool _showLabels = true;
+  String? _backgroundImageId;
+  double _backgroundOpacity = 1.0;
+  BackgroundFit _backgroundFit = BackgroundFit.cover;
   int _page = 0;
   var _apps = <({String name, String category, String path})>[];
   var _shortcuts = <String>[];
@@ -335,6 +339,9 @@ class _LayoutPageState extends State<LayoutPage> {
       _layout = layout;
       _theme = appearance.theme;
       _showLabels = appearance.showLabels;
+      _backgroundImageId = appearance.backgroundImageId;
+      _backgroundOpacity = appearance.backgroundOpacity;
+      _backgroundFit = appearance.backgroundFit;
       _apps = apps;
       _shortcuts = shortcuts;
       _loading = false;
@@ -453,6 +460,58 @@ class _LayoutPageState extends State<LayoutPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                Text(
+                  'Background image',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                BackgroundPicker(
+                  imageId: _backgroundImageId,
+                  onChanged: (id) {
+                    setDialogState(() {});
+                    _setBackgroundImage(id);
+                  },
+                ),
+                const SizedBox(height: 4),
+                Opacity(
+                  opacity: _backgroundImageId == null ? 0.5 : 1,
+                  child: Row(
+                    children: [
+                      const Text('Opacity'),
+                      Expanded(
+                        child: Slider(
+                          value: _backgroundOpacity,
+                          divisions: 20,
+                          label: '${(_backgroundOpacity * 100).round()}%',
+                          onChanged: _backgroundImageId == null
+                              ? null
+                              : (value) {
+                                  setDialogState(() {});
+                                  _setBackgroundOpacity(value);
+                                },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Opacity(
+                  opacity: _backgroundImageId == null ? 0.5 : 1,
+                  child: SegmentedButton<BackgroundFit>(
+                    segments: [
+                      for (final fit in BackgroundFit.values)
+                        ButtonSegment(value: fit, label: Text(fit.label)),
+                    ],
+                    selected: {_backgroundFit},
+                    showSelectedIcon: false,
+                    onSelectionChanged: _backgroundImageId == null
+                        ? null
+                        : (selection) {
+                            setDialogState(() {});
+                            _setBackgroundFit(selection.first);
+                          },
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Text('Grid', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 4),
                 _NumberStepper(
@@ -548,8 +607,46 @@ class _LayoutPageState extends State<LayoutPage> {
       _theme = theme ?? _theme;
       _showLabels = showLabels ?? _showLabels;
     });
-    await SettingsStore.save(theme: _theme, showLabels: _showLabels);
+    await _saveAppearance();
+  }
+
+  /// Writes every appearance field at once and tells the host to push it —
+  /// [SettingsStore] and [SetAppearance] both carry the background settings
+  /// alongside the theme and labels as one unit, so a change to any one of
+  /// them resaves and rebroadcasts all of them rather than only the field
+  /// that changed.
+  Future<void> _saveAppearance() async {
+    await SettingsStore.save(
+      theme: _theme,
+      showLabels: _showLabels,
+      backgroundImageId: _backgroundImageId,
+      backgroundOpacity: _backgroundOpacity,
+      backgroundFit: _backgroundFit,
+    );
     widget.onAppearanceChanged(_theme, _showLabels);
+  }
+
+  /// Replaces the background image, deleting whatever file the previous id
+  /// pointed to — mirroring how [IconPicker._pickImage] avoids orphaning a
+  /// button's old custom icon when a new one is chosen. Passing null clears
+  /// the background entirely.
+  Future<void> _setBackgroundImage(String? imageId) async {
+    final previous = _backgroundImageId;
+    setState(() => _backgroundImageId = imageId);
+    await _saveAppearance();
+    if (previous != null && previous != imageId) {
+      unawaited(BackgroundImageStore.delete(previous));
+    }
+  }
+
+  Future<void> _setBackgroundOpacity(double opacity) async {
+    setState(() => _backgroundOpacity = opacity);
+    await _saveAppearance();
+  }
+
+  Future<void> _setBackgroundFit(BackgroundFit fit) async {
+    setState(() => _backgroundFit = fit);
+    await _saveAppearance();
   }
 
   /// Saves the current appearance, layout, and custom icons to a file the
@@ -1407,6 +1504,135 @@ class _IconPickerState extends State<IconPicker> {
     }
     return Icon(
       Icons.add_photo_alternate_outlined,
+      color: Theme.of(context).colorScheme.outline,
+    );
+  }
+}
+
+/// Preview and picker for the deck's background image — [IconPicker]'s
+/// image half without the emoji/text alternative, since there is no
+/// glyph-sized stand-in for a whole-screen photo.
+///
+/// Public, not a private implementation detail of the settings dialog, for
+/// the same reason [IconPicker] is: it can be pumped and tapped through in
+/// isolation without the dialog around it.
+class BackgroundPicker extends StatefulWidget {
+  const BackgroundPicker({
+    super.key,
+    required this.imageId,
+    required this.onChanged,
+  });
+
+  final String? imageId;
+
+  /// Reports the newly picked id, or null when "Remove" is tapped.
+  final ValueChanged<String?> onChanged;
+
+  @override
+  State<BackgroundPicker> createState() => _BackgroundPickerState();
+}
+
+class _BackgroundPickerState extends State<BackgroundPicker> {
+  Uint8List? _bytes;
+
+  /// Same reason as [_IconPickerState._loading]: distinct from [_bytes]
+  /// being null, which is also true once a read finishes and finds nothing.
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant BackgroundPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageId != widget.imageId) _load();
+  }
+
+  Future<void> _load() async {
+    final id = widget.imageId;
+    if (id == null) {
+      setState(() {
+        _bytes = null;
+        _loading = false;
+      });
+      return;
+    }
+    setState(() => _loading = true);
+    final bytes = await BackgroundImageStore.read(id);
+    // The id could have changed again while this was in flight.
+    if (mounted && widget.imageId == id) {
+      setState(() {
+        _bytes = bytes;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _pick() async {
+    final png = await BackgroundImageStore.pickAndProcess();
+    if (png == null || !mounted) return;
+    final id = await BackgroundImageStore.save(png);
+    if (id == null || !mounted) return;
+    widget.onChanged(id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 64,
+          height: 64,
+          child: Material(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(onTap: _pick, child: _preview(context)),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton(
+                onPressed: _pick,
+                child: Text(
+                  widget.imageId == null ? 'Choose image...' : 'Change...',
+                ),
+              ),
+              if (widget.imageId != null)
+                TextButton(
+                  onPressed: () => widget.onChanged(null),
+                  child: const Text('Remove'),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _preview(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    final bytes = _bytes;
+    // A dangling id falls through to the placeholder, same as IconPicker.
+    if (bytes != null) return Image.memory(bytes, fit: BoxFit.cover);
+    return Icon(
+      Icons.image_outlined,
       color: Theme.of(context).colorScheme.outline,
     );
   }

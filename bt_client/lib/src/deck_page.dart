@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'background_fit.dart';
 import 'debug_page.dart';
 import 'edge_bar.dart';
 import 'safe_insets.dart';
@@ -221,6 +222,13 @@ class _DeckPageState extends State<DeckPage> {
           ],
           child: Stack(
             children: [
+              // Drawn first so the grid and every overlay above it composite
+              // on top; a null image renders nothing.
+              DeckBackground(
+                image: session.backgroundImage,
+                opacity: session.backgroundOpacity,
+                fit: session.backgroundFit,
+              ),
               Positioned.fill(child: _body(session)),
               // Built only while the link is unusable, so a connected deck
               // has nothing layered over it to absorb taps.
@@ -541,6 +549,49 @@ class _PageDots extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// The host's chosen background image, drawn behind the whole deck.
+///
+/// Public, not a private implementation detail of [DeckPage], so it can be
+/// pumped in isolation — the same reason [IconPicker]-style widgets
+/// elsewhere in this codebase are public — to check that a null image, a
+/// mid-range opacity, and each fit mode all build without throwing.
+class DeckBackground extends StatelessWidget {
+  const DeckBackground({
+    super.key,
+    required this.image,
+    required this.opacity,
+    required this.fit,
+  });
+
+  /// Null means no custom background is set, or its bytes have not arrived
+  /// yet — either way there is nothing to draw, and the deck's ordinary
+  /// theme-derived background (the Scaffold's own) shows through.
+  final Uint8List? image;
+
+  /// 0 (invisible) to 1 (fully opaque); values outside that range are
+  /// clamped rather than trusted, since this rides over BLE from a host
+  /// build that might disagree about the range in the future.
+  final double opacity;
+
+  final BackgroundFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = image;
+    if (bytes == null) return const SizedBox.shrink();
+    return Positioned.fill(
+      child: Opacity(
+        opacity: opacity.clamp(0.0, 1.0),
+        child: Image.memory(
+          bytes,
+          fit: boxFitFor(fit),
+          gaplessPlayback: true,
+        ),
+      ),
     );
   }
 }

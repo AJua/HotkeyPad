@@ -75,6 +75,12 @@ sealed class BtMessage {
           theme: DeckTheme.fromWire(json['v'] as String?),
           // Absent on an older host, which always drew labels.
           showLabels: json['lbl'] as bool? ?? true,
+          // All three absent on a host built before backgrounds existed, or
+          // simply means "no custom background" on a current one — either
+          // way the client falls back to its own theme-derived background.
+          backgroundImageId: json['bg'] as String?,
+          backgroundOpacity: (json['bop'] as num?)?.toDouble() ?? 1.0,
+          backgroundFit: BackgroundFit.fromWire(json['bft'] as String?),
         ),
         'lay?' => const RequestLayout(),
         'lay' => LayoutStart(
@@ -817,13 +823,48 @@ enum DeckTheme {
   }
 }
 
+/// How a background image scales to fill the screen behind the deck.
+///
+/// A deliberate subset of Flutter's `BoxFit` rather than all of it: cropping
+/// to fill, letterboxing to fit, and stretching cover every look a user
+/// actually wants from a wallpaper, and a longer menu of the more esoteric
+/// values would just be more to explain. The client, not this package,
+/// knows what `BoxFit` is — this lives here as an opaque wire value the same
+/// way [DeckTheme] does, and bt_client maps it to a real `BoxFit` for
+/// painting.
+enum BackgroundFit {
+  cover('cover', 'Fill screen'),
+  contain('contain', 'Fit whole image'),
+  stretch('fill', 'Stretch');
+
+  const BackgroundFit(this.wire, this.label);
+
+  /// Short identifier on the wire; the enum name is not used so renaming a
+  /// constant cannot silently break an installed client.
+  final String wire;
+  final String label;
+
+  static BackgroundFit fromWire(String? wire) {
+    for (final fit in values) {
+      if (fit.wire == wire) return fit;
+    }
+    return BackgroundFit.cover;
+  }
+}
+
 /// Host -> client: use this appearance.
 ///
 /// Sent with the layout on connect and again whenever it changes, so the
 /// phone follows the Mac rather than keeping settings of its own — the host
 /// owns configuration here as it does the grid.
 final class SetAppearance extends BtMessage {
-  const SetAppearance({required this.theme, required this.showLabels});
+  const SetAppearance({
+    required this.theme,
+    required this.showLabels,
+    this.backgroundImageId,
+    this.backgroundOpacity = 1.0,
+    this.backgroundFit = BackgroundFit.cover,
+  });
 
   final DeckTheme theme;
 
@@ -831,11 +872,32 @@ final class SetAppearance extends BtMessage {
   /// fills them, since there is no caption to leave room for.
   final bool showLabels;
 
+  /// Names an image behind the deck's button grid, fetched and cached the
+  /// same way an app's own icon or a button's custom image is — see
+  /// [RequestIcon] and [IconFrame]. Null means no custom background: the
+  /// client draws its ordinary theme-derived background instead, which is
+  /// also what an older host that never sent this field gets.
+  final String? backgroundImageId;
+
+  /// How opaque [backgroundImageId] is drawn over the deck's own background,
+  /// 0 (invisible) to 1 (fully opaque). Meaningless while that id is null.
+  final double backgroundOpacity;
+
+  /// How [backgroundImageId] is scaled to fill the screen. Meaningless
+  /// while that id is null.
+  final BackgroundFit backgroundFit;
+
   @override
   Map<String, Object?> toJson() => {
     't': 'thm',
     'v': theme.wire,
     'lbl': showLabels,
+    // Omitted entirely rather than sent as null/defaults when there is no
+    // background, so an older client parsing this message with a stricter
+    // decoder would still see nothing background-shaped to misinterpret.
+    if (backgroundImageId != null) 'bg': backgroundImageId,
+    if (backgroundImageId != null) 'bop': backgroundOpacity,
+    if (backgroundImageId != null) 'bft': backgroundFit.wire,
   };
 }
 
