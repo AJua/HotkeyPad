@@ -140,12 +140,15 @@ void main() {
       expect(BtMessage.decode(const [0xff, 0xfe]), isNull);
     });
 
-    test('Hello defaults to an empty name and clientId rather than crashing', () {
-      final decoded = BtMessage.decode(utf8.encode('{"t":"hi"}'));
-      expect(decoded, isA<Hello>());
-      expect((decoded as Hello).name, '');
-      expect(decoded.clientId, '');
-    });
+    test(
+      'Hello defaults to an empty name and clientId rather than crashing',
+      () {
+        final decoded = BtMessage.decode(utf8.encode('{"t":"hi"}'));
+        expect(decoded, isA<Hello>());
+        expect((decoded as Hello).name, '');
+        expect(decoded.clientId, '');
+      },
+    );
   });
 
   group('DeckItem', () {
@@ -747,6 +750,29 @@ void main() {
       expect(decoded!.showAppBar, isTrue);
     });
 
+    test('round-trips the page dots setting', () {
+      for (final showPageDots in [true, false]) {
+        final decoded =
+            BtMessage.decode(
+                  SetAppearance(
+                    theme: DeckTheme.dark,
+                    showLabels: true,
+                    showPageDots: showPageDots,
+                  ).encode(),
+                )
+                as SetAppearance?;
+        expect(decoded!.showPageDots, showPageDots);
+      }
+    });
+
+    test('the page dots default to on when an older host omits them', () {
+      final decoded =
+          BtMessage.decode(utf8.encode('{"t":"thm","v":"dark","lbl":true}'))
+              as SetAppearance?;
+
+      expect(decoded!.showPageDots, isTrue);
+    });
+
     test('an unknown or missing value falls back to system', () {
       expect(DeckTheme.fromWire('solarized'), DeckTheme.system);
       expect(DeckTheme.fromWire(null), DeckTheme.system);
@@ -879,7 +905,10 @@ void main() {
     test('extracts every frame when several arrive in one chunk', () {
       final first = utf8.encode('one');
       final second = utf8.encode('two');
-      final combined = [...FrameCodec.encode(first), ...FrameCodec.encode(second)];
+      final combined = [
+        ...FrameCodec.encode(first),
+        ...FrameCodec.encode(second),
+      ];
       final reassembler = FrameReassembler();
 
       final frames = reassembler.add(combined);

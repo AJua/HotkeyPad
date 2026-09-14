@@ -13,6 +13,7 @@ typedef Appearance = ({
   DeckTheme theme,
   bool showLabels,
   bool showAppBar,
+  bool showPageDots,
   String? backgroundImageId,
   double backgroundOpacity,
   BackgroundFit backgroundFit,
@@ -38,6 +39,7 @@ abstract final class SettingsStore {
     theme: DeckTheme.system,
     showLabels: true,
     showAppBar: true,
+    showPageDots: true,
     backgroundImageId: null,
     backgroundOpacity: 1.0,
     backgroundFit: BackgroundFit.cover,
@@ -54,6 +56,7 @@ abstract final class SettingsStore {
         theme: DeckTheme.fromWire(decoded['theme'] as String?),
         showLabels: decoded['showLabels'] as bool? ?? true,
         showAppBar: decoded['showAppBar'] as bool? ?? true,
+        showPageDots: decoded['showPageDots'] as bool? ?? true,
         backgroundImageId: decoded['backgroundImageId'] as String?,
         backgroundOpacity:
             (decoded['backgroundOpacity'] as num?)?.toDouble() ?? 1.0,
@@ -70,6 +73,7 @@ abstract final class SettingsStore {
     required DeckTheme theme,
     required bool showLabels,
     bool showAppBar = true,
+    bool showPageDots = true,
     String? backgroundImageId,
     double backgroundOpacity = 1.0,
     BackgroundFit backgroundFit = BackgroundFit.cover,
@@ -78,6 +82,7 @@ abstract final class SettingsStore {
       theme: theme,
       showLabels: showLabels,
       showAppBar: showAppBar,
+      showPageDots: showPageDots,
       backgroundImageId: backgroundImageId,
       backgroundOpacity: backgroundOpacity,
       backgroundFit: backgroundFit,
@@ -94,6 +99,7 @@ abstract final class SettingsStore {
           'theme': theme.wire,
           'showLabels': showLabels,
           'showAppBar': showAppBar,
+          'showPageDots': showPageDots,
           // Written even when null — this is a settings file, not the wire
           // protocol, so there is no older-reader compatibility reason to
           // omit the key rather than store an explicit null.

@@ -281,7 +281,12 @@ class LayoutPage extends StatefulWidget {
 
   /// Called when the appearance changes, so it can be applied here and
   /// pushed to the phone.
-  final void Function(DeckTheme theme, bool showLabels, bool showAppBar)
+  final void Function(
+    DeckTheme theme,
+    bool showLabels,
+    bool showAppBar,
+    bool showPageDots,
+  )
   onAppearanceChanged;
 
   /// Opens the service view, which is reached from the settings dialog now
@@ -316,6 +321,7 @@ class _LayoutPageState extends State<LayoutPage> {
   DeckTheme _theme = DeckTheme.system;
   bool _showLabels = true;
   bool _showAppBar = true;
+  bool _showPageDots = true;
   String? _backgroundImageId;
   double _backgroundOpacity = 1.0;
   BackgroundFit _backgroundFit = BackgroundFit.cover;
@@ -342,6 +348,7 @@ class _LayoutPageState extends State<LayoutPage> {
       _theme = appearance.theme;
       _showLabels = appearance.showLabels;
       _showAppBar = appearance.showAppBar;
+      _showPageDots = appearance.showPageDots;
       _backgroundImageId = appearance.backgroundImageId;
       _backgroundOpacity = appearance.backgroundOpacity;
       _backgroundFit = appearance.backgroundFit;
@@ -487,6 +494,19 @@ class _LayoutPageState extends State<LayoutPage> {
                     title: const Text('Button labels'),
                     subtitle: const Text(
                       'Off makes cells square and lets the icon fill them',
+                    ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _showPageDots,
+                    onChanged: (value) {
+                      setDialogState(() {});
+                      _setAppearance(showPageDots: value);
+                    },
+                    title: const Text('Page dots'),
+                    subtitle: const Text(
+                      'Off hides the page indicator below a multi-page deck '
+                      '— swiping between pages still works',
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -637,11 +657,13 @@ class _LayoutPageState extends State<LayoutPage> {
     DeckTheme? theme,
     bool? showLabels,
     bool? showAppBar,
+    bool? showPageDots,
   }) async {
     setState(() {
       _theme = theme ?? _theme;
       _showLabels = showLabels ?? _showLabels;
       _showAppBar = showAppBar ?? _showAppBar;
+      _showPageDots = showPageDots ?? _showPageDots;
     });
     await _saveAppearance();
   }
@@ -656,11 +678,12 @@ class _LayoutPageState extends State<LayoutPage> {
       theme: _theme,
       showLabels: _showLabels,
       showAppBar: _showAppBar,
+      showPageDots: _showPageDots,
       backgroundImageId: _backgroundImageId,
       backgroundOpacity: _backgroundOpacity,
       backgroundFit: _backgroundFit,
     );
-    widget.onAppearanceChanged(_theme, _showLabels, _showAppBar);
+    widget.onAppearanceChanged(_theme, _showLabels, _showAppBar, _showPageDots);
   }
 
   /// Replaces the background image, deleting whatever file the previous id
@@ -716,6 +739,7 @@ class _LayoutPageState extends State<LayoutPage> {
       _theme = bundle.theme;
       _showLabels = bundle.showLabels;
       _showAppBar = bundle.showAppBar;
+      _showPageDots = bundle.showPageDots;
       _clampPage();
       // Bytes for a restored icon can differ from whatever this session
       // already cached under the same id (a re-import of an edited backup,
@@ -727,6 +751,7 @@ class _LayoutPageState extends State<LayoutPage> {
       bundle.theme,
       bundle.showLabels,
       bundle.showAppBar,
+      bundle.showPageDots,
     );
     _showMessage('Settings imported.');
   }

@@ -835,6 +835,7 @@ class _HostPageState extends State<HostPage> {
         theme: appearance.theme,
         showLabels: appearance.showLabels,
         showAppBar: appearance.showAppBar,
+        showPageDots: appearance.showPageDots,
         backgroundImageId: appearance.backgroundImageId,
         backgroundOpacity: appearance.backgroundOpacity,
         backgroundFit: appearance.backgroundFit,
@@ -866,6 +867,7 @@ class _HostPageState extends State<HostPage> {
       theme: appearance.theme,
       showLabels: appearance.showLabels,
       showAppBar: appearance.showAppBar,
+      showPageDots: appearance.showPageDots,
       backgroundImageId: appearance.backgroundImageId,
       backgroundOpacity: appearance.backgroundOpacity,
       backgroundFit: appearance.backgroundFit,
@@ -1150,10 +1152,11 @@ class _HostPageState extends State<HostPage> {
           Expanded(
             child: LayoutPage(
               onChanged: _broadcastLayout,
-              onAppearanceChanged: (theme, showLabels, showAppBar) {
-                widget.onThemeChanged(theme);
-                _broadcastAppearance();
-              },
+              onAppearanceChanged:
+                  (theme, showLabels, showAppBar, showPageDots) {
+                    widget.onThemeChanged(theme);
+                    _broadcastAppearance();
+                  },
               onShowService: () => setState(() => _showingService = true),
               connectedClients: [
                 for (final client in clients)

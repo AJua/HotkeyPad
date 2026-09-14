@@ -550,7 +550,7 @@ class _DeckPageState extends State<DeckPage> {
           horizontal: margin,
           vertical: margin,
         );
-        final dots = layout.pages > 1 ? 28.0 : 0.0;
+        final dots = layout.pages > 1 && session.showPageDots ? 28.0 : 0.0;
 
         final freeWidth =
             constraints.maxWidth -
@@ -643,7 +643,7 @@ class _DeckPageState extends State<DeckPage> {
                   ),
                 ),
               ),
-              if (layout.pages > 1)
+              if (layout.pages > 1 && session.showPageDots)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: _PageDots(count: layout.pages, current: _page),

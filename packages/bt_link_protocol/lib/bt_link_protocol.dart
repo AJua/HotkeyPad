@@ -83,6 +83,8 @@ sealed class BtMessage {
           showLabels: json['lbl'] as bool? ?? true,
           // Absent on an older host, which always showed the app bar.
           showAppBar: json['bar'] as bool? ?? true,
+          // Absent on an older host, which always showed the page dots.
+          showPageDots: json['dot'] as bool? ?? true,
           // All three absent on a host built before backgrounds existed, or
           // simply means "no custom background" on a current one — either
           // way the client falls back to its own theme-derived background.
@@ -915,6 +917,7 @@ final class SetAppearance extends BtMessage {
     required this.theme,
     required this.showLabels,
     this.showAppBar = true,
+    this.showPageDots = true,
     this.backgroundImageId,
     this.backgroundOpacity = 1.0,
     this.backgroundFit = BackgroundFit.cover,
@@ -931,6 +934,12 @@ final class SetAppearance extends BtMessage {
   /// or a phone mounted as a dedicated deck would want to make, same
   /// spirit as [showLabels].
   final bool showAppBar;
+
+  /// The row of dots marking which page of a multi-page deck is showing
+  /// (see `_PageDots` on the client) — swiping between pages still works
+  /// with these off, this only hides the indicator itself, the same
+  /// "reclaim a little more of the screen" trade as [showAppBar].
+  final bool showPageDots;
 
   /// Names an image behind the deck's button grid, fetched and cached the
   /// same way an app's own icon or a button's custom image is — see
@@ -953,6 +962,7 @@ final class SetAppearance extends BtMessage {
     'v': theme.wire,
     'lbl': showLabels,
     'bar': showAppBar,
+    'dot': showPageDots,
     // Omitted entirely rather than sent as null/defaults when there is no
     // background, so an older client parsing this message with a stricter
     // decoder would still see nothing background-shaped to misinterpret.
@@ -1268,7 +1278,11 @@ class FrameReassembler {
 /// the user typing in an IP address — WiFi's equivalent of a BLE
 /// advertisement.
 class WifiBeacon {
-  const WifiBeacon({required this.hostId, required this.name, required this.port});
+  const WifiBeacon({
+    required this.hostId,
+    required this.name,
+    required this.port,
+  });
 
   /// Persists across restarts (see the host's `HostIdentity`) and is
   /// namespaced separately from a BLE peripheral's own UUID — the two
@@ -1285,9 +1299,7 @@ class WifiBeacon {
   final int port;
 
   Uint8List encode() => Uint8List.fromList(
-    utf8.encode(
-      jsonEncode({'t': 'beacon', 'h': hostId, 'n': name, 'p': port}),
-    ),
+    utf8.encode(jsonEncode({'t': 'beacon', 'h': hostId, 'n': name, 'p': port})),
   );
 
   /// Returns null for anything that is not a well-formed beacon, so a

@@ -94,6 +94,7 @@ abstract final class BackupStore {
         theme: appearance.theme,
         showLabels: appearance.showLabels,
         showAppBar: appearance.showAppBar,
+        showPageDots: appearance.showPageDots,
         layout: layout,
         customIcons: icons,
       ),
@@ -163,6 +164,7 @@ abstract final class BackupStore {
       theme: bundle.theme,
       showLabels: bundle.showLabels,
       showAppBar: bundle.showAppBar,
+      showPageDots: bundle.showPageDots,
     );
     for (final entry in bundle.customIcons.entries) {
       await CustomIconStore.writeAtId(entry.key, entry.value);

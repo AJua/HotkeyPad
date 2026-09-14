@@ -11,6 +11,7 @@ typedef CachedAppearance = ({
   DeckTheme theme,
   bool showLabels,
   bool showAppBar,
+  bool showPageDots,
   String? backgroundImageId,
   double backgroundOpacity,
   BackgroundFit backgroundFit,
@@ -41,6 +42,7 @@ abstract final class DeckStore {
       theme: DeckTheme.fromWire(prefs.getString('theme:$hostId')),
       showLabels: prefs.getBool('labels:$hostId') ?? true,
       showAppBar: prefs.getBool('appBar:$hostId') ?? true,
+      showPageDots: prefs.getBool('pageDots:$hostId') ?? true,
       backgroundImageId: prefs.getString('bg:$hostId'),
       backgroundOpacity: prefs.getDouble('bgOpacity:$hostId') ?? 1.0,
       backgroundFit: BackgroundFit.fromWire(prefs.getString('bgFit:$hostId')),
@@ -52,6 +54,7 @@ abstract final class DeckStore {
     DeckTheme theme,
     bool showLabels, {
     bool showAppBar = true,
+    bool showPageDots = true,
     String? backgroundImageId,
     double backgroundOpacity = 1.0,
     BackgroundFit backgroundFit = BackgroundFit.cover,
@@ -60,6 +63,7 @@ abstract final class DeckStore {
     await prefs.setString('theme:$hostId', theme.wire);
     await prefs.setBool('labels:$hostId', showLabels);
     await prefs.setBool('appBar:$hostId', showAppBar);
+    await prefs.setBool('pageDots:$hostId', showPageDots);
     // Removed rather than set to an empty string: a missing key is what
     // loadAppearance's prefs.getString(...) == null branch expects for "no
     // background", matching how the host itself treats a null id.

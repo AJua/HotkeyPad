@@ -21,6 +21,7 @@ class BackupBundle {
     required this.theme,
     required this.showLabels,
     this.showAppBar = true,
+    this.showPageDots = true,
     required this.layout,
     required this.customIcons,
   });
@@ -28,6 +29,7 @@ class BackupBundle {
   final DeckTheme theme;
   final bool showLabels;
   final bool showAppBar;
+  final bool showPageDots;
   final DeckLayout layout;
 
   /// Keyed by the same id [DeckItem.customIconId] carries, so restoring a
@@ -76,6 +78,7 @@ Map<String, Object?> backupBundleToJson(BackupBundle bundle) => {
   'theme': bundle.theme.wire,
   'showLabels': bundle.showLabels,
   'showAppBar': bundle.showAppBar,
+  'showPageDots': bundle.showPageDots,
   'layout': bundle.layout.toJson(),
   'customIcons': {
     for (final entry in bundle.customIcons.entries)
@@ -113,6 +116,7 @@ BackupBundle? backupBundleFromJson(Object? json) {
     theme: DeckTheme.fromWire(json['theme'] as String?),
     showLabels: json['showLabels'] as bool? ?? true,
     showAppBar: json['showAppBar'] as bool? ?? true,
+    showPageDots: json['showPageDots'] as bool? ?? true,
     layout: layout,
     customIcons: icons,
   );

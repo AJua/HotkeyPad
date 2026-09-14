@@ -74,29 +74,29 @@ void main() {
       theme: DeckTheme.dark,
       showLabels: false,
       showAppBar: false,
+      showPageDots: false,
       layout: _layoutWith([const AppItem('Safari', customIconId: 'img_1')]),
       customIcons: {
         'img_1': Uint8List.fromList([1, 2, 3, 4]),
       },
     );
 
-    test(
-      'round-trips theme, showLabels, showAppBar, layout and icon bytes',
-      () {
-        final json = backupBundleToJson(sample());
-        final restored = backupBundleFromJson(json)!;
+    test('round-trips theme, showLabels, showAppBar, showPageDots, layout and '
+        'icon bytes', () {
+      final json = backupBundleToJson(sample());
+      final restored = backupBundleFromJson(json)!;
 
-        expect(restored.theme, DeckTheme.dark);
-        expect(restored.showLabels, isFalse);
-        expect(restored.showAppBar, isFalse);
-        expect(restored.layout.columns, 1);
-        expect(
-          restored.layout.slots[0]?.value,
-          const AppItem('Safari', customIconId: 'img_1').stored,
-        );
-        expect(restored.customIcons['img_1'], [1, 2, 3, 4]);
-      },
-    );
+      expect(restored.theme, DeckTheme.dark);
+      expect(restored.showLabels, isFalse);
+      expect(restored.showAppBar, isFalse);
+      expect(restored.showPageDots, isFalse);
+      expect(restored.layout.columns, 1);
+      expect(
+        restored.layout.slots[0]?.value,
+        const AppItem('Safari', customIconId: 'img_1').stored,
+      );
+      expect(restored.customIcons['img_1'], [1, 2, 3, 4]);
+    });
 
     test(
       'the app bar defaults to on for a backup written before it existed',
@@ -105,6 +105,16 @@ void main() {
         final restored = backupBundleFromJson(json)!;
 
         expect(restored.showAppBar, isTrue);
+      },
+    );
+
+    test(
+      'the page dots default to on for a backup written before they existed',
+      () {
+        final json = backupBundleToJson(sample())..remove('showPageDots');
+        final restored = backupBundleFromJson(json)!;
+
+        expect(restored.showPageDots, isTrue);
       },
     );
 

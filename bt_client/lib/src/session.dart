@@ -107,6 +107,7 @@ class BtLinkSession extends ChangeNotifier {
   /// Labels off means icons alone, with square cells the icon fills.
   bool _showLabels = true;
   bool _showAppBar = true;
+  bool _showPageDots = true;
 
   /// Names an image behind the deck's button grid — fetched the same way an
   /// app icon is (see [ensureIcon]), null meaning no custom background.
@@ -180,6 +181,7 @@ class BtLinkSession extends ChangeNotifier {
   bool get showLabels => _showLabels;
 
   bool get showAppBar => _showAppBar;
+  bool get showPageDots => _showPageDots;
   DeckLayout? get layout => _layout;
 
   /// Null when the host has no custom background set, or its bytes have
@@ -316,6 +318,7 @@ class BtLinkSession extends ChangeNotifier {
         :final theme,
         :final showLabels,
         :final showAppBar,
+        :final showPageDots,
         :final backgroundImageId,
         :final backgroundOpacity,
         :final backgroundFit,
@@ -323,6 +326,7 @@ class BtLinkSession extends ChangeNotifier {
         _theme = theme;
         _showLabels = showLabels;
         _showAppBar = showAppBar;
+        _showPageDots = showPageDots;
         _backgroundImageId = backgroundImageId;
         _backgroundOpacity = backgroundOpacity;
         _backgroundFit = backgroundFit;
@@ -332,6 +336,7 @@ class BtLinkSession extends ChangeNotifier {
             theme,
             showLabels,
             showAppBar: showAppBar,
+            showPageDots: showPageDots,
             backgroundImageId: backgroundImageId,
             backgroundOpacity: backgroundOpacity,
             backgroundFit: backgroundFit,
@@ -789,6 +794,7 @@ class BtLinkSession extends ChangeNotifier {
     final cached = await DeckStore.loadAppearance(hostId);
     _showLabels = cached.showLabels;
     _showAppBar = cached.showAppBar;
+    _showPageDots = cached.showPageDots;
     _backgroundImageId = cached.backgroundImageId;
     _backgroundOpacity = cached.backgroundOpacity;
     _backgroundFit = cached.backgroundFit;
