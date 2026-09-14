@@ -12,6 +12,7 @@ import 'package:bt_link_protocol/bt_link_protocol.dart';
 typedef Appearance = ({
   DeckTheme theme,
   bool showLabels,
+  bool showAppBar,
   String? backgroundImageId,
   double backgroundOpacity,
   BackgroundFit backgroundFit,
@@ -36,6 +37,7 @@ abstract final class SettingsStore {
   static const _fallback = (
     theme: DeckTheme.system,
     showLabels: true,
+    showAppBar: true,
     backgroundImageId: null,
     backgroundOpacity: 1.0,
     backgroundFit: BackgroundFit.cover,
@@ -51,6 +53,7 @@ abstract final class SettingsStore {
       return (
         theme: DeckTheme.fromWire(decoded['theme'] as String?),
         showLabels: decoded['showLabels'] as bool? ?? true,
+        showAppBar: decoded['showAppBar'] as bool? ?? true,
         backgroundImageId: decoded['backgroundImageId'] as String?,
         backgroundOpacity:
             (decoded['backgroundOpacity'] as num?)?.toDouble() ?? 1.0,
@@ -66,6 +69,7 @@ abstract final class SettingsStore {
   static Future<void> save({
     required DeckTheme theme,
     required bool showLabels,
+    bool showAppBar = true,
     String? backgroundImageId,
     double backgroundOpacity = 1.0,
     BackgroundFit backgroundFit = BackgroundFit.cover,
@@ -73,6 +77,7 @@ abstract final class SettingsStore {
     final appearance = (
       theme: theme,
       showLabels: showLabels,
+      showAppBar: showAppBar,
       backgroundImageId: backgroundImageId,
       backgroundOpacity: backgroundOpacity,
       backgroundFit: backgroundFit,
@@ -88,6 +93,7 @@ abstract final class SettingsStore {
         jsonEncode({
           'theme': theme.wire,
           'showLabels': showLabels,
+          'showAppBar': showAppBar,
           // Written even when null — this is a settings file, not the wire
           // protocol, so there is no older-reader compatibility reason to
           // omit the key rather than store an explicit null.

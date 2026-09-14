@@ -59,10 +59,7 @@ void main() {
       );
       final layout = _layoutWith([combo]);
 
-      expect(
-        customIconIdsReferencedBy(layout),
-        {'combo_icon', 'step_icon'},
-      );
+      expect(customIconIdsReferencedBy(layout), {'combo_icon', 'step_icon'});
     });
 
     test('a slot this build cannot parse contributes nothing', () {
@@ -76,29 +73,47 @@ void main() {
     BackupBundle sample() => BackupBundle(
       theme: DeckTheme.dark,
       showLabels: false,
-      layout: _layoutWith([
-        const AppItem('Safari', customIconId: 'img_1'),
-      ]),
+      showAppBar: false,
+      layout: _layoutWith([const AppItem('Safari', customIconId: 'img_1')]),
       customIcons: {
         'img_1': Uint8List.fromList([1, 2, 3, 4]),
       },
     );
 
-    test('round-trips theme, showLabels, layout and icon bytes', () {
-      final json = backupBundleToJson(sample());
-      final restored = backupBundleFromJson(json)!;
+    test(
+      'round-trips theme, showLabels, showAppBar, layout and icon bytes',
+      () {
+        final json = backupBundleToJson(sample());
+        final restored = backupBundleFromJson(json)!;
 
-      expect(restored.theme, DeckTheme.dark);
-      expect(restored.showLabels, isFalse);
-      expect(restored.layout.columns, 1);
-      expect(restored.layout.slots[0]?.value, const AppItem('Safari', customIconId: 'img_1').stored);
-      expect(restored.customIcons['img_1'], [1, 2, 3, 4]);
-    });
+        expect(restored.theme, DeckTheme.dark);
+        expect(restored.showLabels, isFalse);
+        expect(restored.showAppBar, isFalse);
+        expect(restored.layout.columns, 1);
+        expect(
+          restored.layout.slots[0]?.value,
+          const AppItem('Safari', customIconId: 'img_1').stored,
+        );
+        expect(restored.customIcons['img_1'], [1, 2, 3, 4]);
+      },
+    );
+
+    test(
+      'the app bar defaults to on for a backup written before it existed',
+      () {
+        final json = backupBundleToJson(sample())..remove('showAppBar');
+        final restored = backupBundleFromJson(json)!;
+
+        expect(restored.showAppBar, isTrue);
+      },
+    );
 
     test('encodes icon bytes as base64, not raw bytes, in the JSON map', () {
       final json = backupBundleToJson(sample());
 
-      expect(json['customIcons'], {'img_1': base64Encode([1, 2, 3, 4])});
+      expect(json['customIcons'], {
+        'img_1': base64Encode([1, 2, 3, 4]),
+      });
     });
 
     test('round-trips through actual JSON text via encode/decode', () {
@@ -119,7 +134,10 @@ void main() {
     });
 
     test('malformed bytes are rejected rather than throwing', () {
-      expect(decodeBackupBundle(Uint8List.fromList([0xff, 0xfe, 0x00])), isNull);
+      expect(
+        decodeBackupBundle(Uint8List.fromList([0xff, 0xfe, 0x00])),
+        isNull,
+      );
     });
 
     test('a bundle from a future format version is rejected', () {

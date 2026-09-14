@@ -724,6 +724,29 @@ void main() {
       expect(decoded.theme, DeckTheme.dark);
     });
 
+    test('round-trips the app bar setting', () {
+      for (final showAppBar in [true, false]) {
+        final decoded =
+            BtMessage.decode(
+                  SetAppearance(
+                    theme: DeckTheme.dark,
+                    showLabels: true,
+                    showAppBar: showAppBar,
+                  ).encode(),
+                )
+                as SetAppearance?;
+        expect(decoded!.showAppBar, showAppBar);
+      }
+    });
+
+    test('the app bar defaults to on when an older host omits it', () {
+      final decoded =
+          BtMessage.decode(utf8.encode('{"t":"thm","v":"dark","lbl":true}'))
+              as SetAppearance?;
+
+      expect(decoded!.showAppBar, isTrue);
+    });
+
     test('an unknown or missing value falls back to system', () {
       expect(DeckTheme.fromWire('solarized'), DeckTheme.system);
       expect(DeckTheme.fromWire(null), DeckTheme.system);

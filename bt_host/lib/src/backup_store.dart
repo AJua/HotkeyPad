@@ -93,6 +93,7 @@ abstract final class BackupStore {
       BackupBundle(
         theme: appearance.theme,
         showLabels: appearance.showLabels,
+        showAppBar: appearance.showAppBar,
         layout: layout,
         customIcons: icons,
       ),
@@ -114,7 +115,10 @@ abstract final class BackupStore {
     if (path == null) return null;
     try {
       await File(path).writeAsBytes(await exportCurrent(), flush: true);
-      return (ok: true, message: 'Exported settings to ${path.split('/').last}');
+      return (
+        ok: true,
+        message: 'Exported settings to ${path.split('/').last}',
+      );
     } on FileSystemException catch (error) {
       return (ok: false, message: 'Export failed: ${error.message}');
     }
@@ -126,9 +130,7 @@ abstract final class BackupStore {
   /// apply. Null means the user cancelled the picker.
   static Future<BackupReadResult?> pickAndReadFile() async {
     if (!BackupFilePicker.supported) {
-      return const BackupReadResult.failed(
-        'Import is only supported on macOS',
-      );
+      return const BackupReadResult.failed('Import is only supported on macOS');
     }
     final path = await BackupFilePicker.pickOpenFile();
     if (path == null) return null;
@@ -136,7 +138,9 @@ abstract final class BackupStore {
     try {
       bytes = await File(path).readAsBytes();
     } on FileSystemException catch (error) {
-      return BackupReadResult.failed('Could not read that file: ${error.message}');
+      return BackupReadResult.failed(
+        'Could not read that file: ${error.message}',
+      );
     }
     final bundle = decodeBackupBundle(bytes);
     if (bundle == null) {
@@ -158,6 +162,7 @@ abstract final class BackupStore {
     await SettingsStore.save(
       theme: bundle.theme,
       showLabels: bundle.showLabels,
+      showAppBar: bundle.showAppBar,
     );
     for (final entry in bundle.customIcons.entries) {
       await CustomIconStore.writeAtId(entry.key, entry.value);

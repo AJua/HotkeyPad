@@ -106,6 +106,7 @@ class BtLinkSession extends ChangeNotifier {
 
   /// Labels off means icons alone, with square cells the icon fills.
   bool _showLabels = true;
+  bool _showAppBar = true;
 
   /// Names an image behind the deck's button grid — fetched the same way an
   /// app icon is (see [ensureIcon]), null meaning no custom background.
@@ -177,6 +178,8 @@ class BtLinkSession extends ChangeNotifier {
   List<DeckApp> get apps => List.unmodifiable(_apps);
   DeckTheme get theme => _theme;
   bool get showLabels => _showLabels;
+
+  bool get showAppBar => _showAppBar;
   DeckLayout? get layout => _layout;
 
   /// Null when the host has no custom background set, or its bytes have
@@ -310,14 +313,16 @@ class BtLinkSession extends ChangeNotifier {
           );
         }
       case SetAppearance(
-          :final theme,
-          :final showLabels,
-          :final backgroundImageId,
-          :final backgroundOpacity,
-          :final backgroundFit,
-        ):
+        :final theme,
+        :final showLabels,
+        :final showAppBar,
+        :final backgroundImageId,
+        :final backgroundOpacity,
+        :final backgroundFit,
+      ):
         _theme = theme;
         _showLabels = showLabels;
+        _showAppBar = showAppBar;
         _backgroundImageId = backgroundImageId;
         _backgroundOpacity = backgroundOpacity;
         _backgroundFit = backgroundFit;
@@ -326,6 +331,7 @@ class BtLinkSession extends ChangeNotifier {
             hostId,
             theme,
             showLabels,
+            showAppBar: showAppBar,
             backgroundImageId: backgroundImageId,
             backgroundOpacity: backgroundOpacity,
             backgroundFit: backgroundFit,
@@ -615,7 +621,10 @@ class BtLinkSession extends ChangeNotifier {
       // the same time — see its device lock. clientId is what a WiFi
       // host's PIN-pairing remembers across reconnects; see RequestPin.
       await _send(
-        Hello(name: await DeviceInfo.name(), clientId: await ClientIdentity.id()),
+        Hello(
+          name: await DeviceInfo.name(),
+          clientId: await ClientIdentity.id(),
+        ),
       );
       await requestLayout();
     } catch (error) {
@@ -712,7 +721,11 @@ class BtLinkSession extends ChangeNotifier {
   /// WiFi's whole connect sequence in one step — there is no service
   /// discovery or subscribe handshake the way BLE has; a TCP connection is
   /// either open or it isn't.
-  Future<void> _connectWifi(String address, int port, {required int attempt}) async {
+  Future<void> _connectWifi(
+    String address,
+    int port, {
+    required int attempt,
+  }) async {
     _stage = LinkStage.discovering;
     notifyListeners();
 
@@ -775,6 +788,7 @@ class BtLinkSession extends ChangeNotifier {
   Future<void> _loadLayout() async {
     final cached = await DeckStore.loadAppearance(hostId);
     _showLabels = cached.showLabels;
+    _showAppBar = cached.showAppBar;
     _backgroundImageId = cached.backgroundImageId;
     _backgroundOpacity = cached.backgroundOpacity;
     _backgroundFit = cached.backgroundFit;

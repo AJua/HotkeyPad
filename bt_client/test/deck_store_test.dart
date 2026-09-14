@@ -39,6 +39,7 @@ void main() {
 
       final cached = await DeckStore.loadAppearance('host-1');
 
+      expect(cached.showAppBar, isTrue);
       expect(cached.backgroundImageId, isNull);
       expect(cached.backgroundOpacity, 1.0);
       expect(cached.backgroundFit, BackgroundFit.cover);
@@ -51,6 +52,7 @@ void main() {
         'host-1',
         DeckTheme.dark,
         false,
+        showAppBar: false,
         backgroundImageId: 'bg_1',
         backgroundOpacity: 0.42,
         backgroundFit: BackgroundFit.contain,
@@ -59,24 +61,31 @@ void main() {
 
       expect(cached.theme, DeckTheme.dark);
       expect(cached.showLabels, isFalse);
+      expect(cached.showAppBar, isFalse);
       expect(cached.backgroundImageId, 'bg_1');
       expect(cached.backgroundOpacity, 0.42);
       expect(cached.backgroundFit, BackgroundFit.contain);
     });
 
-    test('clearing the background removes it rather than storing empty', () async {
-      SharedPreferences.setMockInitialValues({});
-      await DeckStore.saveAppearance(
-        'host-1',
-        DeckTheme.system,
-        true,
-        backgroundImageId: 'bg_1',
-      );
+    test(
+      'clearing the background removes it rather than storing empty',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        await DeckStore.saveAppearance(
+          'host-1',
+          DeckTheme.system,
+          true,
+          backgroundImageId: 'bg_1',
+        );
 
-      await DeckStore.saveAppearance('host-1', DeckTheme.system, true);
+        await DeckStore.saveAppearance('host-1', DeckTheme.system, true);
 
-      expect((await DeckStore.loadAppearance('host-1')).backgroundImageId, isNull);
-    });
+        expect(
+          (await DeckStore.loadAppearance('host-1')).backgroundImageId,
+          isNull,
+        );
+      },
+    );
 
     test('keeps hosts separate', () async {
       SharedPreferences.setMockInitialValues({});
@@ -88,8 +97,14 @@ void main() {
       );
       await DeckStore.saveAppearance('host-2', DeckTheme.system, true);
 
-      expect((await DeckStore.loadAppearance('host-1')).backgroundImageId, 'bg_1');
-      expect((await DeckStore.loadAppearance('host-2')).backgroundImageId, isNull);
+      expect(
+        (await DeckStore.loadAppearance('host-1')).backgroundImageId,
+        'bg_1',
+      );
+      expect(
+        (await DeckStore.loadAppearance('host-2')).backgroundImageId,
+        isNull,
+      );
     });
   });
 }

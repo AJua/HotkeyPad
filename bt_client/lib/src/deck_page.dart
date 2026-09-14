@@ -274,7 +274,9 @@ class _DeckPageState extends State<DeckPage> {
                 address: address,
                 port: beacon.port,
               ),
-              name: beacon.name.isNotEmpty ? beacon.name : BtLink.advertisedName,
+              name: beacon.name.isNotEmpty
+                  ? beacon.name
+                  : BtLink.advertisedName,
             )
             ..onTheme = widget.onTheme
             ..start();
@@ -296,6 +298,28 @@ class _DeckPageState extends State<DeckPage> {
     return ListenableBuilder(
       listenable: session,
       builder: (context, _) {
+        final deck = buildDeckStack(
+          backgroundImage: session.backgroundImage,
+          backgroundOpacity: session.backgroundOpacity,
+          backgroundFit: session.backgroundFit,
+          body: _body(session),
+          // Built only while the link is unusable, so a connected deck
+          // has nothing layered over it to absorb taps.
+          overlay: session.stage != LinkStage.ready
+              ? _ConnectionOverlay(
+                  session: session,
+                  deviceName: session.name,
+                  onBack: _forget,
+                )
+              : null,
+        );
+        // Off, the title and debug-console button disappear and the grid
+        // takes the whole screen — a plain Scaffold in their place, rather
+        // than nothing at all, so the notch/nav-bar inset EdgeBarScaffold
+        // would otherwise have consumed on its own edge is still respected.
+        if (!session.showAppBar) {
+          return Scaffold(body: SafeArea(child: deck));
+        }
         return EdgeBarScaffold(
           side: barSideFor(context),
           title: session.name,
@@ -308,21 +332,7 @@ class _DeckPageState extends State<DeckPage> {
               icon: const Icon(Icons.bug_report_outlined),
             ),
           ],
-          child: buildDeckStack(
-            backgroundImage: session.backgroundImage,
-            backgroundOpacity: session.backgroundOpacity,
-            backgroundFit: session.backgroundFit,
-            body: _body(session),
-            // Built only while the link is unusable, so a connected deck
-            // has nothing layered over it to absorb taps.
-            overlay: session.stage != LinkStage.ready
-                ? _ConnectionOverlay(
-                    session: session,
-                    deviceName: session.name,
-                    onBack: _forget,
-                  )
-                : null,
-          ),
+          child: deck,
         );
       },
     );

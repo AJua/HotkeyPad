@@ -65,8 +65,10 @@ Future<ActionResult> runComboSteps(
 /// itself is transport-agnostic (a BLE central's uuid or a WiFi client's
 /// `wifi:address:port`), so first-connected-wins already applies across
 /// both without this needing to know which is which.
-bool isPressAllowed({required String clientId, required String? lockedClientId}) =>
-    lockedClientId == clientId;
+bool isPressAllowed({
+  required String clientId,
+  required String? lockedClientId,
+}) => lockedClientId == clientId;
 
 /// What the device lock should become after the connected-client list
 /// changes.
@@ -502,9 +504,7 @@ class _HostPageState extends State<HostPage> {
         );
       case WifiTrust.blocked:
         if (mounted) {
-          setState(
-            () => _addLog('WiFi client $clientId rejected (blocked)'),
-          );
+          setState(() => _addLog('WiFi client $clientId rejected (blocked)'));
         }
         await client.socket.close();
       case WifiTrust.unknown:
@@ -536,9 +536,7 @@ class _HostPageState extends State<HostPage> {
     await pending.client.send(PinResult(ok: ok).encode());
     if (!ok) {
       if (mounted) {
-        setState(
-          () => _addLog('WiFi PIN rejected for ${pending.clientId}'),
-        );
+        setState(() => _addLog('WiFi PIN rejected for ${pending.clientId}'));
       }
       await pending.client.socket.close();
       return;
@@ -756,10 +754,7 @@ class _HostPageState extends State<HostPage> {
   /// there. The client sent only a number, so a shell command cannot be
   /// injected from the other end of the link.
   Future<void> _pressSlot(ClientSource source, int id) async {
-    if (!isPressAllowed(
-      clientId: source.id,
-      lockedClientId: _lockedClientId,
-    )) {
+    if (!isPressAllowed(clientId: source.id, lockedClientId: _lockedClientId)) {
       final message = _lockedClientId == null
           ? 'No device is selected on the host yet'
           : 'This host is locked to another device';
@@ -839,6 +834,7 @@ class _HostPageState extends State<HostPage> {
       SetAppearance(
         theme: appearance.theme,
         showLabels: appearance.showLabels,
+        showAppBar: appearance.showAppBar,
         backgroundImageId: appearance.backgroundImageId,
         backgroundOpacity: appearance.backgroundOpacity,
         backgroundFit: appearance.backgroundFit,
@@ -869,6 +865,7 @@ class _HostPageState extends State<HostPage> {
     final message = SetAppearance(
       theme: appearance.theme,
       showLabels: appearance.showLabels,
+      showAppBar: appearance.showAppBar,
       backgroundImageId: appearance.backgroundImageId,
       backgroundOpacity: appearance.backgroundOpacity,
       backgroundFit: appearance.backgroundFit,
@@ -1153,7 +1150,7 @@ class _HostPageState extends State<HostPage> {
           Expanded(
             child: LayoutPage(
               onChanged: _broadcastLayout,
-              onAppearanceChanged: (theme, showLabels) {
+              onAppearanceChanged: (theme, showLabels, showAppBar) {
                 widget.onThemeChanged(theme);
                 _broadcastAppearance();
               },
@@ -1310,7 +1307,8 @@ class _HostPageState extends State<HostPage> {
           // DeviceLockPicker.
           DeviceLockPicker(
             clients: [
-              for (final client in clients) (id: client.id, label: _labelFor(client)),
+              for (final client in clients)
+                (id: client.id, label: _labelFor(client)),
             ],
             lockedClientId: _lockedClientId,
             onChanged: (value) => setState(() => _lockedClientId = value),
@@ -1501,9 +1499,7 @@ class _ClientTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      color: locked
-          ? Theme.of(context).colorScheme.primaryContainer
-          : null,
+      color: locked ? Theme.of(context).colorScheme.primaryContainer : null,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: client.subscribed
