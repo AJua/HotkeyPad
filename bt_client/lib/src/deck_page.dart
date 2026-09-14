@@ -220,27 +220,20 @@ class _DeckPageState extends State<DeckPage> {
               icon: const Icon(Icons.bug_report_outlined),
             ),
           ],
-          child: Stack(
-            children: [
-              // Drawn first so the grid and every overlay above it composite
-              // on top; a null image renders nothing.
-              DeckBackground(
-                image: session.backgroundImage,
-                opacity: session.backgroundOpacity,
-                fit: session.backgroundFit,
-              ),
-              Positioned.fill(child: _body(session)),
-              // Built only while the link is unusable, so a connected deck
-              // has nothing layered over it to absorb taps.
-              if (session.stage != LinkStage.ready)
-                Positioned.fill(
-                  child: _ConnectionOverlay(
+          child: buildDeckStack(
+            backgroundImage: session.backgroundImage,
+            backgroundOpacity: session.backgroundOpacity,
+            backgroundFit: session.backgroundFit,
+            body: _body(session),
+            // Built only while the link is unusable, so a connected deck
+            // has nothing layered over it to absorb taps.
+            overlay: session.stage != LinkStage.ready
+                ? _ConnectionOverlay(
                     session: session,
                     deviceName: session.name,
                     onBack: _forget,
-                  ),
-                ),
-            ],
+                  )
+                : null,
           ),
         );
       },
@@ -553,6 +546,43 @@ class _PageDots extends StatelessWidget {
   }
 }
 
+/// Builds the deck's own visual stack — background, body, and (while the
+/// link isn't ready) the connection overlay — as a standalone function
+/// rather than inlined in [_DeckPageState.build], so a test can pump
+/// exactly what production does instead of a hand-copied stand-in that
+/// could silently drift from it.
+///
+/// Every child is wrapped in [Positioned.fill], [DeckBackground] included:
+/// a [Stack] sizes itself from its non-positioned children alone, and
+/// [DeckBackground]'s own `build()` returns a zero-size `SizedBox` for as
+/// long as it has no image — forever, if none is ever configured. Passing
+/// it to the [Stack] un-positioned would size the *whole deck* — every
+/// sibling in it, [body] included — down to zero instead of leaving the
+/// [Stack] to size from whatever space its own parent gives it.
+Widget buildDeckStack({
+  required Uint8List? backgroundImage,
+  required double backgroundOpacity,
+  required BackgroundFit backgroundFit,
+  required Widget body,
+  Widget? overlay,
+}) {
+  return Stack(
+    children: [
+      // Drawn first so the grid and every overlay above it composite on
+      // top; a null image renders nothing.
+      Positioned.fill(
+        child: DeckBackground(
+          image: backgroundImage,
+          opacity: backgroundOpacity,
+          fit: backgroundFit,
+        ),
+      ),
+      Positioned.fill(child: body),
+      if (overlay != null) Positioned.fill(child: overlay),
+    ],
+  );
+}
+
 /// The host's chosen background image, drawn behind the whole deck.
 ///
 /// Public, not a private implementation detail of [DeckPage], so it can be
@@ -579,19 +609,20 @@ class DeckBackground extends StatelessWidget {
 
   final BackgroundFit fit;
 
+  /// The caller wraps this in `Positioned.fill`, not this widget itself:
+  /// a `Stack` sizes itself from its non-positioned children alone, so if
+  /// this returned a plain `SizedBox.shrink()` as an un-positioned child
+  /// (the null-image case, true for as long as no background has loaded —
+  /// which, with none configured, is forever) it would collapse the whole
+  /// deck's `Stack` to zero size instead of leaving it to size from
+  /// whatever space the scaffold around it actually gives it.
   @override
   Widget build(BuildContext context) {
     final bytes = image;
     if (bytes == null) return const SizedBox.shrink();
-    return Positioned.fill(
-      child: Opacity(
-        opacity: opacity.clamp(0.0, 1.0),
-        child: Image.memory(
-          bytes,
-          fit: boxFitFor(fit),
-          gaplessPlayback: true,
-        ),
-      ),
+    return Opacity(
+      opacity: opacity.clamp(0.0, 1.0),
+      child: Image.memory(bytes, fit: boxFitFor(fit), gaplessPlayback: true),
     );
   }
 }

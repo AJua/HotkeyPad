@@ -4,7 +4,19 @@ import 'package:bt_client/src/background_fit.dart';
 import 'package:bt_client/src/deck_page.dart';
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'package:flutter/material.dart'
-    show Image, MaterialApp, MemoryImage, Opacity, Scaffold, Stack, Widget;
+    show
+        Colors,
+        Container,
+        Image,
+        Key,
+        KeyedSubtree,
+        MaterialApp,
+        MemoryImage,
+        Opacity,
+        Positioned,
+        Scaffold,
+        Stack,
+        Widget;
 import 'package:flutter_test/flutter_test.dart';
 
 /// Stand-in "image" bytes — the smallest possible real PNG (a single
@@ -21,11 +33,16 @@ final _bytes = base64Decode(
   '+A8AAQUBAScY42YAAAAASUVORK5CYII=',
 );
 
-/// [DeckBackground] renders itself as a [Positioned], which is only valid
-/// directly inside a [Stack] — exactly how deck_page.dart actually places
-/// it, and how every test here must too.
-Widget _harness(Widget background) =>
-    MaterialApp(home: Scaffold(body: Stack(children: [background])));
+/// [DeckBackground] must be wrapped in `Positioned.fill` by its *caller* —
+/// see deck_page.dart's own Stack — never left un-positioned itself: a
+/// `Stack` sizes itself from its non-positioned children alone, and a null
+/// image's `SizedBox.shrink()` is exactly such a child, sized to zero. Every
+/// test here wraps it the same way to match, and 'collapses the whole deck
+/// to zero size' below exists specifically to catch a regression back to
+/// leaving it un-positioned.
+Widget _harness(Widget background) => MaterialApp(
+  home: Scaffold(body: Stack(children: [Positioned.fill(child: background)])),
+);
 
 void main() {
   group('DeckBackground', () {
@@ -109,5 +126,42 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 0.0);
     });
+
+    testWidgets(
+      'a null image never collapses the body to zero size — regression: '
+      'with no background configured, DeckBackground.build() returns a '
+      "zero-size SizedBox.shrink(); left un-positioned in buildDeckStack's "
+      "Stack, that alone used to shrink the whole deck — body included — "
+      'to zero width, with no exception thrown to reveal why. Goes through '
+      'buildDeckStack itself, the same function deck_page.dart actually '
+      'calls, rather than a hand-copied Stack that could drift from it.',
+      (tester) async {
+        const stackKey = Key('deck-stack');
+        const bodyKey = Key('body-stand-in');
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: KeyedSubtree(
+                key: stackKey,
+                child: buildDeckStack(
+                  backgroundImage: null,
+                  backgroundOpacity: 1,
+                  backgroundFit: BackgroundFit.cover,
+                  body: Container(key: bodyKey, color: Colors.blue),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(tester.takeException(), isNull);
+        final stackSize = tester.getSize(find.byKey(stackKey));
+        expect(stackSize.width, greaterThan(0));
+        expect(stackSize.height, greaterThan(0));
+        // The whole point: the body meant to fill the screen actually does,
+        // rather than being squeezed to zero by DeckBackground.
+        expect(tester.getSize(find.byKey(bodyKey)), stackSize);
+      },
+    );
   });
 }
