@@ -33,6 +33,24 @@ class DeckApp {
   final String category;
 }
 
+/// What the icon-fetch queue should send next, given its current state —
+/// pulled out of [BtLinkSession._drainIconQueue] as a pure function purely
+/// so the priority rule can be tested without a real BLE link: every
+/// ordinary icon in [queue] is always sent before [pendingBackground],
+/// regardless of which was asked for first, since a background image can
+/// be a hundred times an icon's size and must never make the deck's own
+/// buttons wait behind it. Null means there is nothing to fetch right now.
+({String name, bool lowPriority})? nextIconFetch({
+  required List<String> queue,
+  required String? pendingBackground,
+}) {
+  if (queue.isNotEmpty) return (name: queue.first, lowPriority: false);
+  if (pendingBackground != null) {
+    return (name: pendingBackground, lowPriority: true);
+  }
+  return null;
+}
+
 /// One line in the debug console.
 class LinkMessage {
   LinkMessage({required this.text, required this.inbound})
@@ -101,7 +119,17 @@ class BtLinkSession extends ChangeNotifier {
   /// one it already knows — see [reportOrientation].
   bool? _reportedPortrait;
   final _iconQueue = <String>[];
-  bool _fetchingIcon = false;
+
+  /// The background image, held separately from [_iconQueue] rather than
+  /// appended to it: a background can be a hundred times the size of an
+  /// app icon, and must never make the deck's own buttons wait behind it.
+  /// Only drawn from once [_iconQueue] is empty — see [_drainIconQueue].
+  String? _pendingBackgroundFetch;
+
+  /// The name and priority of whichever fetch [_drainIconQueue] currently
+  /// has outstanding, so a retry (see [_finishIconFetch]) can re-queue it
+  /// at the same priority it started at instead of always promoting it.
+  ({String name, bool lowPriority})? _fetching;
   bool _loadingApps = false;
   final _log = <LinkMessage>[];
   int? _mtu;
@@ -268,7 +296,9 @@ class BtLinkSession extends ChangeNotifier {
             backgroundFit: backgroundFit,
           ),
         );
-        if (backgroundImageId != null) unawaited(ensureIcon(backgroundImageId));
+        if (backgroundImageId != null) {
+          unawaited(ensureIcon(backgroundImageId, lowPriority: true));
+        }
         onTheme?.call(theme);
         _append(
           'appearance: ${theme.label.toLowerCase()}, '
@@ -333,7 +363,13 @@ class BtLinkSession extends ChangeNotifier {
   /// Fetches [appName]'s icon if it is not already known, preferring the disk
   /// cache. Requests are queued one at a time so a deck full of new buttons
   /// does not flood the notification queue.
-  Future<void> ensureIcon(String appName) async {
+  ///
+  /// [lowPriority] is for the background image alone: it is fetched only
+  /// once every ordinary icon already queued has had its turn (see
+  /// [_pendingBackgroundFetch]), so a background that is a hundred times an
+  /// icon's size — or simply slow to arrive — can never make the deck's own
+  /// buttons wait behind it.
+  Future<void> ensureIcon(String appName, {bool lowPriority = false}) async {
     if (_icons.containsKey(appName)) return;
     if (!_requestedIcons.add(appName)) return;
 
@@ -346,15 +382,20 @@ class BtLinkSession extends ChangeNotifier {
       return;
     }
 
-    _iconQueue.add(appName);
+    if (lowPriority) {
+      _pendingBackgroundFetch = appName;
+    } else {
+      _iconQueue.add(appName);
+    }
     unawaited(_drainIconQueue());
   }
 
   /// Retries every deck icon that never arrived.
   ///
-  /// A frame lost mid-transfer leaves nothing to retry on its own — see
-  /// [_finishIconFetch] — so pulling to refresh is the user's way to ask
-  /// again, rather than living with a fallback glyph until the app restarts.
+  /// A timed-out fetch already retries itself (see [_finishIconFetch]), but
+  /// only after its own 10-second wait; pulling to refresh is the
+  /// impatient — or manual — way to ask again right away rather than
+  /// living with a fallback glyph until it comes back around on its own.
   Future<void> refreshIcons() async {
     final layout = _layout;
     if (layout == null) return;
@@ -370,6 +411,13 @@ class BtLinkSession extends ChangeNotifier {
     for (final name in missing) {
       unawaited(ensureIcon(name));
     }
+    // The background isn't a layout slot, so it needs its own "never
+    // arrived" check alongside the loop above.
+    final backgroundId = _backgroundImageId;
+    if (backgroundId != null && !_icons.containsKey(backgroundId)) {
+      _requestedIcons.remove(backgroundId);
+      unawaited(ensureIcon(backgroundId, lowPriority: true));
+    }
   }
 
   Future<void> _drainIconQueue() async {
@@ -377,24 +425,48 @@ class BtLinkSession extends ChangeNotifier {
     // with ~100 catalogue notifications would leave the deck without labels
     // for far longer than it leaves it without pictures.
     if (_loadingApps) return;
-    if (_fetchingIcon || _iconQueue.isEmpty || !ready) return;
-    _fetchingIcon = true;
-    final appName = _iconQueue.removeAt(0);
+    if (_fetching != null || !ready) return;
+    final next = nextIconFetch(
+      queue: _iconQueue,
+      pendingBackground: _pendingBackgroundFetch,
+    );
+    if (next == null) return;
+    final appName = next.name;
+    if (next.lowPriority) {
+      _pendingBackgroundFetch = null;
+    } else {
+      _iconQueue.removeAt(0);
+    }
+    _fetching = next;
     await _send(RequestIcon(name: appName));
     // The host answers with frames; _finishIconFetch releases the queue. A
     // host that never answers must not wedge it, hence the timeout.
     _iconTimeout = Timer(const Duration(seconds: 10), () {
-      _finishIconFetch(appName);
+      _finishIconFetch(appName, retryable: true);
     });
   }
 
   Timer? _iconTimeout;
 
-  void _finishIconFetch(String appName) {
+  /// Ends whichever fetch is outstanding for [appName].
+  ///
+  /// [retryable] is only true when the 10-second timeout is what ended it
+  /// — the host may simply still be busy (a large background image can
+  /// take far longer than any app icon), not permanently unable to answer,
+  /// so unlike [IconUnavailable] or a completed transfer this asks for it
+  /// again rather than giving up on it for the rest of the session; see
+  /// [refreshIcons] for the manual, immediate equivalent.
+  void _finishIconFetch(String appName, {bool retryable = false}) {
     _iconTimeout?.cancel();
     _iconTimeout = null;
-    _fetchingIcon = false;
-    unawaited(_drainIconQueue());
+    final lowPriority = _fetching?.lowPriority ?? false;
+    _fetching = null;
+    if (retryable) {
+      _requestedIcons.remove(appName);
+      unawaited(ensureIcon(appName, lowPriority: lowPriority));
+    } else {
+      unawaited(_drainIconQueue());
+    }
   }
 
   void _append(String text, {required bool inbound}) {
@@ -591,7 +663,9 @@ class BtLinkSession extends ChangeNotifier {
     // the first frame; ensureIcon only reaches for the link when the cache
     // misses.
     final backgroundId = _backgroundImageId;
-    if (backgroundId != null) unawaited(ensureIcon(backgroundId));
+    if (backgroundId != null) {
+      unawaited(ensureIcon(backgroundId, lowPriority: true));
+    }
     final cachedLayout = await DeckStore.load(hostId);
     if (cachedLayout == null || _layout != null) return;
     _layout = cachedLayout;
