@@ -1116,3 +1116,134 @@ abstract final class IconFrame {
     }
   }
 }
+
+/// How a client reached the host — shown next to a connected device's name
+/// wherever more than one might be picked between (the device lock), since
+/// the same phone can show up twice at once, once per transport.
+enum LinkTransport {
+  bluetooth('bluetooth'),
+  wifi('wifi');
+
+  const LinkTransport(this.label);
+  final String label;
+}
+
+/// Fixed ports for the WiFi transport, agreed on by both ends since neither
+/// negotiates the other's address ahead of time.
+abstract final class WifiLink {
+  /// Where the host's `ServerSocket` listens. BLE has no equivalent to pick
+  /// — a peripheral's GATT server just *is* the service — so WiFi needs a
+  /// fixed rendezvous point instead.
+  static const tcpPort = 54871;
+
+  /// Where the host's discovery beacon is broadcast, and where a client
+  /// listens for one. Deliberately not [tcpPort]: a broadcast socket and a
+  /// connection-oriented server socket are different concerns, and sharing
+  /// a port would make either harder to reason about on its own.
+  static const discoveryPort = 54872;
+
+  /// How often the host re-announces itself. Frequent enough that a client
+  /// which starts listening a moment late still finds it quickly; sparse
+  /// enough not to be noise on the network.
+  static const beaconInterval = Duration(seconds: 2);
+}
+
+/// Adds a 4-byte big-endian length prefix so a byte *stream* with no
+/// built-in message boundaries (a TCP socket) can still carry the same
+/// discrete messages BLE already delivers one per GATT write/notify —
+/// [BtMessage] bytes and [IconFrame] bytes alike, unchanged either way.
+/// Nothing else in the protocol needs to know this exists.
+abstract final class FrameCodec {
+  static Uint8List encode(List<int> payload) {
+    final framed = Uint8List(4 + payload.length);
+    framed.buffer.asByteData().setUint32(0, payload.length, Endian.big);
+    framed.setRange(4, framed.length, payload);
+    return framed;
+  }
+}
+
+/// Reassembles [FrameCodec]-framed messages out of a byte stream, needed
+/// only for a stream transport like TCP — BLE already delivers one whole
+/// message per GATT write/notify, so it has no equivalent.
+///
+/// Stateful and incremental on purpose: a socket hands over bytes in
+/// whatever chunks the network happened to deliver, which may split a
+/// frame's header or payload anywhere at all, or bundle several frames
+/// into one chunk.
+class FrameReassembler {
+  final _buffer = BytesBuilder();
+  int? _expectedLength;
+
+  /// Feeds [chunk] in and returns every frame it completed, in order. A
+  /// still-incomplete trailing frame is buffered for the next call rather
+  /// than returned.
+  List<Uint8List> add(List<int> chunk) {
+    _buffer.add(chunk);
+    final frames = <Uint8List>[];
+    while (true) {
+      final bytes = _buffer.toBytes();
+      final expected = _expectedLength;
+      if (expected == null) {
+        if (bytes.length < 4) break;
+        _expectedLength = ByteData.sublistView(
+          bytes,
+          0,
+          4,
+        ).getUint32(0, Endian.big);
+        continue;
+      }
+      if (bytes.length < 4 + expected) break;
+      frames.add(Uint8List.fromList(bytes.sublist(4, 4 + expected)));
+      _buffer
+        ..clear()
+        ..add(bytes.sublist(4 + expected));
+      _expectedLength = null;
+    }
+    return frames;
+  }
+}
+
+/// Broadcast over UDP so a client on the same LAN can find the host without
+/// the user typing in an IP address — WiFi's equivalent of a BLE
+/// advertisement.
+class WifiBeacon {
+  const WifiBeacon({required this.hostId, required this.name, required this.port});
+
+  /// Persists across restarts (see the host's `HostIdentity`) and is
+  /// namespaced separately from a BLE peripheral's own UUID — the two
+  /// transports do not share an identity, so the same Mac reached over
+  /// either one is cached separately on the client. Not shown to the user;
+  /// [name] is.
+  final String hostId;
+
+  /// The host's own display name (its computer name), so a client picking
+  /// between several discovered hosts sees something meaningful rather
+  /// than a bare id.
+  final String name;
+
+  final int port;
+
+  Uint8List encode() => Uint8List.fromList(
+    utf8.encode(
+      jsonEncode({'t': 'beacon', 'h': hostId, 'n': name, 'p': port}),
+    ),
+  );
+
+  /// Returns null for anything that is not a well-formed beacon, so a
+  /// stray or malformed UDP packet on the same port cannot be mistaken for
+  /// one — this travels outside the app's own service boundary (BLE at
+  /// least filters by service UUID), so it must not trust its input.
+  static WifiBeacon? tryParse(List<int> bytes) {
+    try {
+      final json = jsonDecode(utf8.decode(bytes));
+      if (json is! Map || json['t'] != 'beacon') return null;
+      final hostId = json['h'];
+      final name = json['n'];
+      final port = json['p'];
+      if (hostId is! String || name is! String || port is! int) return null;
+      return WifiBeacon(hostId: hostId, name: name, port: port);
+    } catch (_) {
+      return null;
+    }
+  }
+}

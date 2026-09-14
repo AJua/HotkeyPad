@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -790,6 +791,143 @@ void main() {
         'contain',
         'fill',
       ]);
+    });
+  });
+
+  group('FrameCodec/FrameReassembler', () {
+    test('round-trips a single frame fed whole', () {
+      final payload = utf8.encode('{"t":"hi","n":"iPhone"}');
+      final reassembler = FrameReassembler();
+
+      final frames = reassembler.add(FrameCodec.encode(payload));
+
+      expect(frames, hasLength(1));
+      expect(frames.single, payload);
+    });
+
+    test('reassembles a frame fed one byte at a time', () {
+      final payload = List<int>.generate(50, (i) => i);
+      final framed = FrameCodec.encode(payload);
+      final reassembler = FrameReassembler();
+
+      final frames = <Uint8List>[];
+      for (final byte in framed) {
+        frames.addAll(reassembler.add([byte]));
+      }
+
+      expect(frames, hasLength(1));
+      expect(frames.single, payload);
+    });
+
+    test('splits mid-header correctly', () {
+      final payload = List<int>.generate(30, (i) => i);
+      final framed = FrameCodec.encode(payload);
+      final reassembler = FrameReassembler();
+
+      // The 4-byte length header split across two chunks.
+      final frames = [
+        ...reassembler.add(framed.sublist(0, 2)),
+        ...reassembler.add(framed.sublist(2)),
+      ];
+
+      expect(frames, hasLength(1));
+      expect(frames.single, payload);
+    });
+
+    test('splits mid-payload correctly', () {
+      final payload = List<int>.generate(30, (i) => i);
+      final framed = FrameCodec.encode(payload);
+      final reassembler = FrameReassembler();
+
+      final frames = [
+        ...reassembler.add(framed.sublist(0, 10)),
+        ...reassembler.add(framed.sublist(10)),
+      ];
+
+      expect(frames, hasLength(1));
+      expect(frames.single, payload);
+    });
+
+    test('extracts every frame when several arrive in one chunk', () {
+      final first = utf8.encode('one');
+      final second = utf8.encode('two');
+      final combined = [...FrameCodec.encode(first), ...FrameCodec.encode(second)];
+      final reassembler = FrameReassembler();
+
+      final frames = reassembler.add(combined);
+
+      expect(frames, hasLength(2));
+      expect(frames[0], first);
+      expect(frames[1], second);
+    });
+
+    test('buffers an incomplete trailing frame for the next call', () {
+      final first = utf8.encode('complete');
+      final second = utf8.encode('also complete');
+      final framedSecond = FrameCodec.encode(second);
+      final reassembler = FrameReassembler();
+
+      final firstBatch = reassembler.add([
+        ...FrameCodec.encode(first),
+        // Half of the second frame.
+        ...framedSecond.sublist(0, framedSecond.length ~/ 2),
+      ]);
+      expect(firstBatch, [first]);
+
+      final secondBatch = reassembler.add(
+        framedSecond.sublist(framedSecond.length ~/ 2),
+      );
+      expect(secondBatch, [second]);
+    });
+  });
+
+  group('WifiBeacon', () {
+    test('round-trips through encode/tryParse', () {
+      const beacon = WifiBeacon(
+        hostId: 'host_123',
+        name: "Ray's MacBook Pro",
+        port: 54871,
+      );
+
+      final decoded = WifiBeacon.tryParse(beacon.encode());
+
+      expect(decoded, isNotNull);
+      expect(decoded!.hostId, 'host_123');
+      expect(decoded.name, "Ray's MacBook Pro");
+      expect(decoded.port, 54871);
+    });
+
+    test('rejects malformed JSON', () {
+      expect(WifiBeacon.tryParse(utf8.encode('not json')), isNull);
+    });
+
+    test('rejects a JSON message that is not a beacon', () {
+      expect(
+        WifiBeacon.tryParse(utf8.encode('{"t":"hi","n":"iPhone"}')),
+        isNull,
+      );
+    });
+
+    test('rejects a beacon missing a required field', () {
+      expect(
+        WifiBeacon.tryParse(utf8.encode('{"t":"beacon","h":"x"}')),
+        isNull,
+      );
+    });
+
+    test('rejects a beacon with a wrong-typed field', () {
+      expect(
+        WifiBeacon.tryParse(
+          utf8.encode('{"t":"beacon","h":"x","n":"y","p":"not a number"}'),
+        ),
+        isNull,
+      );
+    });
+  });
+
+  group('LinkTransport', () {
+    test('is offered as bluetooth, wifi', () {
+      expect(LinkTransport.values.map((t) => t.label), ['bluetooth', 'wifi']);
     });
   });
 }

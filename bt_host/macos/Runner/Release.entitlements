@@ -6,5 +6,13 @@
 	<false/>
 	<key>com.apple.security.device.bluetooth</key>
 	<true/>
+	<!-- Not required while the sandbox above is off, but declared for
+	     parity with DebugProfile.entitlements in case sandboxing is ever
+	     turned back on — the WiFi transport's TCP server and UDP beacon
+	     both need it. -->
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>

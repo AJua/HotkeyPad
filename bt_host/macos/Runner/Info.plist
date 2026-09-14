@@ -32,5 +32,7 @@
 	<string>This app uses Bluetooth to advertise the BTLink host service to nearby clients.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app uses Bluetooth to advertise the BTLink host service to nearby clients.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app serves the BTLink host service on your local network as an alternative to Bluetooth.</string>
 </dict>
 </plist>

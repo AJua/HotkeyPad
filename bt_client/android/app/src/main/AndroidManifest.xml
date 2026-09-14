@@ -15,6 +15,14 @@
     <uses-feature android:name="android.hardware.bluetooth_le"
         android:required="true" />
 
+    <!-- WiFi transport: a TCP connection to the host, and listening for
+         its UDP discovery beacon. No runtime prompt — Android has no
+         local-network permission gate for plain broadcast the way iOS
+         does. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:label="bt_client"
         android:name="${applicationName}"

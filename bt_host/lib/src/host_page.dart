@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
@@ -9,12 +10,14 @@ import 'app_launcher.dart';
 import 'background_image_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
+import 'host_identity.dart';
 import 'layout_page.dart';
 import 'layout_store.dart';
 import 'media_control.dart';
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 import 'settings_store.dart';
 import 'unsupported_page.dart';
+import 'wifi_server.dart';
 
 /// What running one action came to — every `AppLauncher.open`-style helper
 /// already returns this shape, so a combo step and a top-level press report
@@ -46,7 +49,7 @@ Future<ActionResult> runComboSteps(
   return (ok: true, message: 'Ran ${steps.length} steps');
 }
 
-/// Whether a press from [centralId] should actually run.
+/// Whether a press from [clientId] should actually run.
 ///
 /// There is no "accept anyone" state: a null [lockedClientId] means no
 /// device has been picked yet (nothing connected, or more than one
@@ -55,10 +58,13 @@ Future<ActionResult> runComboSteps(
 /// until it is one specific device's turn.
 ///
 /// A pure function of the two ids specifically so it can be tested without
-/// a real `Central`/BLE stack — the same reason [runComboSteps] takes its
-/// dependencies as parameters instead of reaching for them itself.
-bool isPressAllowed({required String centralId, required String? lockedClientId}) =>
-    lockedClientId == centralId;
+/// a real transport — the same reason [runComboSteps] takes its
+/// dependencies as parameters instead of reaching for them itself. The id
+/// itself is transport-agnostic (a BLE central's uuid or a WiFi client's
+/// `wifi:address:port`), so first-connected-wins already applies across
+/// both without this needing to know which is which.
+bool isPressAllowed({required String clientId, required String? lockedClientId}) =>
+    lockedClientId == clientId;
 
 /// What the device lock should become after the connected-client list
 /// changes.
@@ -78,12 +84,32 @@ String? nextLockedClientId({
   return connectedClientIds.length == 1 ? connectedClientIds.single : null;
 }
 
-/// A client that the host has seen. Centrals are only reported to us when
-/// they do something — connect, subscribe, read or write — so the list grows
-/// as clients interact rather than the moment they come into range.
+/// Everything needed to identify a client and talk to it, before it has
+/// necessarily been seen — passed into [_HostPageState._touch] and
+/// [_HostPageState._pressSlot], which create a [ConnectedClient] entry on
+/// first use rather than requiring one to already exist. Bundled together
+/// (rather than four separate parameters everywhere) since a caller always
+/// has all four at once: a BLE `Central` or a [WifiClient] each map to
+/// exactly one of these.
+typedef ClientSource = ({
+  String id,
+  LinkTransport transport,
+  Future<void> Function(Uint8List bytes) send,
+  Future<int> Function() maxFrameSize,
+});
+
+/// A client that the host has seen. A BLE central is only reported to us
+/// when it does something — connect, subscribe, read or write — so the
+/// list grows as clients interact rather than the moment they come into
+/// range; a WiFi client is reported the moment its TCP connection is
+/// accepted, since there is no equivalent "in range but not yet talking"
+/// state for a socket.
 class ConnectedClient {
   ConnectedClient({
-    required this.central,
+    required this.id,
+    required this.transport,
+    required this.send,
+    required this.maxFrameSize,
     required this.since,
     required this.subscribed,
     required this.lastActivity,
@@ -91,7 +117,22 @@ class ConnectedClient {
     this.portrait,
   });
 
-  final Central central;
+  final String id;
+  final LinkTransport transport;
+
+  /// Sends already-encoded bytes to this client over whichever transport
+  /// it connected with — a BLE notify or a WiFi socket write, hidden
+  /// behind one shape (see [_HostPageState._send]/`_sendIcon`) so neither
+  /// needs to know which transport it is talking to.
+  final Future<void> Function(Uint8List bytes) send;
+
+  /// The largest single frame this client can currently receive — a BLE
+  /// central's negotiated MTU (queried fresh each time, since a
+  /// reconnect can change it) or a large fixed constant for WiFi, which
+  /// has no equivalent limit. Drives both the plain drop-if-too-big check
+  /// in `_send` and the icon-chunking capacity in `_sendIcon`.
+  final Future<int> Function() maxFrameSize;
+
   final DateTime since;
   final bool subscribed;
   final String lastActivity;
@@ -104,8 +145,6 @@ class ConnectedClient {
   /// until the first one arrives, same as [name].
   final bool? portrait;
 
-  String get id => central.uuid.toString();
-
   ConnectedClient copyWith({
     bool? subscribed,
     String? lastActivity,
@@ -113,7 +152,10 @@ class ConnectedClient {
     bool? portrait,
   }) {
     return ConnectedClient(
-      central: central,
+      id: id,
+      transport: transport,
+      send: send,
+      maxFrameSize: maxFrameSize,
       since: since,
       subscribed: subscribed ?? this.subscribed,
       lastActivity: lastActivity ?? this.lastActivity,
@@ -136,6 +178,19 @@ class HostPage extends StatefulWidget {
 class _HostPageState extends State<HostPage> {
   PeripheralManager? _peripheral;
   Object? _initError;
+
+  final _wifiServer = WifiServer();
+
+  /// WiFi has no MTU negotiation the way BLE does — a TCP write simply
+  /// carries however many bytes it is given — so this is not a hardware
+  /// limit, just a generous cap far above any real message (the catalogue
+  /// and layout are small JSON; even an unprocessed background photo
+  /// downscaled by `BackgroundImageStore` tops out in the low megabytes),
+  /// kept mainly so `_send`'s "message too big" guard means something for
+  /// this transport too rather than never firing at all.
+  static const _wifiMaxFrameSize = 8 * 1024 * 1024;
+
+  String? _wifiError;
 
   final _clients = <String, ConnectedClient>{};
   final _log = <String>[];
@@ -262,9 +317,9 @@ class _HostPageState extends State<HostPage> {
         CentralConnectionStateChangedEventArgs event,
       ) {
         if (event.state == ConnectionState.connected) {
-          _touch(event.central, 'connected');
+          _touch(_bleSource(event.central), 'connected');
         } else {
-          _remove(event.central, 'disconnected');
+          _remove(event.central.uuid.toString(), 'disconnected');
         }
       }, 'connection events');
 
@@ -272,7 +327,7 @@ class _HostPageState extends State<HostPage> {
         GATTCharacteristicNotifyStateChangedEventArgs event,
       ) {
         _touch(
-          event.central,
+          _bleSource(event.central),
           event.state ? 'subscribed' : 'unsubscribed',
           subscribed: event.state,
         );
@@ -281,7 +336,7 @@ class _HostPageState extends State<HostPage> {
       _listenSafely(() => peripheral.characteristicReadRequested, (
         GATTCharacteristicReadRequestedEventArgs event,
       ) async {
-        _touch(event.central, 'read');
+        _touch(_bleSource(event.central), 'read');
         await peripheral.respondReadRequestWithValue(
           event.request,
           value: const Ack(ok: true, message: 'ready').encode(),
@@ -294,10 +349,67 @@ class _HostPageState extends State<HostPage> {
         // Respond first: the client is blocked on the ATT response, and
         // launching an app takes far longer than the ATT timeout allows.
         await peripheral.respondWriteRequest(event.request);
-        await _handleCommand(event.central, event.request.value);
+        await _handleCommand(_bleSource(event.central), event.request.value);
       }, 'write requests');
     } catch (error) {
       _initError = error;
+    }
+  }
+
+  /// Wraps a BLE `Central` as the transport-agnostic shape [_touch] and
+  /// [_handleCommand] actually work with — see [ClientSource].
+  ClientSource _bleSource(Central central) => (
+    id: central.uuid.toString(),
+    transport: LinkTransport.bluetooth,
+    send: (bytes) => _peripheral!.notifyCharacteristic(
+      central,
+      _notifyCharacteristic,
+      value: bytes,
+    ),
+    maxFrameSize: () => _peripheral!.getMaximumNotifyLength(central),
+  );
+
+  /// The WiFi counterpart of [_bleSource] — a [WifiClient] already carries
+  /// everything [ClientSource] needs, so this only supplies the constant
+  /// frame-size cap BLE gets from MTU negotiation instead.
+  ClientSource _wifiSource(WifiClient client) => (
+    id: client.id,
+    transport: LinkTransport.wifi,
+    send: client.send,
+    maxFrameSize: () async => _wifiMaxFrameSize,
+  );
+
+  Future<void> _startWifi() async {
+    try {
+      final hostId = await HostIdentity.id();
+      await _wifiServer.start(
+        hostId: hostId,
+        hostName: Platform.localHostname,
+        onConnected: (client) {
+          // A WiFi connection has no separate "subscribe" step the way a
+          // BLE central does — the TCP connection itself is the
+          // subscription, so this client is ready to be broadcast to the
+          // moment it is accepted.
+          _touch(_wifiSource(client), 'connected', subscribed: true);
+        },
+        onMessage: (client, bytes) {
+          unawaited(_handleCommand(_wifiSource(client), bytes));
+        },
+        onDisconnected: (client) => _remove(client.id, 'disconnected'),
+      );
+      if (mounted) {
+        setState(() {
+          _wifiError = null;
+          _addLog('WiFi listening on port ${WifiLink.tcpPort}');
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _wifiError = '$error';
+          _addLog('WiFi failed to start: $error');
+        });
+      }
     }
   }
 
@@ -316,14 +428,14 @@ class _HostPageState extends State<HostPage> {
   }
 
   void _touch(
-    Central central,
+    ClientSource source,
     String activity, {
     bool? subscribed,
     String? name,
     bool? portrait,
   }) {
     if (!mounted) return;
-    final id = central.uuid.toString();
+    final id = source.id;
     setState(() {
       final existing = _clients[id];
       _clients[id] =
@@ -334,7 +446,10 @@ class _HostPageState extends State<HostPage> {
             portrait: portrait,
           ) ??
           ConnectedClient(
-            central: central,
+            id: id,
+            transport: source.transport,
+            send: source.send,
+            maxFrameSize: source.maxFrameSize,
             since: DateTime.now(),
             subscribed: subscribed ?? false,
             lastActivity: activity,
@@ -348,7 +463,7 @@ class _HostPageState extends State<HostPage> {
 
   /// Re-derives the device lock after the connected-client list changes —
   /// pulled out so [nextLockedClientId]'s actual decision can be tested
-  /// without a real `Central`/BLE stack.
+  /// without a real transport.
   void _autoLockIfSingleClient() {
     _lockedClientId = nextLockedClientId(
       currentLockedClientId: _lockedClientId,
@@ -356,9 +471,8 @@ class _HostPageState extends State<HostPage> {
     );
   }
 
-  void _remove(Central central, String activity) {
+  void _remove(String id, String activity) {
     if (!mounted) return;
-    final id = central.uuid.toString();
     setState(() {
       _clients.remove(id);
       // Locking to a device that just left would otherwise silently block
@@ -382,36 +496,36 @@ class _HostPageState extends State<HostPage> {
     if (_log.length > 50) _log.removeLast();
   }
 
-  Future<void> _handleCommand(Central central, List<int> bytes) async {
+  Future<void> _handleCommand(ClientSource source, List<int> bytes) async {
     final message = BtMessage.decode(bytes);
     if (message == null) {
-      _touch(central, 'unknown command (${bytes.length} bytes)');
+      _touch(source, 'unknown command (${bytes.length} bytes)');
       return;
     }
     switch (message) {
       case Hello(:final name):
-        _touch(central, 'said hello as $name', name: name);
+        _touch(source, 'said hello as $name', name: name);
       case SetOrientation(:final portrait):
         _touch(
-          central,
+          source,
           'reported orientation: ${portrait ? 'portrait' : 'landscape'}',
           portrait: portrait,
         );
       case ListApps():
-        _touch(central, 'requested the app list');
-        await _queueTransfer(() => _sendCatalogue(central));
+        _touch(source, 'requested the app list');
+        await _queueTransfer(() => _sendCatalogue(source.id));
       // Every button arrives the same way: a slot id the host resolves
       // against its own layout.
       case PressSlot(:final id):
-        await _pressSlot(central, id);
+        await _pressSlot(source, id);
       case RequestLayout():
-        _touch(central, 'requested the layout');
-        await _queueTransfer(() => _sendLayout(central));
+        _touch(source, 'requested the layout');
+        await _queueTransfer(() => _sendLayout(source.id));
       case RequestIcon(:final name):
-        _touch(central, 'icon for $name');
-        await _queueTransfer(() => _sendIcon(central, name));
+        _touch(source, 'icon for $name');
+        await _queueTransfer(() => _sendIcon(source.id, name));
       case DebugText(:final text):
-        _touch(central, 'said: $text');
+        _touch(source, 'said: $text');
       case Ack() ||
           SetAppearance() ||
           PressSlot() ||
@@ -422,7 +536,7 @@ class _HostPageState extends State<HostPage> {
           LayoutSlot() ||
           LayoutEnd():
         // Host-to-client shapes; a client has no business sending them.
-        _touch(central, 'ignored a ${message.runtimeType}');
+        _touch(source, 'ignored a ${message.runtimeType}');
     }
   }
 
@@ -451,24 +565,22 @@ class _HostPageState extends State<HostPage> {
     if (mounted) setState(() => _appCount = apps.length);
   }
 
-  Future<void> _sendCatalogue(Central central) async {
+  Future<void> _sendCatalogue(String clientId) async {
     final apps = await AppLauncher.list();
     _appPaths
       ..clear()
       ..addEntries(apps.map((app) => MapEntry(app.name, app.path)));
     if (mounted) setState(() => _appCount = apps.length);
     for (final app in apps) {
-      await _send(central, AppEntry(name: app.name, category: app.category));
+      await _send(clientId, AppEntry(name: app.name, category: app.category));
       // Notifications queue in the controller and are silently dropped once
       // it fills; pacing them is cheaper than detecting the loss.
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
-    await _send(central, ListEnd(count: apps.length));
+    await _send(clientId, ListEnd(count: apps.length));
     if (mounted) {
       setState(
-        () => _addLog(
-          'sent ${apps.length} apps to ${_short(central.uuid.toString())}',
-        ),
+        () => _addLog('sent ${apps.length} apps to ${_short(clientId)}'),
       );
     }
   }
@@ -476,38 +588,38 @@ class _HostPageState extends State<HostPage> {
   /// Acts on the button [id] names, whatever the host's own layout says is
   /// there. The client sent only a number, so a shell command cannot be
   /// injected from the other end of the link.
-  Future<void> _pressSlot(Central central, int id) async {
+  Future<void> _pressSlot(ClientSource source, int id) async {
     if (!isPressAllowed(
-      centralId: central.uuid.toString(),
+      clientId: source.id,
       lockedClientId: _lockedClientId,
     )) {
       final message = _lockedClientId == null
           ? 'No device is selected on the host yet'
           : 'This host is locked to another device';
-      _touch(central, 'slot $id ignored — $message');
-      await _send(central, Ack(ok: false, message: message));
+      _touch(source, 'slot $id ignored — $message');
+      await _send(source.id, Ack(ok: false, message: message));
       return;
     }
     final layout = await LayoutStore.load();
     if (id < 0 || id >= layout.slots.length) {
-      _touch(central, 'slot $id is outside the layout');
-      await _send(central, const Ack(ok: false, message: 'No such button'));
+      _touch(source, 'slot $id is outside the layout');
+      await _send(source.id, const Ack(ok: false, message: 'No such button'));
       return;
     }
     final stored = layout.slots[id]?.value;
     final item = stored == null ? null : DeckItem.parse(stored);
     if (item == null) {
-      _touch(central, 'slot $id is empty');
-      await _send(central, const Ack(ok: false, message: 'Empty button'));
+      _touch(source, 'slot $id is empty');
+      await _send(source.id, const Ack(ok: false, message: 'Empty button'));
       return;
     }
 
     // Names the slot as well as what was in it: the client sends only a
     // number, and the log should not read as though it sent the action.
-    _touch(central, 'slot $id -> ${item.label}');
+    _touch(source, 'slot $id -> ${item.label}');
     final result = await _runItem(item);
     if (mounted) setState(() => _addLog(result.message));
-    await _send(central, Ack(ok: result.ok, message: result.message));
+    await _send(source.id, Ack(ok: result.ok, message: result.message));
   }
 
   /// Runs whatever a single [DeckItem] means to run. Pulled out of
@@ -535,10 +647,10 @@ class _HostPageState extends State<HostPage> {
   /// Streams the layout: a header, one message per occupied cell, then an
   /// end marker. Empty cells are not sent — the header's dimensions are
   /// enough to place the rest.
-  Future<void> _sendLayout(Central central) async {
+  Future<void> _sendLayout(String clientId) async {
     final layout = await LayoutStore.load();
     await _send(
-      central,
+      clientId,
       LayoutStart(
         columns: layout.columns,
         rows: layout.rows,
@@ -548,15 +660,15 @@ class _HostPageState extends State<HostPage> {
     for (var index = 0; index < layout.slots.length; index++) {
       final value = layout.slots[index]?.value;
       if (value == null) continue;
-      await _send(central, LayoutSlot(index: index, value: value));
+      await _send(clientId, LayoutSlot(index: index, value: value));
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
-    await _send(central, const LayoutEnd());
+    await _send(clientId, const LayoutEnd());
     // The appearance rides along with the layout so a fresh client is
     // dressed correctly before it draws anything.
     final appearance = await SettingsStore.load();
     await _send(
-      central,
+      clientId,
       SetAppearance(
         theme: appearance.theme,
         showLabels: appearance.showLabels,
@@ -570,7 +682,7 @@ class _HostPageState extends State<HostPage> {
         _addLog(
           'sent layout ${layout.columns}x${layout.rows}'
           '${layout.pages > 1 ? ' x${layout.pages} pages' : ''} to '
-          '${_short(central.uuid.toString())}',
+          '${_short(clientId)}',
         );
       });
     }
@@ -595,7 +707,7 @@ class _HostPageState extends State<HostPage> {
       backgroundFit: appearance.backgroundFit,
     );
     for (final client in _clients.values.where((c) => c.subscribed)) {
-      await _queueTransfer(() => _send(client.central, message));
+      await _queueTransfer(() => _send(client.id, message));
     }
   }
 
@@ -603,17 +715,18 @@ class _HostPageState extends State<HostPage> {
   /// on the phone changes as the grid is arranged here.
   Future<void> _broadcastLayout(DeckLayout layout) async {
     for (final client in _clients.values.where((c) => c.subscribed)) {
-      await _queueTransfer(() => _sendLayout(client.central));
+      await _queueTransfer(() => _sendLayout(client.id));
     }
   }
 
   /// Renders an app's icon, reads back a user-picked custom icon, or reads
   /// back a custom background image, and streams it as binary frames sized
-  /// to the link's MTU either way — the transfer itself does not care which
-  /// [id] names, or which of the three stores it came from.
-  Future<void> _sendIcon(Central central, String id) async {
-    final peripheral = _peripheral;
-    if (peripheral == null) return;
+  /// to the client's own frame-size limit either way — the transfer itself
+  /// does not care which [id] names, which of the three stores it came
+  /// from, or which transport [clientId] is on.
+  Future<void> _sendIcon(String clientId, String id) async {
+    final client = _clients[clientId];
+    if (client == null) return;
 
     // The client restores its deck from local storage and can ask for an
     // icon before it has asked for the catalogue.
@@ -623,13 +736,13 @@ class _HostPageState extends State<HostPage> {
         ? await AppLauncher.icon(path, size: BtLink.iconSize)
         : await CustomIconStore.read(id) ?? await BackgroundImageStore.read(id);
     if (png == null) {
-      await _send(central, IconUnavailable(name: id));
+      await _send(clientId, IconUnavailable(name: id));
       return;
     }
 
     final int maximum;
     try {
-      maximum = await peripheral.getMaximumNotifyLength(central);
+      maximum = await client.maxFrameSize();
     } catch (error) {
       if (mounted) setState(() => _addLog('icon aborted: $error'));
       return;
@@ -637,9 +750,9 @@ class _HostPageState extends State<HostPage> {
 
     final capacity = IconFrame.payloadCapacity(maximum, id);
     if (capacity <= 0) {
-      // A name long enough to fill the MTU on its own leaves nowhere to put
-      // the image.
-      await _send(central, IconUnavailable(name: id));
+      // A name long enough to fill the frame size on its own leaves
+      // nowhere to put the image.
+      await _send(clientId, IconUnavailable(name: id));
       return;
     }
 
@@ -648,10 +761,8 @@ class _HostPageState extends State<HostPage> {
       final start = index * capacity;
       final end = start + capacity < png.length ? start + capacity : png.length;
       try {
-        await peripheral.notifyCharacteristic(
-          central,
-          _notifyCharacteristic,
-          value: IconFrame.encode(
+        await client.send(
+          IconFrame.encode(
             name: id,
             index: index,
             total: total,
@@ -672,13 +783,14 @@ class _HostPageState extends State<HostPage> {
     }
   }
 
-  /// Sends one message, refusing anything the negotiated MTU cannot carry.
-  Future<void> _send(Central central, BtMessage message) async {
-    final peripheral = _peripheral;
-    if (peripheral == null) return;
+  /// Sends one message, refusing anything the client's own frame-size
+  /// limit cannot carry.
+  Future<void> _send(String clientId, BtMessage message) async {
+    final client = _clients[clientId];
+    if (client == null) return;
     final value = message.encode();
     try {
-      final maximum = await peripheral.getMaximumNotifyLength(central);
+      final maximum = await client.maxFrameSize();
       if (value.length > maximum) {
         if (mounted) {
           setState(() {
@@ -687,21 +799,17 @@ class _HostPageState extends State<HostPage> {
         }
         return;
       }
-      await peripheral.notifyCharacteristic(
-        central,
-        _notifyCharacteristic,
-        value: value,
-      );
+      await client.send(value);
     } catch (error) {
       if (mounted) setState(() => _addLog('notify failed: $error'));
     }
   }
 
-  /// Pushes a value on the notify characteristic to every subscribed client.
-  /// Centrals that never subscribed are skipped by the platform anyway.
+  /// Pushes a value to every subscribed client, whichever transport each
+  /// is on.
   Future<void> _broadcast() async {
     final text = _composer.text.trim();
-    if (_peripheral == null || text.isEmpty) return;
+    if (text.isEmpty) return;
 
     final targets = _clients.values.where((c) => c.subscribed).toList();
     if (targets.isEmpty) {
@@ -710,7 +818,7 @@ class _HostPageState extends State<HostPage> {
     }
 
     for (final client in targets) {
-      await _send(client.central, DebugText(text: text));
+      await _send(client.id, DebugText(text: text));
     }
     final delivered = targets.length;
 
@@ -724,61 +832,100 @@ class _HostPageState extends State<HostPage> {
   String _short(String uuid) =>
       uuid.length > 8 ? '${uuid.substring(0, 8)}…' : uuid;
 
+  /// A connected client's label in the device-lock picker — its name plus
+  /// which transport it is on, e.g. "iPhone(bluetooth)", so the same phone
+  /// connected over both at once shows as two distinct, pickable entries
+  /// rather than one that silently means either.
+  String _labelFor(ConnectedClient client) =>
+      '${client.name ?? _short(client.id)}(${client.transport.label})';
+
+  /// Starts or stops both transports together as one "the service is on"
+  /// toggle — Bluetooth and WiFi are best-effort independent of each
+  /// other, so if one radio is off or fails, the other still comes up
+  /// rather than either blocking the other.
   Future<void> _toggleAdvertising() async {
-    final peripheral = _peripheral;
-    if (peripheral == null || _busy) return;
+    if (_busy) return;
     setState(() => _busy = true);
     try {
       if (_advertising) {
-        await peripheral.stopAdvertising();
-        await peripheral.removeAllServices();
-        if (mounted) {
-          setState(() {
-            _advertising = false;
-            _clients.clear();
-            _addLog('stopped advertising');
-          });
-        }
-        return;
+        await _stopService();
+      } else {
+        await _startService();
       }
-
-      if (_state == BluetoothLowEnergyState.poweredOff) {
-        _showMessage('Turn Bluetooth on first.');
-        return;
-      }
-      if (!await _ensureAuthorized()) {
-        _showMessage('Bluetooth permission denied.');
-        return;
-      }
-
-      // A service can only be published once, so clear anything left over
-      // from a previous run before re-adding.
-      await peripheral.removeAllServices();
-      await peripheral.addService(
-        GATTService(
-          uuid: BtLink.serviceUuid,
-          isPrimary: true,
-          includedServices: [],
-          characteristics: [_notifyCharacteristic, _writeCharacteristic],
-        ),
-      );
-      await peripheral.startAdvertising(
-        Advertisement(
-          name: BtLink.advertisedName,
-          serviceUUIDs: [BtLink.serviceUuid],
-        ),
-      );
-      if (mounted) {
-        setState(() {
-          _advertising = true;
-          _addLog('advertising as ${BtLink.advertisedName}');
-        });
-      }
-    } catch (error) {
-      _showMessage('$error');
-      if (mounted) setState(() => _advertising = false);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _stopService() async {
+    final peripheral = _peripheral;
+    if (peripheral != null) {
+      try {
+        await peripheral.stopAdvertising();
+        await peripheral.removeAllServices();
+      } catch (error) {
+        _showMessage('$error');
+      }
+    }
+    await _wifiServer.stop();
+    if (mounted) {
+      setState(() {
+        _advertising = false;
+        _wifiError = null;
+        _clients.clear();
+        _addLog('stopped');
+      });
+    }
+  }
+
+  Future<void> _startService() async {
+    var bleStarted = false;
+    final peripheral = _peripheral;
+    if (peripheral == null) {
+      // Nothing to show — the page itself falls back to UnsupportedPage
+      // when there is no Bluetooth plugin at all, so getting here with a
+      // null peripheral would mean the plugin threw during setup instead;
+      // WiFi below still gets a chance to start regardless.
+    } else if (_state == BluetoothLowEnergyState.poweredOff) {
+      _showMessage('Turn Bluetooth on first.');
+    } else if (!await _ensureAuthorized()) {
+      _showMessage('Bluetooth permission denied.');
+    } else {
+      try {
+        // A service can only be published once, so clear anything left
+        // over from a previous run before re-adding.
+        await peripheral.removeAllServices();
+        await peripheral.addService(
+          GATTService(
+            uuid: BtLink.serviceUuid,
+            isPrimary: true,
+            includedServices: [],
+            characteristics: [_notifyCharacteristic, _writeCharacteristic],
+          ),
+        );
+        await peripheral.startAdvertising(
+          Advertisement(
+            name: BtLink.advertisedName,
+            serviceUUIDs: [BtLink.serviceUuid],
+          ),
+        );
+        bleStarted = true;
+        if (mounted) {
+          setState(() => _addLog('advertising as ${BtLink.advertisedName}'));
+        }
+      } catch (error) {
+        _showMessage('$error');
+      }
+    }
+
+    await _startWifi();
+
+    if (mounted) {
+      setState(() {
+        // "Advertising" now means "the service is up," true once either
+        // transport is — see this method's own doc comment.
+        _advertising = bleStarted || _wifiServer.running;
+      });
     }
   }
 
@@ -796,6 +943,7 @@ class _HostPageState extends State<HostPage> {
       subscription.cancel();
     }
     if (_advertising) _peripheral?.stopAdvertising();
+    unawaited(_wifiServer.stop());
     super.dispose();
   }
 
@@ -834,8 +982,7 @@ class _HostPageState extends State<HostPage> {
         },
         onShowService: () => setState(() => _showingService = true),
         connectedClients: [
-          for (final client in clients)
-            (id: client.id, label: client.name ?? _short(client.id)),
+          for (final client in clients) (id: client.id, label: _labelFor(client)),
         ],
         lockedClientId: _lockedClientId,
         onLockChanged: (value) => setState(() => _lockedClientId = value),
@@ -880,9 +1027,13 @@ class _HostPageState extends State<HostPage> {
           appCount: _appCount,
           advertising: _advertising,
           busy: _busy,
-          onToggle: _state == BluetoothLowEnergyState.unsupported
-              ? null
-              : _toggleAdvertising,
+          // Unlike Bluetooth, WiFi has no adapter-state gate that can
+          // disable the button on its own — it is either bound or it
+          // isn't, and _startService already surfaces a failure to bind
+          // via _wifiError rather than needing this to pre-empt it.
+          onToggle: _toggleAdvertising,
+          wifiRunning: _wifiServer.running,
+          wifiError: _wifiError,
         ),
         const SizedBox(height: 24),
         Text(
@@ -903,8 +1054,7 @@ class _HostPageState extends State<HostPage> {
           // DeviceLockPicker.
           DeviceLockPicker(
             clients: [
-              for (final client in clients)
-                (id: client.id, label: client.name ?? _short(client.id)),
+              for (final client in clients) (id: client.id, label: _labelFor(client)),
             ],
             lockedClientId: _lockedClientId,
             onChanged: (value) => setState(() => _lockedClientId = value),
@@ -968,6 +1118,8 @@ class _StatusCard extends StatelessWidget {
     required this.advertising,
     required this.busy,
     required this.onToggle,
+    required this.wifiRunning,
+    required this.wifiError,
   });
 
   final BluetoothLowEnergyState state;
@@ -975,6 +1127,8 @@ class _StatusCard extends StatelessWidget {
   final bool advertising;
   final bool busy;
   final VoidCallback? onToggle;
+  final bool wifiRunning;
+  final String? wifiError;
 
   @override
   Widget build(BuildContext context) {
@@ -1007,6 +1161,12 @@ class _StatusCard extends StatelessWidget {
               AppLauncher.supported
                   ? (appCount == 0 ? 'not requested yet' : '$appCount found')
                   : 'launching unsupported on this platform',
+            ),
+            _row(
+              'WiFi',
+              wifiRunning
+                  ? 'listening on port ${WifiLink.tcpPort}'
+                  : wifiError ?? 'not running',
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -1065,12 +1225,17 @@ class _ClientTile extends StatelessWidget {
               ? Colors.green.withValues(alpha: 0.15)
               : Theme.of(context).disabledColor.withValues(alpha: 0.15),
           child: Icon(
-            client.subscribed ? Icons.notifications_active : Icons.link,
+            client.transport == LinkTransport.wifi
+                ? Icons.wifi
+                : Icons.bluetooth,
             color: client.subscribed ? Colors.green : null,
           ),
         ),
         title: Text(
-          client.name ?? client.id,
+          // Same "name(transport)" shape as the lock picker — see
+          // _labelFor — so the same device connected twice at once (once
+          // per transport) is still told apart here too.
+          '${client.name ?? client.id}(${client.transport.label})',
           style: const TextStyle(fontSize: 13),
         ),
         subtitle: Text(client.lastActivity),

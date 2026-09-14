@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'background_fit.dart';
 import 'debug_page.dart';
 import 'edge_bar.dart';
+import 'link_target.dart';
 import 'safe_insets.dart';
 import 'deck_icons.dart';
 import 'package:bt_link_protocol/bt_link_protocol.dart';
@@ -41,6 +43,12 @@ class _DeckPageState extends State<DeckPage> {
   Object? _searchError;
   bool _searching = false;
 
+  /// WiFi's own discovery, alongside Bluetooth's — bound independently of
+  /// [_central]/[_state] since WiFi needs neither an adapter nor a runtime
+  /// permission, so it must not be gated behind Bluetooth's own state
+  /// machine below; see [_startWifiDiscovery].
+  RawDatagramSocket? _wifiDiscovery;
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +70,10 @@ class _DeckPageState extends State<DeckPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_central != null) _onState(_state);
     });
+    // Independent of the Bluetooth branch above — WiFi races Bluetooth for
+    // the same host, so it starts regardless of whether this platform even
+    // has a Bluetooth implementation.
+    unawaited(_startWifiDiscovery());
   }
 
   @override
@@ -70,9 +82,47 @@ class _DeckPageState extends State<DeckPage> {
     _stateChanges?.cancel();
     _discovery?.cancel();
     if (_searching) _central?.stopDiscovery();
+    _stopWifiDiscovery();
     _pages.dispose();
     _session?.dispose();
     super.dispose();
+  }
+
+  /// Listens for the host's UDP beacon (see `bt_host`'s `WifiServer`) —
+  /// WiFi's equivalent of Bluetooth's `central.discovered` stream. Silent
+  /// on any failure to bind: an unsupported platform or a denied local-
+  /// network permission just leaves Bluetooth discovery to work alone,
+  /// the same as a Bluetooth-side failure never blocks WiFi.
+  Future<void> _startWifiDiscovery() async {
+    if (_wifiDiscovery != null) return;
+    try {
+      final socket = await RawDatagramSocket.bind(
+        InternetAddress.anyIPv4,
+        WifiLink.discoveryPort,
+        reuseAddress: true,
+      );
+      if (_session != null) {
+        // Adopted over Bluetooth while this was still binding.
+        socket.close();
+        return;
+      }
+      _wifiDiscovery = socket;
+      socket.listen((event) {
+        if (event != RawSocketEvent.read) return;
+        final datagram = socket.receive();
+        if (datagram == null) return;
+        final beacon = WifiBeacon.tryParse(datagram.data);
+        if (beacon == null) return;
+        _adoptWifi(beacon, datagram.address.address);
+      });
+    } catch (_) {
+      // No WiFi discovery this run; Bluetooth above still works on its own.
+    }
+  }
+
+  void _stopWifiDiscovery() {
+    _wifiDiscovery?.close();
+    _wifiDiscovery = null;
   }
 
   /// The adapter's state decides what happens next. Requesting permission
@@ -176,17 +226,41 @@ class _DeckPageState extends State<DeckPage> {
     if (mounted) setState(() => _searching = false);
   }
 
-  /// Takes the first host that answers. With one Mac in the room there is
-  /// nothing to choose between, and a picker would just be a step to dismiss.
+  /// Takes the first host that answers, over either transport. With one
+  /// Mac in the room there is nothing to choose between, and a picker
+  /// would just be a step to dismiss.
   void _adopt(Peripheral peripheral, String? name) {
     if (_session != null) return;
     _stopSearch();
+    _stopWifiDiscovery();
     if (!mounted) return;
     setState(() {
       _session =
           BtLinkSession(
-              peripheral: peripheral,
+              target: BleTarget(peripheral),
               name: name?.isNotEmpty == true ? name! : BtLink.advertisedName,
+            )
+            ..onTheme = widget.onTheme
+            ..start();
+    });
+  }
+
+  /// WiFi's counterpart to [_adopt] — same "first to answer wins" rule,
+  /// extended across both transports.
+  void _adoptWifi(WifiBeacon beacon, String address) {
+    if (_session != null) return;
+    _stopSearch();
+    _stopWifiDiscovery();
+    if (!mounted) return;
+    setState(() {
+      _session =
+          BtLinkSession(
+              target: WifiTarget(
+                hostId: beacon.hostId,
+                address: address,
+                port: beacon.port,
+              ),
+              name: beacon.name.isNotEmpty ? beacon.name : BtLink.advertisedName,
             )
             ..onTheme = widget.onTheme
             ..start();

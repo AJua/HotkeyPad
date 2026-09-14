@@ -30,6 +30,8 @@
 	<string>This app uses Bluetooth to find and connect to the BTLink host service.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app uses Bluetooth to find and connect to the BTLink host service.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app looks for the BTLink host service on your local network as an alternative to Bluetooth.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

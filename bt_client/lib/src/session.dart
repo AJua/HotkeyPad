@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +11,7 @@ import 'dart:typed_data';
 import 'deck_store.dart';
 import 'device_info.dart';
 import 'icon_cache.dart';
+import 'link_target.dart';
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 /// Where the link is in the connect -> discover -> subscribe sequence.
@@ -66,9 +68,9 @@ class LinkMessage {
 /// The deck and the debug console are two views of this single connection,
 /// so neither may open one of its own.
 class BtLinkSession extends ChangeNotifier {
-  BtLinkSession({required this.peripheral, required this.name});
+  BtLinkSession({required this.target, required this.name});
 
-  final Peripheral peripheral;
+  final LinkTarget target;
   final String name;
 
   final _central = CentralManager();
@@ -78,6 +80,12 @@ class BtLinkSession extends ChangeNotifier {
   String? _error;
   GATTCharacteristic? _notifyCharacteristic;
   GATTCharacteristic? _writeCharacteristic;
+
+  /// The WiFi transport's equivalent of [_notifyCharacteristic]/
+  /// [_writeCharacteristic] together — a bare socket carries both
+  /// directions, so there is only one of these rather than two.
+  Socket? _wifiSocket;
+  StreamSubscription<Uint8List>? _wifiSubscription;
 
   /// The grid the host sent. Cached locally so the deck draws immediately
   /// on open rather than after the link comes up.
@@ -177,7 +185,15 @@ class BtLinkSession extends ChangeNotifier {
   Uint8List? iconFor(String appName) => _icons[appName];
 
   /// Identifies this host's layout in storage.
-  String get hostId => peripheral.uuid.toString();
+  /// BLE keeps today's bare peripheral uuid, unprefixed — changing its
+  /// shape would silently orphan every existing user's cached layout and
+  /// icons. WiFi has no such history, so it gets its own namespace: the
+  /// two transports share no identity, so the same Mac reached over
+  /// either one is (harmlessly) cached twice.
+  String get hostId => switch (target) {
+    BleTarget(:final peripheral) => peripheral.uuid.toString(),
+    WifiTarget(:final hostId) => 'wifi:$hostId',
+  };
   bool get loadingApps => _loadingApps;
   List<LinkMessage> get log => List.unmodifiable(_log);
   int? get mtu => _mtu;
@@ -200,28 +216,35 @@ class BtLinkSession extends ChangeNotifier {
         if (_reconnectTimer?.isActive ?? false) _reconnectNow();
       },
     );
-    _subscriptions.add(
-      _central.connectionStateChanged.listen((event) {
-        if (event.peripheral.uuid != peripheral.uuid) return;
-        if (event.state == ConnectionState.disconnected) {
-          _stage = LinkStage.disconnected;
-          _notifyCharacteristic = null;
-          _writeCharacteristic = null;
-          notifyListeners();
-          _scheduleReconnect();
-        }
-      }),
-    );
 
-    _subscriptions.add(
-      _central.characteristicNotified.listen((event) {
-        if (event.peripheral.uuid != peripheral.uuid) return;
-        if (event.characteristic.uuid != BtLink.notifyCharacteristicUuid) {
-          return;
-        }
-        _receive(event.value);
-      }),
-    );
+    // WiFi needs neither of these: a dropped socket reports itself
+    // directly via its own onDone/onError (see _connectWifi), scoped to
+    // this one connection, unlike CentralManager's streams which are a
+    // process-wide singleton every session must filter by uuid itself.
+    if (target case BleTarget(:final peripheral)) {
+      _subscriptions.add(
+        _central.connectionStateChanged.listen((event) {
+          if (event.peripheral.uuid != peripheral.uuid) return;
+          if (event.state == ConnectionState.disconnected) {
+            _stage = LinkStage.disconnected;
+            _notifyCharacteristic = null;
+            _writeCharacteristic = null;
+            notifyListeners();
+            _scheduleReconnect();
+          }
+        }),
+      );
+
+      _subscriptions.add(
+        _central.characteristicNotified.listen((event) {
+          if (event.peripheral.uuid != peripheral.uuid) return;
+          if (event.characteristic.uuid != BtLink.notifyCharacteristicUuid) {
+            return;
+          }
+          _receive(event.value);
+        }),
+      );
+    }
 
     connect();
   }
@@ -542,78 +565,12 @@ class BtLinkSession extends ChangeNotifier {
     _reportedPortrait = null;
     notifyListeners();
     try {
-      // The whole sequence is bounded, not just one step of it. iOS never
-      // gives up on a connect: CoreBluetooth waits indefinitely for a
-      // peripheral to reappear, so a host restarted at the wrong moment
-      // leaves connect() hanging forever. Since connect() has already
-      // cancelled the backoff, nothing would ever retry — the deck simply
-      // stops reconnecting. Android's GATT layer times out on its own,
-      // which is why this only ever showed up on iPhone.
-      // Reconnecting straight after a drop fails on Android with
-      // "Write descriptor failed with status: 1" (GATT_INVALID_HANDLE): the
-      // stack is still tearing the old link down when the new descriptor
-      // write arrives. Close it explicitly and give the stack a moment.
-      if (reconnecting) {
-        try {
-          await _central.disconnect(peripheral).timeout(_connectTimeout);
-        } catch (_) {
-          // Already gone is the expected case here.
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 400));
+      switch (target) {
+        case BleTarget(:final peripheral):
+          await _connectBle(peripheral, reconnecting: reconnecting);
+        case WifiTarget(:final address, :final port):
+          await _connectWifi(address, port, attempt: attempt);
       }
-
-      // Scanning while connecting slows the connection down and on some
-      // platforms blocks it outright.
-      await _central.stopDiscovery();
-      await _central.connect(peripheral).timeout(_connectTimeout);
-
-      _stage = LinkStage.discovering;
-      notifyListeners();
-
-      // The default 23-byte MTU leaves 20 bytes of payload, too little for
-      // even a short JSON message. Android is the only platform that lets us
-      // ask; elsewhere the stack negotiates on its own.
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-        try {
-          _mtu = await _central.requestMTU(peripheral, mtu: 512);
-        } on UnsupportedError {
-          // Not fatal — the negotiated default may still be enough.
-        }
-      }
-
-      final services = await _central
-          .discoverGATT(peripheral)
-          .timeout(_connectTimeout);
-      final service = services
-          .where((s) => s.uuid == BtLink.serviceUuid)
-          .firstOrNull;
-      if (service == null) {
-        throw StateError(
-          'This device does not expose the BTLink service '
-          '(${BtLink.serviceUuid}).',
-        );
-      }
-
-      final notify = service.characteristics
-          .where((c) => c.uuid == BtLink.notifyCharacteristicUuid)
-          .firstOrNull;
-      final write = service.characteristics
-          .where((c) => c.uuid == BtLink.writeCharacteristicUuid)
-          .firstOrNull;
-      if (notify == null || write == null) {
-        throw StateError(
-          'The BTLink service is missing its notify or write characteristic.',
-        );
-      }
-
-      _stage = LinkStage.subscribing;
-      _notifyCharacteristic = notify;
-      _writeCharacteristic = write;
-      notifyListeners();
-
-      await _central
-          .setCharacteristicNotifyState(peripheral, notify, state: true)
-          .timeout(_connectTimeout);
 
       if (attempt != _attempt) return;
       _stage = LinkStage.ready;
@@ -635,6 +592,135 @@ class BtLinkSession extends ChangeNotifier {
       // transient failures are worth retrying. A timeout is transient.
       if (error is! StateError) _scheduleReconnect();
     }
+  }
+
+  Future<void> _connectBle(
+    Peripheral peripheral, {
+    required bool reconnecting,
+  }) async {
+    // The whole sequence is bounded, not just one step of it. iOS never
+    // gives up on a connect: CoreBluetooth waits indefinitely for a
+    // peripheral to reappear, so a host restarted at the wrong moment
+    // leaves connect() hanging forever. Since connect() has already
+    // cancelled the backoff, nothing would ever retry — the deck simply
+    // stops reconnecting. Android's GATT layer times out on its own,
+    // which is why this only ever showed up on iPhone.
+    // Reconnecting straight after a drop fails on Android with
+    // "Write descriptor failed with status: 1" (GATT_INVALID_HANDLE): the
+    // stack is still tearing the old link down when the new descriptor
+    // write arrives. Close it explicitly and give the stack a moment.
+    if (reconnecting) {
+      try {
+        await _central.disconnect(peripheral).timeout(_connectTimeout);
+      } catch (_) {
+        // Already gone is the expected case here.
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
+
+    // Scanning while connecting slows the connection down and on some
+    // platforms blocks it outright.
+    await _central.stopDiscovery();
+    await _central.connect(peripheral).timeout(_connectTimeout);
+
+    _stage = LinkStage.discovering;
+    notifyListeners();
+
+    // The default 23-byte MTU leaves 20 bytes of payload, too little for
+    // even a short JSON message. Android is the only platform that lets us
+    // ask; elsewhere the stack negotiates on its own.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        _mtu = await _central.requestMTU(peripheral, mtu: 512);
+      } on UnsupportedError {
+        // Not fatal — the negotiated default may still be enough.
+      }
+    }
+
+    final services = await _central
+        .discoverGATT(peripheral)
+        .timeout(_connectTimeout);
+    final service = services
+        .where((s) => s.uuid == BtLink.serviceUuid)
+        .firstOrNull;
+    if (service == null) {
+      throw StateError(
+        'This device does not expose the BTLink service '
+        '(${BtLink.serviceUuid}).',
+      );
+    }
+
+    final notify = service.characteristics
+        .where((c) => c.uuid == BtLink.notifyCharacteristicUuid)
+        .firstOrNull;
+    final write = service.characteristics
+        .where((c) => c.uuid == BtLink.writeCharacteristicUuid)
+        .firstOrNull;
+    if (notify == null || write == null) {
+      throw StateError(
+        'The BTLink service is missing its notify or write characteristic.',
+      );
+    }
+
+    _stage = LinkStage.subscribing;
+    _notifyCharacteristic = notify;
+    _writeCharacteristic = write;
+    notifyListeners();
+
+    await _central
+        .setCharacteristicNotifyState(peripheral, notify, state: true)
+        .timeout(_connectTimeout);
+  }
+
+  /// WiFi's whole connect sequence in one step — there is no service
+  /// discovery or subscribe handshake the way BLE has; a TCP connection is
+  /// either open or it isn't.
+  Future<void> _connectWifi(String address, int port, {required int attempt}) async {
+    _stage = LinkStage.discovering;
+    notifyListeners();
+
+    // A reconnect must not leave the previous attempt's socket dangling.
+    await _wifiSocket?.close();
+    final socket = await Socket.connect(address, port).timeout(_connectTimeout);
+    if (attempt != _attempt) {
+      // A newer attempt already started while this one was still
+      // connecting — same "abandoned, not cancelled" situation _connectBle
+      // guards against with its own attempt check up in connect().
+      unawaited(socket.close());
+      return;
+    }
+
+    _wifiSocket = socket;
+    final reassembler = FrameReassembler();
+    _wifiSubscription = socket.listen(
+      (chunk) {
+        for (final frame in reassembler.add(chunk)) {
+          _receive(frame);
+        }
+      },
+      onDone: () => _onWifiClosed(attempt),
+      onError: (_) => _onWifiClosed(attempt),
+      cancelOnError: true,
+    );
+
+    _stage = LinkStage.subscribing;
+    notifyListeners();
+  }
+
+  /// The WiFi equivalent of the BLE `connectionStateChanged` handling in
+  /// [start] — unlike that process-wide stream, a socket's own onDone/
+  /// onError is already scoped to this one connection, so there is no uuid
+  /// filtering to do here.
+  void _onWifiClosed(int attempt) {
+    if (attempt != _attempt) return;
+    if (_stage == LinkStage.disconnected || _stage == LinkStage.failed) {
+      return;
+    }
+    _stage = LinkStage.disconnected;
+    _wifiSocket = null;
+    _wifiSubscription = null;
+    notifyListeners();
+    _scheduleReconnect();
   }
 
   /// The first line of [error], capped. Platform exceptions arrive with a
@@ -735,15 +821,23 @@ class BtLinkSession extends ChangeNotifier {
   }
 
   Future<void> _send(BtMessage message) async {
-    final characteristic = _writeCharacteristic;
-    if (characteristic == null) return;
     try {
-      await _central.writeCharacteristic(
-        peripheral,
-        characteristic,
-        value: message.encode(),
-        type: GATTCharacteristicWriteType.withResponse,
-      );
+      switch (target) {
+        case BleTarget(:final peripheral):
+          final characteristic = _writeCharacteristic;
+          if (characteristic == null) return;
+          await _central.writeCharacteristic(
+            peripheral,
+            characteristic,
+            value: message.encode(),
+            type: GATTCharacteristicWriteType.withResponse,
+          );
+        case WifiTarget():
+          final socket = _wifiSocket;
+          if (socket == null) return;
+          socket.add(FrameCodec.encode(message.encode()));
+          await socket.flush();
+      }
     } catch (error) {
       _append('send failed: $error', inbound: true);
       notifyListeners();
@@ -765,15 +859,21 @@ class BtLinkSession extends ChangeNotifier {
 
   Future<void> _teardown() async {
     try {
-      final notify = _notifyCharacteristic;
-      if (notify != null && _stage == LinkStage.ready) {
-        await _central.setCharacteristicNotifyState(
-          peripheral,
-          notify,
-          state: false,
-        );
+      switch (target) {
+        case BleTarget(:final peripheral):
+          final notify = _notifyCharacteristic;
+          if (notify != null && _stage == LinkStage.ready) {
+            await _central.setCharacteristicNotifyState(
+              peripheral,
+              notify,
+              state: false,
+            );
+          }
+          await _central.disconnect(peripheral);
+        case WifiTarget():
+          await _wifiSubscription?.cancel();
+          await _wifiSocket?.close();
       }
-      await _central.disconnect(peripheral);
     } catch (_) {
       // Tearing down a link that is already gone is not worth reporting.
     }

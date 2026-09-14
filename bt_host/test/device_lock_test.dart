@@ -4,16 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('isPressAllowed', () {
     test('rejects everyone when nothing is picked', () {
-      expect(isPressAllowed(centralId: 'a', lockedClientId: null), isFalse);
-      expect(isPressAllowed(centralId: 'b', lockedClientId: null), isFalse);
+      expect(isPressAllowed(clientId: 'a', lockedClientId: null), isFalse);
+      expect(isPressAllowed(clientId: 'b', lockedClientId: null), isFalse);
     });
 
     test('accepts the picked client', () {
-      expect(isPressAllowed(centralId: 'a', lockedClientId: 'a'), isTrue);
+      expect(isPressAllowed(clientId: 'a', lockedClientId: 'a'), isTrue);
     });
 
     test('rejects anyone but the picked client', () {
-      expect(isPressAllowed(centralId: 'b', lockedClientId: 'a'), isFalse);
+      expect(isPressAllowed(clientId: 'b', lockedClientId: 'a'), isFalse);
     });
   });
 
