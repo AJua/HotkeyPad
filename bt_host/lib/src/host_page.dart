@@ -488,6 +488,16 @@ class _HostPageState extends State<HostPage> {
         _touch(
           _wifiSource(client),
           'said hello as ${hello.name}',
+          // Unlike BLE, which tracks a real GATT subscribe/unsubscribe
+          // handshake (see characteristicNotifyStateChanged below), a WiFi
+          // client has no such step — its raw socket always receives
+          // whatever is sent once it's connected and trusted, so it counts
+          // as subscribed from the moment it's touched in. Omitting this
+          // left every WiFi client permanently unsubscribed: _broadcastLayout
+          // and _broadcastAppearance both filter on `subscribed`, so a
+          // layout/appearance edit while the host is running never reached
+          // a WiFi client, only a BLE one — confirmed against a real client.
+          subscribed: true,
           name: hello.name,
         );
       case WifiTrust.blocked:
@@ -533,13 +543,27 @@ class _HostPageState extends State<HostPage> {
       await pending.client.socket.close();
       return;
     }
-    await WifiTrustStore.setDecision(pending.clientId, true);
+    // _touch (synchronous) runs before the trust file write, not after: the
+    // client receives PinResult(ok:true) the instant it's flushed above and
+    // immediately re-sends RequestLayout — see BtLinkSession's PinResult
+    // handler. That can easily beat a disk write back to the host. Until
+    // _touch adds this client to _clients, _onWifiMessage has nowhere to
+    // route that RequestLayout (its _pendingWifiPins entry is already gone,
+    // removed above) and silently drops it — the client was then stuck on
+    // "Loading the deck..." with nothing to prompt a retry, only fixed by
+    // whatever next happened to reconnect it. Confirmed against a real
+    // client hitting exactly this on first pairing.
     if (mounted) setState(() => _wifiTrust[pending.clientId] = true);
     _touch(
       _wifiSource(pending.client),
       'said hello as ${pending.name}',
+      // See the matching comment in _onWifiHello's WifiTrust.trusted case —
+      // a WiFi client has no GATT-style subscribe step, so it counts as
+      // subscribed the moment it's trusted in, same as that path.
+      subscribed: true,
       name: pending.name,
     );
+    await WifiTrustStore.setDecision(pending.clientId, true);
   }
 
   void _onWifiDisconnected(WifiClient client) {
