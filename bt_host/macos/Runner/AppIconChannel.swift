@@ -2,8 +2,9 @@ import AppKit
 import FlutterMacOS
 import UniformTypeIdentifiers
 
-/// Serves application icons, and lets the user pick their own image, on the
-/// Dart side.
+/// Serves application icons, lets the user pick their own image, and backs
+/// the Save/Open panels behind exporting and importing a settings backup —
+/// all on the Dart side.
 ///
 /// `NSWorkspace.icon(forFile:)` is used rather than reading `CFBundleIconFile`
 /// out of Info.plist: modern apps ship their icon inside `Assets.car`, where
@@ -23,6 +24,10 @@ enum AppIconChannel {
                 handleIcon(call, result)
             case "pickImage":
                 handlePickImage(result)
+            case "pickSaveLocation":
+                handlePickSaveLocation(call, result)
+            case "pickOpenFile":
+                handlePickOpenFile(result)
             default:
                 result(FlutterMethodNotImplemented)
             }
@@ -82,6 +87,49 @@ enum AppIconChannel {
                 return
             }
             result(FlutterStandardTypedData(bytes: data))
+        }
+    }
+
+    /// Opens a native "Save As" panel pre-filled with the caller's suggested
+    /// file name, restricted to JSON — a backup bundle is one JSON file.
+    /// Resolves to the chosen path, or null if the user cancelled, the same
+    /// stance `pickImage` takes on cancellation.
+    private static func handlePickSaveLocation(
+        _ call: FlutterMethodCall,
+        _ result: @escaping FlutterResult
+    ) {
+        let arguments = call.arguments as? [String: Any]
+        let suggestedName = arguments?["suggestedName"] as? String ?? "backup.json"
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = suggestedName
+        if #available(macOS 11.0, *) {
+            panel.allowedContentTypes = [.json]
+        }
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else {
+                result(nil)
+                return
+            }
+            result(url.path)
+        }
+    }
+
+    /// Opens a native "Open" panel restricted to JSON files. Resolves to the
+    /// chosen path, or null if the user cancelled.
+    private static func handlePickOpenFile(_ result: @escaping FlutterResult) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if #available(macOS 11.0, *) {
+            panel.allowedContentTypes = [.json]
+        }
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else {
+                result(nil)
+                return
+            }
+            result(url.path)
         }
     }
 

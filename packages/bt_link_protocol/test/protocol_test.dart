@@ -107,6 +107,8 @@ void main() {
     test('round-trips every message shape', () {
       const messages = <BtMessage>[
         Hello(name: 'Pixel 7'),
+        SetOrientation(portrait: true),
+        SetOrientation(portrait: false),
         ListApps(),
         AppEntry(name: 'Safari', category: 'Apps'),
         ListEnd(count: 96),

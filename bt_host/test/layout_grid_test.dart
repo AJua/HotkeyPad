@@ -277,6 +277,80 @@ void main() {
     });
   });
 
+  group('displayEditToCanonical', () {
+    test('does nothing when the display was not actually transposed', () {
+      final layout = DeckLayout.empty().withSlot(3, 'app:X');
+
+      expect(
+        identical(
+          displayEditToCanonical(layout, wasTransposed: false),
+          layout,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a pick through a transposed display lands on the right canonical '
+        'slot', () {
+      // 5 wide x 3 tall (landscape) with one button at index 7.
+      final canonical = DeckLayout.empty().withSlot(7, 'app:Original');
+      final canonicalId = canonical.slots[7]!.id;
+
+      // Turned for a portrait phone: 3 wide x 5 tall. The button keeps its
+      // id but moves to a different array position.
+      final display = canonical.orientedFor(portrait: true);
+      final displayIndex = display.slots.indexWhere(
+        (slot) => slot?.id == canonicalId,
+      );
+
+      final edited = display.withSlot(displayIndex, 'app:Edited');
+      final result = displayEditToCanonical(edited, wasTransposed: true);
+
+      expect(result.columns, canonical.columns);
+      expect(result.rows, canonical.rows);
+      expect(result.slots[7]?.value, 'app:Edited');
+      expect(result.slots[7]?.id, canonicalId);
+    });
+
+    test('a clear through a transposed display clears the right canonical '
+        'slot', () {
+      final canonical = DeckLayout.empty().withSlot(7, 'app:Original');
+      final canonicalId = canonical.slots[7]!.id;
+      final display = canonical.orientedFor(portrait: true);
+      final displayIndex = display.slots.indexWhere(
+        (slot) => slot?.id == canonicalId,
+      );
+
+      final edited = display.withSlot(displayIndex, null);
+      final result = displayEditToCanonical(edited, wasTransposed: true);
+
+      expect(result.slots[7], isNull);
+    });
+
+    test('a move through a transposed display moves the right canonical '
+        'slots', () {
+      final canonical = DeckLayout.empty()
+          .withSlot(0, 'app:A')
+          .withSlot(7, 'app:B');
+      final idA = canonical.slots[0]!.id;
+      final idB = canonical.slots[7]!.id;
+      final display = canonical.orientedFor(portrait: true);
+      final displayIndexA = display.slots.indexWhere(
+        (slot) => slot?.id == idA,
+      );
+      final displayIndexB = display.slots.indexWhere(
+        (slot) => slot?.id == idB,
+      );
+
+      final edited = display.moved(displayIndexA, displayIndexB);
+      final result = displayEditToCanonical(edited, wasTransposed: true);
+
+      // moved() swaps the two cells.
+      expect(result.slots[0]?.value, 'app:B');
+      expect(result.slots[7]?.value, 'app:A');
+    });
+  });
+
   group('confirmResizeDrop', () {
     /// Opens the dialog and, if [tap] is given, taps that action's button.
     /// Returns whatever confirmResizeDrop resolved to — null while the
@@ -344,6 +418,64 @@ void main() {
       final result = await confirm(tester, const [
         AppItem('Safari'),
       ], tap: 'Remove');
+
+      expect(result, isTrue);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+  });
+
+  group('confirmImportOverwrite', () {
+    /// Opens the dialog and, if [tap] is given, taps that action's button.
+    /// Returns whatever confirmImportOverwrite resolved to — null while the
+    /// dialog is still open, i.e. when [tap] is left out.
+    Future<bool?> confirm(WidgetTester tester, {String? tap}) async {
+      bool? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  result = await confirmImportOverwrite(context);
+                },
+                child: const Text('ask'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('ask'));
+      await tester.pumpAndSettle();
+      if (tap != null) {
+        await tester.tap(find.text(tap));
+        await tester.pumpAndSettle();
+      }
+      return result;
+    }
+
+    testWidgets('names the destructive action clearly', (tester) async {
+      await confirm(tester);
+
+      expect(find.text('Replace current settings?'), findsOneWidget);
+      expect(
+        find.text(
+          'Importing replaces the current appearance, deck layout, and '
+          'custom icons with what is in the chosen file. This cannot be '
+          'undone.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Cancel reports false', (tester) async {
+      final result = await confirm(tester, tap: 'Cancel');
+
+      expect(result, isFalse);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('Replace reports true', (tester) async {
+      final result = await confirm(tester, tap: 'Replace');
 
       expect(result, isTrue);
       expect(find.byType(AlertDialog), findsNothing);

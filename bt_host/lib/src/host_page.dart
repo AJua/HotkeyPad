@@ -87,6 +87,7 @@ class ConnectedClient {
     required this.subscribed,
     required this.lastActivity,
     this.name,
+    this.portrait,
   });
 
   final Central central;
@@ -98,12 +99,17 @@ class ConnectedClient {
   /// which is briefly true for every client right after it connects.
   final String? name;
 
+  /// This device's current orientation, from its [SetOrientation] — null
+  /// until the first one arrives, same as [name].
+  final bool? portrait;
+
   String get id => central.uuid.toString();
 
   ConnectedClient copyWith({
     bool? subscribed,
     String? lastActivity,
     String? name,
+    bool? portrait,
   }) {
     return ConnectedClient(
       central: central,
@@ -111,6 +117,7 @@ class ConnectedClient {
       subscribed: subscribed ?? this.subscribed,
       lastActivity: lastActivity ?? this.lastActivity,
       name: name ?? this.name,
+      portrait: portrait ?? this.portrait,
     );
   }
 }
@@ -312,6 +319,7 @@ class _HostPageState extends State<HostPage> {
     String activity, {
     bool? subscribed,
     String? name,
+    bool? portrait,
   }) {
     if (!mounted) return;
     final id = central.uuid.toString();
@@ -322,6 +330,7 @@ class _HostPageState extends State<HostPage> {
             subscribed: subscribed,
             lastActivity: activity,
             name: name,
+            portrait: portrait,
           ) ??
           ConnectedClient(
             central: central,
@@ -329,6 +338,7 @@ class _HostPageState extends State<HostPage> {
             subscribed: subscribed ?? false,
             lastActivity: activity,
             name: name,
+            portrait: portrait,
           );
       _autoLockIfSingleClient();
       _addLog('$activity — ${_short(id)}');
@@ -380,6 +390,12 @@ class _HostPageState extends State<HostPage> {
     switch (message) {
       case Hello(:final name):
         _touch(central, 'said hello as $name', name: name);
+      case SetOrientation(:final portrait):
+        _touch(
+          central,
+          'reported orientation: ${portrait ? 'portrait' : 'landscape'}',
+          portrait: portrait,
+        );
       case ListApps():
         _touch(central, 'requested the app list');
         await _queueTransfer(() => _sendCatalogue(central));
@@ -801,6 +817,11 @@ class _HostPageState extends State<HostPage> {
         ],
         lockedClientId: _lockedClientId,
         onLockChanged: (value) => setState(() => _lockedClientId = value),
+        // Only meaningful once a lock names one unambiguous device to
+        // match — see LayoutPage's own doc comment on this field.
+        lockedClientPortrait: _lockedClientId == null
+            ? null
+            : _clients[_lockedClientId]?.portrait,
       ),
     );
   }

@@ -190,6 +190,23 @@ abstract final class CustomIconStore {
     }
   }
 
+  /// Writes [png] under [id] exactly as given, unlike [save] which always
+  /// mints a fresh one — for restoring a backup bundle, whose layout already
+  /// points at specific ids and would need rewriting if new ones were
+  /// handed out instead.
+  static Future<void> writeAtId(String id, Uint8List png) async {
+    final directory = _directory;
+    if (directory == null) return;
+    try {
+      await directory.create(recursive: true);
+      await File(
+        '${directory.path}/${_fileName(id)}',
+      ).writeAsBytes(png, flush: true);
+    } on FileSystemException {
+      // Losing one restored icon is better than failing the whole import.
+    }
+  }
+
   static Future<Uint8List?> read(String id) async {
     final directory = _directory;
     if (directory == null) return null;

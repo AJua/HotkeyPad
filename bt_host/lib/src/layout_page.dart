@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import 'app_launcher.dart';
+import 'backup_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
 import 'deck_icons.dart';
@@ -87,6 +88,38 @@ Future<bool> confirmResizeDrop(
   return confirmed ?? false;
 }
 
+/// Asks before an import overwrites the current appearance, layout, and
+/// custom icons. Returns whether to proceed.
+///
+/// A standalone function, not a method on the editor, for the same reason
+/// [confirmResizeDrop] is one: pumped and tapped through in isolation,
+/// without the real file picker or disk I/O ([BackupStore]) that reaching
+/// it for real would trigger.
+Future<bool> confirmImportOverwrite(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Replace current settings?'),
+      content: const Text(
+        'Importing replaces the current appearance, deck layout, and '
+        'custom icons with what is in the chosen file. This cannot be '
+        'undone.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Replace'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
 /// A human-readable read-out of what [stored] actually does — the command a
 /// Shell or Key combination button runs, not just its label — so reopening
 /// the picker answers "what is this?" without guessing from the icon alone
@@ -104,6 +137,19 @@ String? currentButtonSummary(String? stored) {
     ComboItem(:final steps) => 'Runs ${steps.length} steps',
   };
 }
+
+/// Undoes the transpose (if any) that produced a display-oriented view of
+/// a layout, so an edit made through that view lands back in the host's
+/// own canonical shape before it is saved or broadcast.
+///
+/// [DeckLayout.orientedFor]/[DeckLayout.transposed] only ever swap columns
+/// and rows or no-op, so transposing an already-transposed shape again
+/// exactly undoes it — see "transposing twice returns the original" in
+/// protocol_test.dart. A pure function of the edited layout and whether it
+/// was turned, specifically so it is testable without a real
+/// [LayoutPage] — same reason as [itemsDroppedByResize].
+DeckLayout displayEditToCanonical(DeckLayout edited, {required bool wasTransposed}) =>
+    wasTransposed ? edited.transposed() : edited;
 
 /// A dropdown to pick which connected client's presses the host accepts —
 /// shown identically on the deck layout screen and in the service tab, so
@@ -225,6 +271,7 @@ class LayoutPage extends StatefulWidget {
     required this.connectedClients,
     required this.lockedClientId,
     required this.onLockChanged,
+    required this.lockedClientPortrait,
   });
 
   /// Called after every edit so the service can push the new layout to
@@ -249,6 +296,14 @@ class LayoutPage extends StatefulWidget {
   final String? lockedClientId;
 
   final ValueChanged<String?> onLockChanged;
+
+  /// The locked client's own orientation, so the grid can be shown turned
+  /// the same way that phone is actually displaying it — see
+  /// [_LayoutPageState._displayLayout]. Null whenever there is no single
+  /// locked device to match (nothing picked, or its own [SetOrientation]
+  /// has not arrived yet), in which case the canonical, un-turned shape is
+  /// shown, same as before this existed.
+  final bool? lockedClientPortrait;
 
   @override
   State<LayoutPage> createState() => _LayoutPageState();
@@ -311,6 +366,25 @@ class _LayoutPageState extends State<LayoutPage> {
     await LayoutStore.save(layout);
     widget.onChanged(layout);
   }
+
+  /// [_layout] turned to match the locked client's own orientation, when
+  /// one is known — the grid, and only the grid, is shown and edited in
+  /// this shape so the geometry on screen matches what that phone is
+  /// actually displaying. Storage and broadcast are untouched: an edit
+  /// made through this view is turned back via [_toCanonical] before
+  /// [_apply] ever sees it.
+  DeckLayout get _displayLayout {
+    final portrait = widget.lockedClientPortrait;
+    return portrait == null ? _layout : _layout.orientedFor(portrait: portrait);
+  }
+
+  /// Whether producing [_displayLayout] actually turned [_layout] — the
+  /// two hold the exact same buttons either way, only the column/row
+  /// shape (and therefore every index into `slots`) differs.
+  bool get _isDisplayTransposed => _displayLayout.columns != _layout.columns;
+
+  DeckLayout _toCanonical(DeckLayout edited) =>
+      displayEditToCanonical(edited, wasTransposed: _isDisplayTransposed);
 
   /// Resizes to [columns]/[rows]/[pages], confirming first if a button would
   /// no longer fit. Shrinking is the only direction that can delete
@@ -407,6 +481,39 @@ class _LayoutPageState extends State<LayoutPage> {
                   },
                 ),
                 const Divider(height: 32),
+                Text('Backup', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 4),
+                // Two entry points rather than one "Backup..." tile with a
+                // sub-choice: export is safe to tap on a whim and import is
+                // destructive, so keeping them visually distinct here
+                // matches that difference before either is even tapped.
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.upload_outlined),
+                  title: const Text('Export settings...'),
+                  subtitle: const Text(
+                    'Save appearance, layout, and custom icons to a file',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _exportSettings();
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.download_outlined),
+                  title: const Text('Import settings...'),
+                  subtitle: const Text(
+                    'Replace the current setup from a backup file',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _importSettings();
+                  },
+                ),
+                const Divider(height: 32),
                 // A diagnostic, like the client's debug console: for
                 // working out why the deck is misbehaving, not for daily use.
                 ListTile(
@@ -445,17 +552,66 @@ class _LayoutPageState extends State<LayoutPage> {
     widget.onAppearanceChanged(_theme, _showLabels);
   }
 
+  /// Saves the current appearance, layout, and custom icons to a file the
+  /// user picks. Silent on cancel — there's nothing to report — otherwise
+  /// shows whether it actually wrote the file.
+  Future<void> _exportSettings() async {
+    final result = await BackupStore.exportToFile();
+    if (result == null) return;
+    _showMessage(result.message);
+  }
+
+  /// Reads a backup file the user picks and, once confirmed, replaces the
+  /// current appearance, layout, and custom icons with it — then pushes the
+  /// restored state out live, the same way [_apply] and [_setAppearance] do
+  /// for a manual edit.
+  Future<void> _importSettings() async {
+    final read = await BackupStore.pickAndReadFile();
+    if (read == null) return;
+    if (!read.ok) {
+      _showMessage(read.message!);
+      return;
+    }
+    if (!mounted) return;
+    if (!await confirmImportOverwrite(context)) return;
+    final bundle = read.bundle!;
+    await BackupStore.apply(bundle);
+    if (!mounted) return;
+    setState(() {
+      _layout = bundle.layout;
+      _theme = bundle.theme;
+      _showLabels = bundle.showLabels;
+      _clampPage();
+      // Bytes for a restored icon can differ from whatever this session
+      // already cached under the same id (a re-import of an edited backup,
+      // say), so nothing already fetched can be trusted after this.
+      _icons.clear();
+    });
+    widget.onChanged(bundle.layout);
+    widget.onAppearanceChanged(bundle.theme, bundle.showLabels);
+    _showMessage('Settings imported.');
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// [index] is into [_displayLayout] — wherever the tapped cell actually
+  /// sits on screen — not [_layout] directly; see [_toCanonical].
   Future<void> _pick(int index) async {
     final chosen = await showDialog<DeckItemChoice>(
       context: context,
       builder: (context) => _PickerDialog(
         apps: _apps,
         shortcuts: _shortcuts,
-        current: _layout.slots[index]?.value,
+        current: _displayLayout.slots[index]?.value,
       ),
     );
     if (chosen == null) return;
-    await _apply(_layout.withSlot(index, chosen.stored));
+    await _apply(_toCanonical(_displayLayout.withSlot(index, chosen.stored)));
   }
 
   @override
@@ -515,9 +671,11 @@ class _LayoutPageState extends State<LayoutPage> {
                       // which is the only way to reach a page that is not
                       // currently shown.
                       onDropped: (from) => _apply(
-                        _layout.moved(
-                          from,
-                          _layout.indexOf(page: page, cell: 0),
+                        _toCanonical(
+                          _displayLayout.moved(
+                            from,
+                            _displayLayout.indexOf(page: page, cell: 0),
+                          ),
                         ),
                       ),
                     ),
@@ -529,15 +687,17 @@ class _LayoutPageState extends State<LayoutPage> {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: LayoutGrid(
-              layout: _layout,
+              layout: _displayLayout,
               page: _page,
               iconFor: (key) {
                 unawaited(_ensureIcon(key));
                 return _icons[key];
               },
               onPick: _pick,
-              onClear: (index) => _apply(_layout.withSlot(index, null)),
-              onMove: (from, to) => _apply(_layout.moved(from, to)),
+              onClear: (index) =>
+                  _apply(_toCanonical(_displayLayout.withSlot(index, null))),
+              onMove: (from, to) =>
+                  _apply(_toCanonical(_displayLayout.moved(from, to))),
             ),
           ),
         ),

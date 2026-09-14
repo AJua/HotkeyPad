@@ -64,6 +64,7 @@ sealed class BtMessage {
       return switch (json['t']) {
         'ls' => const ListApps(),
         'hi' => Hello(name: json['n'] as String? ?? ''),
+        'ori' => SetOrientation(portrait: json['p'] as bool? ?? false),
         'app' => AppEntry(
           name: json['n'] as String,
           category: json['c'] as String?,
@@ -119,6 +120,19 @@ final class Hello extends BtMessage {
 
   @override
   Map<String, Object?> toJson() => {'t': 'hi', 'n': name};
+}
+
+/// Client -> host: sent at connect and again whenever it changes, so the
+/// host's own editor can show the grid turned the same way this device is
+/// currently showing it — see the host's device lock, which is what makes
+/// "this device" unambiguous in the first place.
+final class SetOrientation extends BtMessage {
+  const SetOrientation({required this.portrait});
+
+  final bool portrait;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'ori', 'p': portrait};
 }
 
 /// Host -> client: one entry of the catalogue.
