@@ -298,28 +298,33 @@ class _DeckPageState extends State<DeckPage> {
     return ListenableBuilder(
       listenable: session,
       builder: (context, _) {
+        final overlay = session.stage != LinkStage.ready
+            ? _ConnectionOverlay(
+                session: session,
+                deviceName: session.name,
+                onBack: _forget,
+              )
+            : null;
+        // Off, the title and debug-console button disappear and the grid
+        // takes the whole screen — see buildFullBleedDeck's own doc
+        // comment for why that is its own composition rather than
+        // buildDeckStack wrapped in a SafeArea.
+        if (!session.showAppBar) {
+          return buildFullBleedDeck(
+            backgroundImage: session.backgroundImage,
+            backgroundOpacity: session.backgroundOpacity,
+            backgroundFit: session.backgroundFit,
+            body: _body(session),
+            overlay: overlay,
+          );
+        }
         final deck = buildDeckStack(
           backgroundImage: session.backgroundImage,
           backgroundOpacity: session.backgroundOpacity,
           backgroundFit: session.backgroundFit,
           body: _body(session),
-          // Built only while the link is unusable, so a connected deck
-          // has nothing layered over it to absorb taps.
-          overlay: session.stage != LinkStage.ready
-              ? _ConnectionOverlay(
-                  session: session,
-                  deviceName: session.name,
-                  onBack: _forget,
-                )
-              : null,
+          overlay: overlay,
         );
-        // Off, the title and debug-console button disappear and the grid
-        // takes the whole screen — a plain Scaffold in their place, rather
-        // than nothing at all, so the notch/nav-bar inset EdgeBarScaffold
-        // would otherwise have consumed on its own edge is still respected.
-        if (!session.showAppBar) {
-          return Scaffold(body: SafeArea(child: deck));
-        }
         return EdgeBarScaffold(
           side: barSideFor(context),
           title: session.name,
@@ -717,6 +722,57 @@ Widget buildDeckStack({
       Positioned.fill(child: body),
       if (overlay != null) Positioned.fill(child: overlay),
     ],
+  );
+}
+
+/// The composition used in place of [buildDeckStack] whenever there is no
+/// app bar — see [BtLinkSession.showAppBar] — to consume the notch/home
+/// indicator inset a hidden [EdgeBarScaffold] would otherwise have
+/// absorbed on its own edge.
+///
+/// The background is built and positioned *outside* the [SafeArea] rather
+/// than [buildDeckStack] wrapped in one: a landscape phone's notch/Dynamic
+/// Island moves to a side edge, and a wallpaper-style background is
+/// exactly the thing that should bleed behind it rather than stop short
+/// and show the [Scaffold]'s own colour there — only [body] and [overlay]
+/// (real content, not decoration) need to stay clear of it. Confirmed
+/// against a real device: wrapping the whole stack (background included)
+/// in a [SafeArea] left a visible bar of blank space on the notch's edge
+/// in landscape.
+///
+/// Public, and its own top-level [Scaffold] rather than folded into
+/// [buildDeckStack] with a flag, so this exact layout can be pumped and
+/// measured in a test without a whole `DeckPage`/`BtLinkSession` behind
+/// it.
+Widget buildFullBleedDeck({
+  required Uint8List? backgroundImage,
+  required double backgroundOpacity,
+  required BackgroundFit backgroundFit,
+  required Widget body,
+  Widget? overlay,
+}) {
+  return Scaffold(
+    body: Stack(
+      children: [
+        Positioned.fill(
+          child: DeckBackground(
+            image: backgroundImage,
+            opacity: backgroundOpacity,
+            fit: backgroundFit,
+          ),
+        ),
+        SafeArea(
+          child: SizedBox.expand(
+            child: Stack(
+              children: [
+                Positioned.fill(child: body),
+                if (overlay != null) Positioned.fill(child: overlay),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
