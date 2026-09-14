@@ -63,6 +63,7 @@ sealed class BtMessage {
       if (json is! Map<String, Object?>) return null;
       return switch (json['t']) {
         'ls' => const ListApps(),
+        'hi' => Hello(name: json['n'] as String? ?? ''),
         'app' => AppEntry(
           name: json['n'] as String,
           category: json['c'] as String?,
@@ -106,6 +107,18 @@ final class ListApps extends BtMessage {
 
   @override
   Map<String, Object?> toJson() => {'t': 'ls'};
+}
+
+/// Client -> host: sent once, right after connecting, so the host can show
+/// a friendlier name than a bare central id when more than one device is
+/// connected at once — see [PressSlot] and the host's device lock.
+final class Hello extends BtMessage {
+  const Hello({required this.name});
+
+  final String name;
+
+  @override
+  Map<String, Object?> toJson() => {'t': 'hi', 'n': name};
 }
 
 /// Host -> client: one entry of the catalogue.

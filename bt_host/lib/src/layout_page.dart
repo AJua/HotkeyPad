@@ -105,6 +105,104 @@ String? currentButtonSummary(String? stored) {
   };
 }
 
+/// A dropdown to pick which connected client's presses the host accepts —
+/// shown identically on the deck layout screen and in the service tab, so
+/// it lives here rather than in either one specifically.
+///
+/// Public, not a private implementation detail of [LayoutPage], so
+/// host_page.dart's service tab can reuse it instead of duplicating the
+/// same picker.
+class DeviceLockPicker extends StatelessWidget {
+  const DeviceLockPicker({
+    super.key,
+    required this.clients,
+    required this.lockedClientId,
+    required this.onChanged,
+    this.compact = false,
+  });
+
+  final List<({String id, String label})> clients;
+  final String? lockedClientId;
+  final ValueChanged<String?> onChanged;
+
+  /// A small tappable label instead of a full labelled row — for the deck
+  /// layout title bar, next to the settings gear, rather than a row of its
+  /// own. The service tab keeps the spelled-out version.
+  final bool compact;
+
+  /// The locked client's own label, or a generic stand-in once it is no
+  /// longer in [clients] (it just disconnected) or nothing is locked.
+  String _labelFor(String? id) {
+    if (id == null) return 'Any device';
+    for (final client in clients) {
+      if (client.id == id) return client.label;
+    }
+    return 'Any device';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (compact) {
+      return PopupMenuButton<String?>(
+        tooltip: 'Accept commands from…',
+        onSelected: onChanged,
+        itemBuilder: (context) => [
+          const PopupMenuItem(child: Text('Any connected device')),
+          for (final client in clients)
+            PopupMenuItem(value: client.id, child: Text(client.label)),
+        ],
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 16,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 140),
+              child: Text(
+                _labelFor(lockedClientId),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down, size: 18),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        Icon(
+          Icons.lock_outline,
+          size: 16,
+          color: Theme.of(context).colorScheme.outline,
+        ),
+        const SizedBox(width: 8),
+        const Text('Accept commands from:'),
+        const SizedBox(width: 8),
+        Expanded(
+          child: DropdownButton<String?>(
+            isDense: true,
+            isExpanded: true,
+            value: lockedClientId,
+            items: [
+              const DropdownMenuItem(child: Text('Any connected device')),
+              for (final client in clients)
+                DropdownMenuItem(value: client.id, child: Text(client.label)),
+            ],
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Edits the grid the client will draw.
 ///
 /// Lives on the host because a phone screen is a poor place to arrange a
@@ -115,6 +213,9 @@ class LayoutPage extends StatefulWidget {
     required this.onChanged,
     required this.onAppearanceChanged,
     required this.onShowService,
+    required this.connectedClients,
+    required this.lockedClientId,
+    required this.onLockChanged,
   });
 
   /// Called after every edit so the service can push the new layout to
@@ -128,6 +229,17 @@ class LayoutPage extends StatefulWidget {
   /// Opens the service view, which is reached from the settings dialog now
   /// that there are no tabs.
   final VoidCallback onShowService;
+
+  /// Every client currently connected, for the device-lock picker — kept as
+  /// plain id/label pairs rather than the host's own `ConnectedClient` so
+  /// this file does not need to import host_page.dart back.
+  final List<({String id, String label})> connectedClients;
+
+  /// The client [PressSlot]s are currently restricted to, or null to accept
+  /// any of them — mirrors the same picker in the service tab.
+  final String? lockedClientId;
+
+  final ValueChanged<String?> onLockChanged;
 
   @override
   State<LayoutPage> createState() => _LayoutPageState();
@@ -355,6 +467,13 @@ class _LayoutPageState extends State<LayoutPage> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const Spacer(),
+              if (widget.connectedClients.isNotEmpty)
+                DeviceLockPicker(
+                  compact: true,
+                  clients: widget.connectedClients,
+                  lockedClientId: widget.lockedClientId,
+                  onChanged: widget.onLockChanged,
+                ),
               IconButton(
                 tooltip: 'Settings',
                 onPressed: _openSettings,

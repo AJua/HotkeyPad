@@ -45,6 +45,15 @@ Future<ActionResult> runComboSteps(
   return (ok: true, message: 'Ran ${steps.length} steps');
 }
 
+/// Whether a press from [centralId] should actually run, given the host's
+/// current device lock.
+///
+/// A pure function of the two ids specifically so it can be tested without
+/// a real `Central`/BLE stack — the same reason [runComboSteps] takes its
+/// dependencies as parameters instead of reaching for them itself.
+bool isPressAllowed({required String centralId, required String? lockedClientId}) =>
+    lockedClientId == null || lockedClientId == centralId;
+
 /// A client that the host has seen. Centrals are only reported to us when
 /// they do something — connect, subscribe, read or write — so the list grows
 /// as clients interact rather than the moment they come into range.
@@ -54,6 +63,7 @@ class ConnectedClient {
     required this.since,
     required this.subscribed,
     required this.lastActivity,
+    this.name,
   });
 
   final Central central;
@@ -61,14 +71,23 @@ class ConnectedClient {
   final bool subscribed;
   final String lastActivity;
 
+  /// The device's own name, from its [Hello] — null until that arrives,
+  /// which is briefly true for every client right after it connects.
+  final String? name;
+
   String get id => central.uuid.toString();
 
-  ConnectedClient copyWith({bool? subscribed, String? lastActivity}) {
+  ConnectedClient copyWith({
+    bool? subscribed,
+    String? lastActivity,
+    String? name,
+  }) {
     return ConnectedClient(
       central: central,
       since: since,
       subscribed: subscribed ?? this.subscribed,
       lastActivity: lastActivity ?? this.lastActivity,
+      name: name ?? this.name,
     );
   }
 }
@@ -91,6 +110,11 @@ class _HostPageState extends State<HostPage> {
   final _log = <String>[];
   final _composer = TextEditingController();
   final _subscriptions = <StreamSubscription>[];
+
+  /// When set, only this client's presses are run — see [isPressAllowed].
+  /// Null means any connected client is accepted, which is also what a
+  /// single-client setup normally looks like.
+  String? _lockedClientId;
 
   BluetoothLowEnergyState _state = BluetoothLowEnergyState.unknown;
   bool _advertising = false;
@@ -260,18 +284,28 @@ class _HostPageState extends State<HostPage> {
     }
   }
 
-  void _touch(Central central, String activity, {bool? subscribed}) {
+  void _touch(
+    Central central,
+    String activity, {
+    bool? subscribed,
+    String? name,
+  }) {
     if (!mounted) return;
     final id = central.uuid.toString();
     setState(() {
       final existing = _clients[id];
       _clients[id] =
-          existing?.copyWith(subscribed: subscribed, lastActivity: activity) ??
+          existing?.copyWith(
+            subscribed: subscribed,
+            lastActivity: activity,
+            name: name,
+          ) ??
           ConnectedClient(
             central: central,
             since: DateTime.now(),
             subscribed: subscribed ?? false,
             lastActivity: activity,
+            name: name,
           );
       _addLog('$activity — ${_short(id)}');
     });
@@ -282,6 +316,9 @@ class _HostPageState extends State<HostPage> {
     final id = central.uuid.toString();
     setState(() {
       _clients.remove(id);
+      // Locking to a device that just left would otherwise silently block
+      // every press from whoever remains.
+      if (_lockedClientId == id) _lockedClientId = null;
       _addLog('$activity — ${_short(id)}');
     });
   }
@@ -306,6 +343,8 @@ class _HostPageState extends State<HostPage> {
       return;
     }
     switch (message) {
+      case Hello(:final name):
+        _touch(central, 'said hello as $name', name: name);
       case ListApps():
         _touch(central, 'requested the app list');
         await _queueTransfer(() => _sendCatalogue(central));
@@ -386,6 +425,17 @@ class _HostPageState extends State<HostPage> {
   /// there. The client sent only a number, so a shell command cannot be
   /// injected from the other end of the link.
   Future<void> _pressSlot(Central central, int id) async {
+    if (!isPressAllowed(
+      centralId: central.uuid.toString(),
+      lockedClientId: _lockedClientId,
+    )) {
+      _touch(central, 'slot $id ignored — locked to another device');
+      await _send(
+        central,
+        const Ack(ok: false, message: 'This host is locked to another device'),
+      );
+      return;
+    }
     final layout = await LayoutStore.load();
     if (id < 0 || id >= layout.slots.length) {
       _touch(central, 'slot $id is outside the layout');
@@ -710,6 +760,12 @@ class _HostPageState extends State<HostPage> {
           _broadcastAppearance(theme, showLabels);
         },
         onShowService: () => setState(() => _showingService = true),
+        connectedClients: [
+          for (final client in clients)
+            (id: client.id, label: client.name ?? _short(client.id)),
+        ],
+        lockedClientId: _lockedClientId,
+        onLockChanged: (value) => setState(() => _lockedClientId = value),
       ),
     );
   }
@@ -761,8 +817,28 @@ class _HostPageState extends State<HostPage> {
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(child: Text('No client has connected yet.')),
           )
-        else
-          ...clients.map((client) => _ClientTile(client: client)),
+        else ...[
+          // Meaningful the moment a second device shows up; kept visible
+          // with just one connected too, so switching between them never
+          // requires hunting for a control that only sometimes exists.
+          // Same picker as the deck layout screen's copy — see
+          // DeviceLockPicker.
+          DeviceLockPicker(
+            clients: [
+              for (final client in clients)
+                (id: client.id, label: client.name ?? _short(client.id)),
+            ],
+            lockedClientId: _lockedClientId,
+            onChanged: (value) => setState(() => _lockedClientId = value),
+          ),
+          const SizedBox(height: 12),
+          ...clients.map(
+            (client) => _ClientTile(
+              client: client,
+              locked: client.id == _lockedClientId,
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         Row(
           children: [
@@ -891,14 +967,20 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _ClientTile extends StatelessWidget {
-  const _ClientTile({required this.client});
+  const _ClientTile({required this.client, required this.locked});
 
   final ConnectedClient client;
+
+  /// Whether this is the one client the host is currently locked to.
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
+      color: locked
+          ? Theme.of(context).colorScheme.primaryContainer
+          : null,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: client.subscribed
@@ -909,8 +991,12 @@ class _ClientTile extends StatelessWidget {
             color: client.subscribed ? Colors.green : null,
           ),
         ),
-        title: Text(client.id, style: const TextStyle(fontSize: 13)),
+        title: Text(
+          client.name ?? client.id,
+          style: const TextStyle(fontSize: 13),
+        ),
         subtitle: Text(client.lastActivity),
+        trailing: locked ? const Icon(Icons.lock) : null,
       ),
     );
   }

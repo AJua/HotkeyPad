@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart' hide ConnectionState;
 import 'dart:typed_data';
 
 import 'deck_store.dart';
+import 'device_info.dart';
 import 'icon_cache.dart';
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 
@@ -240,7 +241,7 @@ class BtLinkSession extends ChangeNotifier {
       case IconUnavailable(:final name):
         _append('no icon for $name', inbound: true);
         _finishIconFetch(name);
-      case ListApps() || PressSlot() || RequestIcon() || RequestLayout():
+      case Hello() || ListApps() || PressSlot() || RequestIcon() || RequestLayout():
         // Client-to-host shapes; a host has no business sending them.
         _append('ignored a ${message.runtimeType}', inbound: true);
     }
@@ -492,6 +493,9 @@ class BtLinkSession extends ChangeNotifier {
       _reconnectAttempt = 0;
       notifyListeners();
 
+      // So the host can tell this device apart from any other connected at
+      // the same time — see its device lock.
+      await _send(Hello(name: await DeviceInfo.name()));
       await requestLayout();
     } catch (error) {
       // A newer attempt owns the state now; this one just goes quiet.

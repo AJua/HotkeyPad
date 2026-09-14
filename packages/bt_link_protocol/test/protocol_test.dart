@@ -106,6 +106,7 @@ void main() {
   group('BtMessage', () {
     test('round-trips every message shape', () {
       const messages = <BtMessage>[
+        Hello(name: 'Pixel 7'),
         ListApps(),
         AppEntry(name: 'Safari', category: 'Apps'),
         ListEnd(count: 96),
@@ -130,6 +131,12 @@ void main() {
     test('returns null for malformed input', () {
       expect(BtMessage.decode(utf8.encode('not json')), isNull);
       expect(BtMessage.decode(const [0xff, 0xfe]), isNull);
+    });
+
+    test('Hello defaults to an empty name rather than crashing', () {
+      final decoded = BtMessage.decode(utf8.encode('{"t":"hi"}'));
+      expect(decoded, isA<Hello>());
+      expect((decoded as Hello).name, '');
     });
   });
 
