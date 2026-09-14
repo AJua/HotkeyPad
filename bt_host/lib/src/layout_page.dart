@@ -466,18 +466,6 @@ class _LayoutPageState extends State<LayoutPage> {
                   const SizedBox(height: 4),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    value: _showLabels,
-                    onChanged: (value) {
-                      setDialogState(() {});
-                      _setAppearance(showLabels: value);
-                    },
-                    title: const Text('Button labels'),
-                    subtitle: const Text(
-                      'Off makes cells square and lets the icon fill them',
-                    ),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
                     value: _showAppBar,
                     onChanged: (value) {
                       setDialogState(() {});
@@ -487,6 +475,18 @@ class _LayoutPageState extends State<LayoutPage> {
                     subtitle: const Text(
                       'Off hides the title and debug console button, and '
                       'gives the whole screen to the deck',
+                    ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _showLabels,
+                    onChanged: (value) {
+                      setDialogState(() {});
+                      _setAppearance(showLabels: value);
+                    },
+                    title: const Text('Button labels'),
+                    subtitle: const Text(
+                      'Off makes cells square and lets the icon fill them',
                     ),
                   ),
                   const SizedBox(height: 12),
