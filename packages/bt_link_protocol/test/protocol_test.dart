@@ -729,4 +729,65 @@ void main() {
       ]);
     });
   });
+
+  group('background appearance', () {
+    test('round-trips an id, opacity, and fit', () {
+      for (final fit in BackgroundFit.values) {
+        final decoded =
+            BtMessage.decode(
+                  SetAppearance(
+                    theme: DeckTheme.dark,
+                    showLabels: true,
+                    backgroundImageId: 'bg_1',
+                    backgroundOpacity: 0.42,
+                    backgroundFit: fit,
+                  ).encode(),
+                )
+                as SetAppearance?;
+
+        expect(decoded!.backgroundImageId, 'bg_1');
+        expect(decoded.backgroundOpacity, 0.42);
+        expect(decoded.backgroundFit, fit);
+      }
+    });
+
+    test('defaults to no background, full opacity, cover', () {
+      const message = SetAppearance(theme: DeckTheme.system, showLabels: true);
+
+      expect(message.backgroundImageId, isNull);
+      expect(message.backgroundOpacity, 1.0);
+      expect(message.backgroundFit, BackgroundFit.cover);
+    });
+
+    test('an unset background is not sent on the wire at all', () {
+      const message = SetAppearance(theme: DeckTheme.system, showLabels: true);
+
+      expect(message.toJson(), isNot(contains('bg')));
+      expect(message.toJson(), isNot(contains('bop')));
+      expect(message.toJson(), isNot(contains('bft')));
+    });
+
+    test('an older host omitting these fields yields no background', () {
+      final decoded =
+          BtMessage.decode(utf8.encode('{"t":"thm","v":"dark","lbl":true}'))
+              as SetAppearance?;
+
+      expect(decoded!.backgroundImageId, isNull);
+      expect(decoded.backgroundOpacity, 1.0);
+      expect(decoded.backgroundFit, BackgroundFit.cover);
+    });
+
+    test('an unknown fit falls back to cover', () {
+      expect(BackgroundFit.fromWire('parallax'), BackgroundFit.cover);
+      expect(BackgroundFit.fromWire(null), BackgroundFit.cover);
+    });
+
+    test('is offered as cover, contain, stretch', () {
+      expect(BackgroundFit.values.map((fit) => fit.wire), [
+        'cover',
+        'contain',
+        'fill',
+      ]);
+    });
+  });
 }

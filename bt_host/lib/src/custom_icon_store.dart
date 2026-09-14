@@ -1,11 +1,10 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart' show SvgBytesLoader, vg;
 
+import 'image_decode.dart';
 import 'package:bt_link_protocol/bt_link_protocol.dart';
 
 /// Custom images the user has picked for a deck button, in place of an app
@@ -32,39 +31,47 @@ abstract final class CustomIconStore {
 
   static String _fileName(String id) => '$id.png';
 
+  /// Opens the native file picker and returns whatever bytes the user
+  /// picked, unprocessed. Returns null if the user cancelled or the
+  /// platform is unsupported.
+  ///
+  /// Shared with [BackgroundImageStore], which needs the same native panel
+  /// but not the square-crop treatment [pickAndProcess] applies below —
+  /// only one method channel call site is worth having, since the picker
+  /// itself does not know or care what the picked image is used for.
+  static Future<Uint8List?> pickRaw() async {
+    if (!supported) return null;
+    try {
+      return await _channel.invokeMethod<Uint8List>('pickImage');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   /// Opens a native file picker and, if the user picked something, crops it
   /// to a centred square and resizes it to [BtLink.iconSize]. Returns null
   /// if the user cancelled, the platform is unsupported, or the file could
   /// not be decoded as an image — none of which are worth surfacing as an
   /// error, the same stance [AppLauncher.icon] takes on a missing icon.
   static Future<Uint8List?> pickAndProcess() async {
-    if (!supported) return null;
-    final Uint8List? picked;
-    try {
-      picked = await _channel.invokeMethod<Uint8List>('pickImage');
-    } on PlatformException {
-      return null;
-    } on MissingPluginException {
-      return null;
-    }
+    final picked = await pickRaw();
     if (picked == null) return null;
     return cropToSquarePng(picked);
   }
 
-  /// Decodes [bytes] — a raster image, or SVG source, sniffed by
-  /// [_looksLikeSvg] since that's the one format [instantiateImageCodec]
-  /// cannot handle on its own — crops the centred square, and re-encodes at
-  /// [BtLink.iconSize]. A plain resize would squash a non-square source
-  /// rather than crop it, and deck buttons are square.
+  /// Decodes [bytes] — a raster image, or SVG source (see [ImageDecode]) —
+  /// crops the centred square, and re-encodes at [BtLink.iconSize]. A plain
+  /// resize would squash a non-square source rather than crop it, and deck
+  /// buttons are square.
   ///
   /// Public, not an implementation detail of [pickAndProcess], so it can be
   /// tested directly against synthetic images without a real file picker.
   static Future<Uint8List?> cropToSquarePng(Uint8List bytes) async {
     final Image source;
     try {
-      source = _looksLikeSvg(bytes)
-          ? await _rasterizeSvg(bytes)
-          : await _decodeRaster(bytes);
+      source = await ImageDecode.decodeAny(bytes);
     } catch (_) {
       return null;
     }
@@ -111,65 +118,6 @@ abstract final class CustomIconStore {
       }
     } finally {
       source.dispose();
-    }
-  }
-
-  /// Sniffs [bytes] for SVG source rather than trying to parse it properly —
-  /// a real parse only to reject non-SVG input would be wasted work, since
-  /// [_decodeRaster] already handles every other format this app needs to
-  /// accept. Looks at a small prefix so a large photo isn't fully decoded as
-  /// text just to rule it out.
-  static bool _looksLikeSvg(Uint8List bytes) {
-    final prefixLength = bytes.length < 2048 ? bytes.length : 2048;
-    final String prefix;
-    try {
-      prefix = utf8.decode(bytes.sublist(0, prefixLength), allowMalformed: true);
-    } catch (_) {
-      return false;
-    }
-    return prefix.toLowerCase().contains('<svg');
-  }
-
-  static Future<Image> _decodeRaster(Uint8List bytes) async {
-    final codec = await instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    return frame.image;
-  }
-
-  /// Rasterizes SVG source into an [Image], scaled so its larger dimension
-  /// lands at a comfortable working resolution — [cropToSquarePng] then
-  /// crops and resizes it exactly like any other decoded image, so a vector
-  /// icon goes through the same centred-square treatment as a photo.
-  ///
-  /// A vector has no natural pixel size, unlike a raster frame; [targetSide]
-  /// stands in for one, chosen well above [BtLink.iconSize] so the crop
-  /// below still has real detail to work with.
-  static Future<Image> _rasterizeSvg(Uint8List bytes) async {
-    const targetSide = 512.0;
-    final pictureInfo = await vg.loadPicture(SvgBytesLoader(bytes), null);
-    try {
-      final svgSize = pictureInfo.size;
-      final side = svgSize.width > svgSize.height
-          ? svgSize.width
-          : svgSize.height;
-      // A missing width/height/viewBox leaves size at zero; fall back to
-      // drawing it at face value rather than dividing by zero.
-      final scale = side > 0 ? targetSide / side : 1.0;
-      final width = (svgSize.width * scale).round().clamp(1, 4096);
-      final height = (svgSize.height * scale).round().clamp(1, 4096);
-
-      final recorder = PictureRecorder();
-      final canvas = Canvas(recorder);
-      canvas.scale(scale);
-      canvas.drawPicture(pictureInfo.picture);
-      final scaledPicture = recorder.endRecording();
-      try {
-        return await scaledPicture.toImage(width, height);
-      } finally {
-        scaledPicture.dispose();
-      }
-    } finally {
-      pictureInfo.picture.dispose();
     }
   }
 

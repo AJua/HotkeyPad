@@ -32,4 +32,64 @@ void main() {
       expect(await DeckStore.load('host-1'), isNull);
     });
   });
+
+  group('appearance cache', () {
+    test('defaults to no background at full opacity, cover', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      final cached = await DeckStore.loadAppearance('host-1');
+
+      expect(cached.backgroundImageId, isNull);
+      expect(cached.backgroundOpacity, 1.0);
+      expect(cached.backgroundFit, BackgroundFit.cover);
+    });
+
+    test('round-trips a background image, opacity, and fit', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      await DeckStore.saveAppearance(
+        'host-1',
+        DeckTheme.dark,
+        false,
+        backgroundImageId: 'bg_1',
+        backgroundOpacity: 0.42,
+        backgroundFit: BackgroundFit.contain,
+      );
+      final cached = await DeckStore.loadAppearance('host-1');
+
+      expect(cached.theme, DeckTheme.dark);
+      expect(cached.showLabels, isFalse);
+      expect(cached.backgroundImageId, 'bg_1');
+      expect(cached.backgroundOpacity, 0.42);
+      expect(cached.backgroundFit, BackgroundFit.contain);
+    });
+
+    test('clearing the background removes it rather than storing empty', () async {
+      SharedPreferences.setMockInitialValues({});
+      await DeckStore.saveAppearance(
+        'host-1',
+        DeckTheme.system,
+        true,
+        backgroundImageId: 'bg_1',
+      );
+
+      await DeckStore.saveAppearance('host-1', DeckTheme.system, true);
+
+      expect((await DeckStore.loadAppearance('host-1')).backgroundImageId, isNull);
+    });
+
+    test('keeps hosts separate', () async {
+      SharedPreferences.setMockInitialValues({});
+      await DeckStore.saveAppearance(
+        'host-1',
+        DeckTheme.system,
+        true,
+        backgroundImageId: 'bg_1',
+      );
+      await DeckStore.saveAppearance('host-2', DeckTheme.system, true);
+
+      expect((await DeckStore.loadAppearance('host-1')).backgroundImageId, 'bg_1');
+      expect((await DeckStore.loadAppearance('host-2')).backgroundImageId, isNull);
+    });
+  });
 }

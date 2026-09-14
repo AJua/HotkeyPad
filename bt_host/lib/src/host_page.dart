@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 
 import 'app_launcher.dart';
+import 'background_image_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
 import 'layout_page.dart';
@@ -540,7 +541,13 @@ class _HostPageState extends State<HostPage> {
     final appearance = await SettingsStore.load();
     await _send(
       central,
-      SetAppearance(theme: appearance.theme, showLabels: appearance.showLabels),
+      SetAppearance(
+        theme: appearance.theme,
+        showLabels: appearance.showLabels,
+        backgroundImageId: appearance.backgroundImageId,
+        backgroundOpacity: appearance.backgroundOpacity,
+        backgroundFit: appearance.backgroundFit,
+      ),
     );
     if (mounted) {
       setState(() {
@@ -555,8 +562,22 @@ class _HostPageState extends State<HostPage> {
 
   /// Pushes the appearance to everyone subscribed, so the phone follows the
   /// Mac the moment it is changed here.
-  Future<void> _broadcastAppearance(DeckTheme theme, bool showLabels) async {
-    final message = SetAppearance(theme: theme, showLabels: showLabels);
+  ///
+  /// Reloads the whole [SettingsStore] rather than taking the changed
+  /// fields as parameters: [LayoutPage] already saves to the store before
+  /// calling back here (both for a theme/label change and a background
+  /// one), so re-reading it is simpler than plumbing five parameters
+  /// through two different call sites for what is, on the wire, one
+  /// message.
+  Future<void> _broadcastAppearance() async {
+    final appearance = await SettingsStore.load();
+    final message = SetAppearance(
+      theme: appearance.theme,
+      showLabels: appearance.showLabels,
+      backgroundImageId: appearance.backgroundImageId,
+      backgroundOpacity: appearance.backgroundOpacity,
+      backgroundFit: appearance.backgroundFit,
+    );
     for (final client in _clients.values.where((c) => c.subscribed)) {
       await _queueTransfer(() => _send(client.central, message));
     }
@@ -570,9 +591,10 @@ class _HostPageState extends State<HostPage> {
     }
   }
 
-  /// Renders an app's icon, or reads back a user-picked custom one, and
-  /// streams it as binary frames sized to the link's MTU either way — the
-  /// transfer itself does not care which [id] names.
+  /// Renders an app's icon, reads back a user-picked custom icon, or reads
+  /// back a custom background image, and streams it as binary frames sized
+  /// to the link's MTU either way — the transfer itself does not care which
+  /// [id] names, or which of the three stores it came from.
   Future<void> _sendIcon(Central central, String id) async {
     final peripheral = _peripheral;
     if (peripheral == null) return;
@@ -583,7 +605,7 @@ class _HostPageState extends State<HostPage> {
     final path = _appPaths[id];
     final png = path != null
         ? await AppLauncher.icon(path, size: BtLink.iconSize)
-        : await CustomIconStore.read(id);
+        : await CustomIconStore.read(id) ?? await BackgroundImageStore.read(id);
     if (png == null) {
       await _send(central, IconUnavailable(name: id));
       return;
@@ -792,7 +814,7 @@ class _HostPageState extends State<HostPage> {
         onChanged: _broadcastLayout,
         onAppearanceChanged: (theme, showLabels) {
           widget.onThemeChanged(theme);
-          _broadcastAppearance(theme, showLabels);
+          _broadcastAppearance();
         },
         onShowService: () => setState(() => _showingService = true),
         connectedClients: [
