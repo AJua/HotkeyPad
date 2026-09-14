@@ -130,24 +130,33 @@ class DeviceLockPicker extends StatelessWidget {
   /// own. The service tab keeps the spelled-out version.
   final bool compact;
 
-  /// The locked client's own label, or a generic stand-in once it is no
-  /// longer in [clients] (it just disconnected) or nothing is locked.
+  /// There is no "any device" choice — every press is rejected until one
+  /// specific device is picked, so a stand-in that says so doubles as a
+  /// warning that presses are not going anywhere right now.
+  static const _unpicked = 'Select a device';
+
+  /// The locked client's own label, or [_unpicked] once it is no longer in
+  /// [clients] (it just disconnected) or nothing has been chosen yet.
   String _labelFor(String? id) {
-    if (id == null) return 'Any device';
-    for (final client in clients) {
-      if (client.id == id) return client.label;
+    if (id != null) {
+      for (final client in clients) {
+        if (client.id == id) return client.label;
+      }
     }
-    return 'Any device';
+    return _unpicked;
   }
 
   @override
   Widget build(BuildContext context) {
+    final label = _labelFor(lockedClientId);
+    final warn = label == _unpicked;
+    final warnColor = Theme.of(context).colorScheme.error;
+
     if (compact) {
       return PopupMenuButton<String?>(
         tooltip: 'Accept commands from…',
         onSelected: onChanged,
         itemBuilder: (context) => [
-          const PopupMenuItem(child: Text('Any connected device')),
           for (final client in clients)
             PopupMenuItem(value: client.id, child: Text(client.label)),
         ],
@@ -157,16 +166,20 @@ class DeviceLockPicker extends StatelessWidget {
             Icon(
               Icons.lock_outline,
               size: 16,
-              color: Theme.of(context).colorScheme.outline,
+              color: warn
+                  ? warnColor
+                  : Theme.of(context).colorScheme.outline,
             ),
             const SizedBox(width: 4),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 140),
               child: Text(
-                _labelFor(lockedClientId),
+                label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: warn ? warnColor : null),
               ),
             ),
             const Icon(Icons.arrow_drop_down, size: 18),
@@ -177,11 +190,7 @@ class DeviceLockPicker extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(
-          Icons.lock_outline,
-          size: 16,
-          color: Theme.of(context).colorScheme.outline,
-        ),
+        Icon(Icons.lock_outline, size: 16, color: warn ? warnColor : null),
         const SizedBox(width: 8),
         const Text('Accept commands from:'),
         const SizedBox(width: 8),
@@ -190,8 +199,8 @@ class DeviceLockPicker extends StatelessWidget {
             isDense: true,
             isExpanded: true,
             value: lockedClientId,
+            hint: Text(_unpicked, style: TextStyle(color: warnColor)),
             items: [
-              const DropdownMenuItem(child: Text('Any connected device')),
               for (final client in clients)
                 DropdownMenuItem(value: client.id, child: Text(client.label)),
             ],

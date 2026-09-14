@@ -3,29 +3,76 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('isPressAllowed', () {
-    test('accepts anyone when nothing is locked', () {
+    test('rejects everyone when nothing is picked', () {
+      expect(isPressAllowed(centralId: 'a', lockedClientId: null), isFalse);
+      expect(isPressAllowed(centralId: 'b', lockedClientId: null), isFalse);
+    });
+
+    test('accepts the picked client', () {
+      expect(isPressAllowed(centralId: 'a', lockedClientId: 'a'), isTrue);
+    });
+
+    test('rejects anyone but the picked client', () {
+      expect(isPressAllowed(centralId: 'b', lockedClientId: 'a'), isFalse);
+    });
+  });
+
+  group('nextLockedClientId', () {
+    test('picks the sole connected client automatically', () {
       expect(
-        isPressAllowed(centralId: 'a', lockedClientId: null),
-        isTrue,
-      );
-      expect(
-        isPressAllowed(centralId: 'b', lockedClientId: null),
-        isTrue,
+        nextLockedClientId(
+          currentLockedClientId: null,
+          connectedClientIds: ['a'],
+        ),
+        'a',
       );
     });
 
-    test('accepts the locked client', () {
+    test('stays unpicked with no clients connected', () {
       expect(
-        isPressAllowed(centralId: 'a', lockedClientId: 'a'),
-        isTrue,
+        nextLockedClientId(
+          currentLockedClientId: null,
+          connectedClientIds: [],
+        ),
+        isNull,
       );
     });
 
-    test('rejects anyone but the locked client', () {
+    test('stays unpicked with more than one candidate', () {
       expect(
-        isPressAllowed(centralId: 'b', lockedClientId: 'a'),
-        isFalse,
+        nextLockedClientId(
+          currentLockedClientId: null,
+          connectedClientIds: ['a', 'b'],
+        ),
+        isNull,
       );
     });
+
+    test('never overrides an existing explicit choice', () {
+      // Even once a second device connects, or the auto-picked one is no
+      // longer the only candidate — an explicit pick is a deliberate act
+      // the client list changing should not undo.
+      expect(
+        nextLockedClientId(
+          currentLockedClientId: 'a',
+          connectedClientIds: ['a', 'b'],
+        ),
+        'a',
+      );
+    });
+
+    test(
+      'keeps an explicit choice even once it is the only one left, rather '
+      'than re-deriving it',
+      () {
+        expect(
+          nextLockedClientId(
+            currentLockedClientId: 'a',
+            connectedClientIds: ['a'],
+          ),
+          'a',
+        );
+      },
+    );
   });
 }

@@ -45,14 +45,37 @@ Future<ActionResult> runComboSteps(
   return (ok: true, message: 'Ran ${steps.length} steps');
 }
 
-/// Whether a press from [centralId] should actually run, given the host's
-/// current device lock.
+/// Whether a press from [centralId] should actually run.
+///
+/// There is no "accept anyone" state: a null [lockedClientId] means no
+/// device has been picked yet (nothing connected, or more than one
+/// candidate and the host has not chosen between them — see
+/// [_HostPageState._autoLockIfSingleClient]), and every press is rejected
+/// until it is one specific device's turn.
 ///
 /// A pure function of the two ids specifically so it can be tested without
 /// a real `Central`/BLE stack — the same reason [runComboSteps] takes its
 /// dependencies as parameters instead of reaching for them itself.
 bool isPressAllowed({required String centralId, required String? lockedClientId}) =>
-    lockedClientId == null || lockedClientId == centralId;
+    lockedClientId == centralId;
+
+/// What the device lock should become after the connected-client list
+/// changes.
+///
+/// An existing explicit choice is always kept, even once it stops being
+/// the only client — picking a device is a deliberate act the client list
+/// changing should not undo. The one case this fills in on its own is
+/// exactly one connected client with nothing chosen yet: that client is
+/// unambiguously "the" device, so a single-phone setup — the common case —
+/// never needs an explicit pick. Zero or two-or-more candidates with
+/// nothing chosen stays unpicked; see [isPressAllowed].
+String? nextLockedClientId({
+  required String? currentLockedClientId,
+  required List<String> connectedClientIds,
+}) {
+  if (currentLockedClientId != null) return currentLockedClientId;
+  return connectedClientIds.length == 1 ? connectedClientIds.single : null;
+}
 
 /// A client that the host has seen. Centrals are only reported to us when
 /// they do something — connect, subscribe, read or write — so the list grows
@@ -307,8 +330,19 @@ class _HostPageState extends State<HostPage> {
             lastActivity: activity,
             name: name,
           );
+      _autoLockIfSingleClient();
       _addLog('$activity — ${_short(id)}');
     });
+  }
+
+  /// Re-derives the device lock after the connected-client list changes —
+  /// pulled out so [nextLockedClientId]'s actual decision can be tested
+  /// without a real `Central`/BLE stack.
+  void _autoLockIfSingleClient() {
+    _lockedClientId = nextLockedClientId(
+      currentLockedClientId: _lockedClientId,
+      connectedClientIds: _clients.keys.toList(),
+    );
   }
 
   void _remove(Central central, String activity) {
@@ -319,6 +353,7 @@ class _HostPageState extends State<HostPage> {
       // Locking to a device that just left would otherwise silently block
       // every press from whoever remains.
       if (_lockedClientId == id) _lockedClientId = null;
+      _autoLockIfSingleClient();
       _addLog('$activity — ${_short(id)}');
     });
   }
@@ -429,11 +464,11 @@ class _HostPageState extends State<HostPage> {
       centralId: central.uuid.toString(),
       lockedClientId: _lockedClientId,
     )) {
-      _touch(central, 'slot $id ignored — locked to another device');
-      await _send(
-        central,
-        const Ack(ok: false, message: 'This host is locked to another device'),
-      );
+      final message = _lockedClientId == null
+          ? 'No device is selected on the host yet'
+          : 'This host is locked to another device';
+      _touch(central, 'slot $id ignored — $message');
+      await _send(central, Ack(ok: false, message: message));
       return;
     }
     final layout = await LayoutStore.load();
