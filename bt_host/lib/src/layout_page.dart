@@ -149,8 +149,10 @@ String? currentButtonSummary(String? stored) {
 /// protocol_test.dart. A pure function of the edited layout and whether it
 /// was turned, specifically so it is testable without a real
 /// [LayoutPage] — same reason as [itemsDroppedByResize].
-DeckLayout displayEditToCanonical(DeckLayout edited, {required bool wasTransposed}) =>
-    wasTransposed ? edited.transposed() : edited;
+DeckLayout displayEditToCanonical(
+  DeckLayout edited, {
+  required bool wasTransposed,
+}) => wasTransposed ? edited.transposed() : edited;
 
 /// A dropdown to pick which connected client's presses the host accepts —
 /// shown identically on the deck layout screen and in the service tab, so
@@ -213,9 +215,7 @@ class DeviceLockPicker extends StatelessWidget {
             Icon(
               Icons.lock_outline,
               size: 16,
-              color: warn
-                  ? warnColor
-                  : Theme.of(context).colorScheme.outline,
+              color: warn ? warnColor : Theme.of(context).colorScheme.outline,
             ),
             const SizedBox(width: 4),
             ConstrainedBox(
@@ -423,172 +423,187 @@ class _LayoutPageState extends State<LayoutPage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Settings'),
+          // A short window (or a tall grid — many pages, custom icons, an
+          // export/import section, the service-details link all stacked
+          // in one Column) easily runs out of vertical room: the dialog
+          // itself already caps its height to the screen, but a bare
+          // Column can't shrink to fit inside that, so it silently
+          // overflowed past "Done" instead — this scroll view is what
+          // lets the content still fit, by scrolling, rather than
+          // overflowing.
           content: SizedBox(
             width: 380,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Appearance',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 8),
-                SegmentedButton<DeckTheme>(
-                  segments: [
-                    for (final theme in DeckTheme.values)
-                      ButtonSegment(value: theme, label: Text(theme.label)),
-                  ],
-                  selected: {_theme},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (selection) {
-                    setDialogState(() {});
-                    _setAppearance(theme: selection.first);
-                  },
-                ),
-                const SizedBox(height: 4),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _showLabels,
-                  onChanged: (value) {
-                    setDialogState(() {});
-                    _setAppearance(showLabels: value);
-                  },
-                  title: const Text('Button labels'),
-                  subtitle: const Text(
-                    'Off makes cells square and lets the icon fill them',
+            child: SingleChildScrollView(
+              // Desktop draws the scrollbar over the trailing edge of the
+              // content rather than reserving its own space for it, so
+              // without this the thumb/track sits right on top of the
+              // text — this padding is that reserved space instead.
+              padding: const EdgeInsets.only(right: 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Appearance',
+                    style: Theme.of(context).textTheme.labelLarge,
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Background image',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 8),
-                BackgroundPicker(
-                  imageId: _backgroundImageId,
-                  onChanged: (id) {
-                    setDialogState(() {});
-                    _setBackgroundImage(id);
-                  },
-                ),
-                const SizedBox(height: 4),
-                Opacity(
-                  opacity: _backgroundImageId == null ? 0.5 : 1,
-                  child: Row(
-                    children: [
-                      const Text('Opacity'),
-                      Expanded(
-                        child: Slider(
-                          value: _backgroundOpacity,
-                          divisions: 20,
-                          label: '${(_backgroundOpacity * 100).round()}%',
-                          onChanged: _backgroundImageId == null
-                              ? null
-                              : (value) {
-                                  setDialogState(() {});
-                                  _setBackgroundOpacity(value);
-                                },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Opacity(
-                  opacity: _backgroundImageId == null ? 0.5 : 1,
-                  child: SegmentedButton<BackgroundFit>(
+                  const SizedBox(height: 8),
+                  SegmentedButton<DeckTheme>(
                     segments: [
-                      for (final fit in BackgroundFit.values)
-                        ButtonSegment(value: fit, label: Text(fit.label)),
+                      for (final theme in DeckTheme.values)
+                        ButtonSegment(value: theme, label: Text(theme.label)),
                     ],
-                    selected: {_backgroundFit},
+                    selected: {_theme},
                     showSelectedIcon: false,
-                    onSelectionChanged: _backgroundImageId == null
-                        ? null
-                        : (selection) {
-                            setDialogState(() {});
-                            _setBackgroundFit(selection.first);
-                          },
+                    onSelectionChanged: (selection) {
+                      setDialogState(() {});
+                      _setAppearance(theme: selection.first);
+                    },
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text('Grid', style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 4),
-                _NumberStepper(
-                  label: 'Columns',
-                  value: _layout.columns,
-                  onChanged: (value) async {
-                    await _resize(columns: value);
-                    setDialogState(() {});
-                  },
-                ),
-                _NumberStepper(
-                  label: 'Rows',
-                  value: _layout.rows,
-                  onChanged: (value) async {
-                    await _resize(rows: value);
-                    setDialogState(() {});
-                  },
-                ),
-                _NumberStepper(
-                  label: 'Pages',
-                  value: _layout.pages,
-                  max: DeckLayout.maxPages,
-                  onChanged: (value) async {
-                    await _resize(pages: value);
-                    setDialogState(() {});
-                  },
-                ),
-                const Divider(height: 32),
-                Text('Backup', style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 4),
-                // Two entry points rather than one "Backup..." tile with a
-                // sub-choice: export is safe to tap on a whim and import is
-                // destructive, so keeping them visually distinct here
-                // matches that difference before either is even tapped.
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.upload_outlined),
-                  title: const Text('Export settings...'),
-                  subtitle: const Text(
-                    'Save appearance, layout, and custom icons to a file',
+                  const SizedBox(height: 4),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _showLabels,
+                    onChanged: (value) {
+                      setDialogState(() {});
+                      _setAppearance(showLabels: value);
+                    },
+                    title: const Text('Button labels'),
+                    subtitle: const Text(
+                      'Off makes cells square and lets the icon fill them',
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _exportSettings();
-                  },
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.download_outlined),
-                  title: const Text('Import settings...'),
-                  subtitle: const Text(
-                    'Replace the current setup from a backup file',
+                  const SizedBox(height: 12),
+                  Text(
+                    'Background image',
+                    style: Theme.of(context).textTheme.labelLarge,
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _importSettings();
-                  },
-                ),
-                const Divider(height: 32),
-                // A diagnostic, like the client's debug console: for
-                // working out why the deck is misbehaving, not for daily use.
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.bug_report_outlined),
-                  title: const Text('Service details'),
-                  subtitle: const Text(
-                    'Advertising state, connected clients, activity log',
+                  const SizedBox(height: 8),
+                  BackgroundPicker(
+                    imageId: _backgroundImageId,
+                    onChanged: (id) {
+                      setDialogState(() {});
+                      _setBackgroundImage(id);
+                    },
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    widget.onShowService();
-                  },
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Opacity(
+                    opacity: _backgroundImageId == null ? 0.5 : 1,
+                    child: Row(
+                      children: [
+                        const Text('Opacity'),
+                        Expanded(
+                          child: Slider(
+                            value: _backgroundOpacity,
+                            divisions: 20,
+                            label: '${(_backgroundOpacity * 100).round()}%',
+                            onChanged: _backgroundImageId == null
+                                ? null
+                                : (value) {
+                                    setDialogState(() {});
+                                    _setBackgroundOpacity(value);
+                                  },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Opacity(
+                    opacity: _backgroundImageId == null ? 0.5 : 1,
+                    child: SegmentedButton<BackgroundFit>(
+                      segments: [
+                        for (final fit in BackgroundFit.values)
+                          ButtonSegment(value: fit, label: Text(fit.label)),
+                      ],
+                      selected: {_backgroundFit},
+                      showSelectedIcon: false,
+                      onSelectionChanged: _backgroundImageId == null
+                          ? null
+                          : (selection) {
+                              setDialogState(() {});
+                              _setBackgroundFit(selection.first);
+                            },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Grid', style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  _NumberStepper(
+                    label: 'Columns',
+                    value: _layout.columns,
+                    onChanged: (value) async {
+                      await _resize(columns: value);
+                      setDialogState(() {});
+                    },
+                  ),
+                  _NumberStepper(
+                    label: 'Rows',
+                    value: _layout.rows,
+                    onChanged: (value) async {
+                      await _resize(rows: value);
+                      setDialogState(() {});
+                    },
+                  ),
+                  _NumberStepper(
+                    label: 'Pages',
+                    value: _layout.pages,
+                    max: DeckLayout.maxPages,
+                    onChanged: (value) async {
+                      await _resize(pages: value);
+                      setDialogState(() {});
+                    },
+                  ),
+                  const Divider(height: 32),
+                  Text('Backup', style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  // Two entry points rather than one "Backup..." tile with a
+                  // sub-choice: export is safe to tap on a whim and import is
+                  // destructive, so keeping them visually distinct here
+                  // matches that difference before either is even tapped.
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.upload_outlined),
+                    title: const Text('Export settings...'),
+                    subtitle: const Text(
+                      'Save appearance, layout, and custom icons to a file',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _exportSettings();
+                    },
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.download_outlined),
+                    title: const Text('Import settings...'),
+                    subtitle: const Text(
+                      'Replace the current setup from a backup file',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _importSettings();
+                    },
+                  ),
+                  const Divider(height: 32),
+                  // A diagnostic, like the client's debug console: for
+                  // working out why the deck is misbehaving, not for daily use.
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.bug_report_outlined),
+                    title: const Text('Service details'),
+                    subtitle: const Text(
+                      'Advertising state, connected clients, activity log',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      widget.onShowService();
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
