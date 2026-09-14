@@ -8,7 +8,16 @@ import 'package:bt_link_protocol/bt_link_protocol.dart';
 /// `Central`, minimal on purpose since [WifiServer] is the only thing that
 /// ever touches the underlying [Socket] directly.
 class WifiClient {
-  WifiClient(this.socket);
+  /// Captures [id] once here rather than computing it lazily from
+  /// [socket] on every access: `socket.remoteAddress`/`remotePort` throw
+  /// `SocketException: Socket has been closed` once the socket actually
+  /// is — exactly the moment a disconnect handler needs the id to remove
+  /// this client from a map. Confirmed against a real disconnect: the old
+  /// getter form took the whole cleanup path down with it, silently
+  /// leaking the entry (see `WifiServer.start`'s `cleanUp`) rather than
+  /// ever reaching `onDisconnected`.
+  WifiClient(this.socket)
+    : id = 'wifi:${socket.remoteAddress.address}:${socket.remotePort}';
 
   final Socket socket;
 
@@ -17,7 +26,7 @@ class WifiClient {
   /// source port, and therefore a new id, so a WiFi client that drops and
   /// comes back is (deliberately) treated as a new device-lock candidate
   /// rather than assumed to be the one that just left.
-  String get id => 'wifi:${socket.remoteAddress.address}:${socket.remotePort}';
+  final String id;
 
   Future<void> send(Uint8List bytes) async {
     socket.add(FrameCodec.encode(bytes));
@@ -157,6 +166,28 @@ class WifiServer {
       // The global broadcast above is still attempted regardless.
     }
     return targets;
+  }
+
+  /// Every non-loopback IPv4 address this machine currently has, for
+  /// display — the host has no way to know which one (if more than one)
+  /// is actually reachable from a given client, so this just lists all of
+  /// them and leaves picking the right one to whoever is typing it into
+  /// the client's manual-entry field. Static, and independent of
+  /// [running], since it is just as useful to see before starting the
+  /// service as after.
+  static Future<List<String>> localAddresses() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        includeLoopback: false,
+        type: InternetAddressType.IPv4,
+      );
+      return [
+        for (final interface in interfaces)
+          for (final address in interface.addresses) address.address,
+      ];
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> stop() async {
