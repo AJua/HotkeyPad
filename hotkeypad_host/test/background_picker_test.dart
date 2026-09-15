@@ -1,3 +1,4 @@
+import 'package:hotkeypad_host/l10n/app_localizations.dart';
 import 'package:hotkeypad_host/src/layout_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,9 @@ void main() {
     required ValueChanged<String?> onChanged,
   }) {
     return MaterialApp(
+      locale: const Locale('en'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: BackgroundPicker(imageId: imageId, onChanged: onChanged),
       ),

@@ -87,6 +87,102 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get done => '完成';
+
+  @override
+  String get deckLayoutTitle => '面板配置';
+
+  @override
+  String get deckLayoutHint => '點擊按鈕格以選擇它的功能。拖曳按鈕可以移動它,也可以拖到其他頁面。';
+
+  @override
+  String get settingsTitle => '設定';
+
+  @override
+  String get appearanceSectionHeader => '外觀';
+
+  @override
+  String get themeSystem => '自動';
+
+  @override
+  String get themeLight => '淺色';
+
+  @override
+  String get themeDark => '深色';
+
+  @override
+  String get appBarToggleTitle => '頂端列';
+
+  @override
+  String get appBarToggleSubtitle => '關閉後會隱藏標題與除錯主控台按鈕,讓整個畫面都用來顯示面板';
+
+  @override
+  String get buttonLabelsToggleTitle => '按鈕文字標籤';
+
+  @override
+  String get buttonLabelsToggleSubtitle => '關閉後按鈕格會變成正方形,並讓圖示填滿整個格子';
+
+  @override
+  String get pageDotsToggleTitle => '頁面圓點';
+
+  @override
+  String get pageDotsToggleSubtitle => '關閉後會隱藏多頁面板下方的頁面指示器——仍然可以滑動切換頁面';
+
+  @override
+  String get backgroundImageSectionHeader => '背景圖片';
+
+  @override
+  String get chooseImageAction => '選擇圖片…';
+
+  @override
+  String get changeImageAction => '更換…';
+
+  @override
+  String get removeImageAction => '移除';
+
+  @override
+  String get opacityLabel => '不透明度';
+
+  @override
+  String get backgroundFitCover => '填滿螢幕';
+
+  @override
+  String get backgroundFitContain => '完整顯示圖片';
+
+  @override
+  String get backgroundFitStretch => '拉伸';
+
+  @override
+  String get gridSectionHeader => '格線';
+
+  @override
+  String get columnsLabel => '欄數';
+
+  @override
+  String get rowsLabel => '列數';
+
+  @override
+  String get pagesLabel => '頁數';
+
+  @override
+  String get backupSectionHeader => '備份';
+
+  @override
+  String get exportSettingsTitle => '匯出設定…';
+
+  @override
+  String get exportSettingsSubtitle => '將外觀、版面配置與自訂圖示儲存成檔案';
+
+  @override
+  String get importSettingsTitle => '匯入設定…';
+
+  @override
+  String get importSettingsSubtitle => '以備份檔取代目前的設定';
+
+  @override
+  String get serviceDetailsTitle => '服務詳細資訊';
+
+  @override
+  String get serviceDetailsSubtitle => '廣播狀態、已連線裝置、活動紀錄';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -172,4 +268,100 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get done => '完成';
+
+  @override
+  String get deckLayoutTitle => '面板配置';
+
+  @override
+  String get deckLayoutHint => '點擊按鈕格以選擇它的功能。拖曳按鈕可以移動它,也可以拖到其他頁面。';
+
+  @override
+  String get settingsTitle => '設定';
+
+  @override
+  String get appearanceSectionHeader => '外觀';
+
+  @override
+  String get themeSystem => '自動';
+
+  @override
+  String get themeLight => '淺色';
+
+  @override
+  String get themeDark => '深色';
+
+  @override
+  String get appBarToggleTitle => '頂端列';
+
+  @override
+  String get appBarToggleSubtitle => '關閉後會隱藏標題與除錯主控台按鈕,讓整個畫面都用來顯示面板';
+
+  @override
+  String get buttonLabelsToggleTitle => '按鈕文字標籤';
+
+  @override
+  String get buttonLabelsToggleSubtitle => '關閉後按鈕格會變成正方形,並讓圖示填滿整個格子';
+
+  @override
+  String get pageDotsToggleTitle => '頁面圓點';
+
+  @override
+  String get pageDotsToggleSubtitle => '關閉後會隱藏多頁面板下方的頁面指示器——仍然可以滑動切換頁面';
+
+  @override
+  String get backgroundImageSectionHeader => '背景圖片';
+
+  @override
+  String get chooseImageAction => '選擇圖片…';
+
+  @override
+  String get changeImageAction => '更換…';
+
+  @override
+  String get removeImageAction => '移除';
+
+  @override
+  String get opacityLabel => '不透明度';
+
+  @override
+  String get backgroundFitCover => '填滿螢幕';
+
+  @override
+  String get backgroundFitContain => '完整顯示圖片';
+
+  @override
+  String get backgroundFitStretch => '拉伸';
+
+  @override
+  String get gridSectionHeader => '格線';
+
+  @override
+  String get columnsLabel => '欄數';
+
+  @override
+  String get rowsLabel => '列數';
+
+  @override
+  String get pagesLabel => '頁數';
+
+  @override
+  String get backupSectionHeader => '備份';
+
+  @override
+  String get exportSettingsTitle => '匯出設定…';
+
+  @override
+  String get exportSettingsSubtitle => '將外觀、版面配置與自訂圖示儲存成檔案';
+
+  @override
+  String get importSettingsTitle => '匯入設定…';
+
+  @override
+  String get importSettingsSubtitle => '以備份檔取代目前的設定';
+
+  @override
+  String get serviceDetailsTitle => '服務詳細資訊';
+
+  @override
+  String get serviceDetailsSubtitle => '廣播狀態、已連線裝置、活動紀錄';
 }

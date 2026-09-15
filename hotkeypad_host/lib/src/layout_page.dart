@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import 'app_launcher.dart';
 import 'backup_store.dart';
 import 'background_image_store.dart';
@@ -316,6 +317,23 @@ class LayoutPage extends StatefulWidget {
   State<LayoutPage> createState() => _LayoutPageState();
 }
 
+/// [DeckTheme.label] is a wire/debug string shared with the client and the
+/// protocol tests, not UI copy, so the Settings dialog maps it to a
+/// localized label here instead of showing it directly.
+String _themeLabel(AppLocalizations l10n, DeckTheme theme) => switch (theme) {
+  DeckTheme.system => l10n.themeSystem,
+  DeckTheme.light => l10n.themeLight,
+  DeckTheme.dark => l10n.themeDark,
+};
+
+/// Same reasoning as [_themeLabel], for [BackgroundFit.label].
+String _backgroundFitLabel(AppLocalizations l10n, BackgroundFit fit) =>
+    switch (fit) {
+      BackgroundFit.cover => l10n.backgroundFitCover,
+      BackgroundFit.contain => l10n.backgroundFitContain,
+      BackgroundFit.stretch => l10n.backgroundFitStretch,
+    };
+
 class _LayoutPageState extends State<LayoutPage> {
   DeckLayout _layout = DeckLayout.empty();
   DeckTheme _theme = DeckTheme.system;
@@ -431,8 +449,10 @@ class _LayoutPageState extends State<LayoutPage> {
     await showDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Settings'),
+        builder: (context, setDialogState) {
+          final l10n = AppLocalizations.of(context)!;
+          return AlertDialog(
+          title: Text(l10n.settingsTitle),
           // A short window (or a tall grid — many pages, custom icons, an
           // export/import section, the service-details link all stacked
           // in one Column) easily runs out of vertical room: the dialog
@@ -454,14 +474,17 @@ class _LayoutPageState extends State<LayoutPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Appearance',
+                    l10n.appearanceSectionHeader,
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
                   const SizedBox(height: 8),
                   SegmentedButton<DeckTheme>(
                     segments: [
                       for (final theme in DeckTheme.values)
-                        ButtonSegment(value: theme, label: Text(theme.label)),
+                        ButtonSegment(
+                          value: theme,
+                          label: Text(_themeLabel(l10n, theme)),
+                        ),
                     ],
                     selected: {_theme},
                     showSelectedIcon: false,
@@ -478,11 +501,8 @@ class _LayoutPageState extends State<LayoutPage> {
                       setDialogState(() {});
                       _setAppearance(showAppBar: value);
                     },
-                    title: const Text('App bar'),
-                    subtitle: const Text(
-                      'Off hides the title and debug console button, and '
-                      'gives the whole screen to the deck',
-                    ),
+                    title: Text(l10n.appBarToggleTitle),
+                    subtitle: Text(l10n.appBarToggleSubtitle),
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
@@ -491,10 +511,8 @@ class _LayoutPageState extends State<LayoutPage> {
                       setDialogState(() {});
                       _setAppearance(showLabels: value);
                     },
-                    title: const Text('Button labels'),
-                    subtitle: const Text(
-                      'Off makes cells square and lets the icon fill them',
-                    ),
+                    title: Text(l10n.buttonLabelsToggleTitle),
+                    subtitle: Text(l10n.buttonLabelsToggleSubtitle),
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
@@ -503,15 +521,12 @@ class _LayoutPageState extends State<LayoutPage> {
                       setDialogState(() {});
                       _setAppearance(showPageDots: value);
                     },
-                    title: const Text('Page dots'),
-                    subtitle: const Text(
-                      'Off hides the page indicator below a multi-page deck '
-                      '— swiping between pages still works',
-                    ),
+                    title: Text(l10n.pageDotsToggleTitle),
+                    subtitle: Text(l10n.pageDotsToggleSubtitle),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Background image',
+                    l10n.backgroundImageSectionHeader,
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
                   const SizedBox(height: 8),
@@ -527,7 +542,7 @@ class _LayoutPageState extends State<LayoutPage> {
                     opacity: _backgroundImageId == null ? 0.5 : 1,
                     child: Row(
                       children: [
-                        const Text('Opacity'),
+                        Text(l10n.opacityLabel),
                         Expanded(
                           child: Slider(
                             value: _backgroundOpacity,
@@ -549,7 +564,10 @@ class _LayoutPageState extends State<LayoutPage> {
                     child: SegmentedButton<BackgroundFit>(
                       segments: [
                         for (final fit in BackgroundFit.values)
-                          ButtonSegment(value: fit, label: Text(fit.label)),
+                          ButtonSegment(
+                            value: fit,
+                            label: Text(_backgroundFitLabel(l10n, fit)),
+                          ),
                       ],
                       selected: {_backgroundFit},
                       showSelectedIcon: false,
@@ -562,10 +580,13 @@ class _LayoutPageState extends State<LayoutPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text('Grid', style: Theme.of(context).textTheme.labelLarge),
+                  Text(
+                    l10n.gridSectionHeader,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
                   const SizedBox(height: 4),
                   _NumberStepper(
-                    label: 'Columns',
+                    label: l10n.columnsLabel,
                     value: _layout.columns,
                     onChanged: (value) async {
                       await _resize(columns: value);
@@ -573,7 +594,7 @@ class _LayoutPageState extends State<LayoutPage> {
                     },
                   ),
                   _NumberStepper(
-                    label: 'Rows',
+                    label: l10n.rowsLabel,
                     value: _layout.rows,
                     onChanged: (value) async {
                       await _resize(rows: value);
@@ -581,7 +602,7 @@ class _LayoutPageState extends State<LayoutPage> {
                     },
                   ),
                   _NumberStepper(
-                    label: 'Pages',
+                    label: l10n.pagesLabel,
                     value: _layout.pages,
                     max: DeckLayout.maxPages,
                     onChanged: (value) async {
@@ -590,7 +611,10 @@ class _LayoutPageState extends State<LayoutPage> {
                     },
                   ),
                   const Divider(height: 32),
-                  Text('Backup', style: Theme.of(context).textTheme.labelLarge),
+                  Text(
+                    l10n.backupSectionHeader,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
                   const SizedBox(height: 4),
                   // Two entry points rather than one "Backup..." tile with a
                   // sub-choice: export is safe to tap on a whim and import is
@@ -599,10 +623,8 @@ class _LayoutPageState extends State<LayoutPage> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.upload_outlined),
-                    title: const Text('Export settings...'),
-                    subtitle: const Text(
-                      'Save appearance, layout, and custom icons to a file',
-                    ),
+                    title: Text(l10n.exportSettingsTitle),
+                    subtitle: Text(l10n.exportSettingsSubtitle),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).pop();
@@ -612,10 +634,8 @@ class _LayoutPageState extends State<LayoutPage> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.download_outlined),
-                    title: const Text('Import settings...'),
-                    subtitle: const Text(
-                      'Replace the current setup from a backup file',
-                    ),
+                    title: Text(l10n.importSettingsTitle),
+                    subtitle: Text(l10n.importSettingsSubtitle),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).pop();
@@ -628,10 +648,8 @@ class _LayoutPageState extends State<LayoutPage> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.bug_report_outlined),
-                    title: const Text('Service details'),
-                    subtitle: const Text(
-                      'Advertising state, connected clients, activity log',
-                    ),
+                    title: Text(l10n.serviceDetailsTitle),
+                    subtitle: Text(l10n.serviceDetailsSubtitle),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).pop();
@@ -645,10 +663,11 @@ class _LayoutPageState extends State<LayoutPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
+              child: Text(l10n.done),
             ),
           ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -784,6 +803,7 @@ class _LayoutPageState extends State<LayoutPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -792,7 +812,7 @@ class _LayoutPageState extends State<LayoutPage> {
           child: Row(
             children: [
               Text(
-                'Deck layout',
+                l10n.deckLayoutTitle,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const Spacer(),
@@ -804,7 +824,7 @@ class _LayoutPageState extends State<LayoutPage> {
                   onChanged: widget.onLockChanged,
                 ),
               IconButton(
-                tooltip: 'Settings',
+                tooltip: l10n.settingsTitle,
                 onPressed: _openSettings,
                 icon: const Icon(Icons.settings_outlined),
               ),
@@ -814,8 +834,7 @@ class _LayoutPageState extends State<LayoutPage> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'Click a cell to choose what it does. Drag a button to move it, '
-            'including onto another page.',
+            l10n.deckLayoutHint,
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
@@ -1670,13 +1689,15 @@ class _BackgroundPickerState extends State<BackgroundPicker> {
               OutlinedButton(
                 onPressed: _pick,
                 child: Text(
-                  widget.imageId == null ? 'Choose image...' : 'Change...',
+                  widget.imageId == null
+                      ? AppLocalizations.of(context)!.chooseImageAction
+                      : AppLocalizations.of(context)!.changeImageAction,
                 ),
               ),
               if (widget.imageId != null)
                 TextButton(
                   onPressed: () => widget.onChanged(null),
-                  child: const Text('Remove'),
+                  child: Text(AppLocalizations.of(context)!.removeImageAction),
                 ),
             ],
           ),

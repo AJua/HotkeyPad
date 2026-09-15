@@ -83,5 +83,101 @@
   "@scanToConnect": {"description": "QR code dialog title."},
 
   "done": "Done",
-  "@done": {"description": "QR code dialog close button."}
+  "@done": {"description": "Generic dialog close button labeled 'Done'."},
+
+  "deckLayoutTitle": "Deck layout",
+  "@deckLayoutTitle": {"description": "Deck layout screen's heading."},
+
+  "deckLayoutHint": "Click a cell to choose what it does. Drag a button to move it, including onto another page.",
+  "@deckLayoutHint": {"description": "Deck layout screen's instructional subtitle."},
+
+  "settingsTitle": "Settings",
+  "@settingsTitle": {"description": "Tooltip on the settings gear icon, and the Settings dialog's title."},
+
+  "appearanceSectionHeader": "Appearance",
+  "@appearanceSectionHeader": {"description": "Settings dialog section header."},
+
+  "themeSystem": "System",
+  "@themeSystem": {"description": "Appearance option that follows the OS light/dark setting."},
+
+  "themeLight": "Light",
+  "@themeLight": {"description": "Appearance option for the light theme."},
+
+  "themeDark": "Dark",
+  "@themeDark": {"description": "Appearance option for the dark theme."},
+
+  "appBarToggleTitle": "App bar",
+  "@appBarToggleTitle": {"description": "Settings switch title."},
+
+  "appBarToggleSubtitle": "Off hides the title and debug console button, and gives the whole screen to the deck",
+  "@appBarToggleSubtitle": {"description": "Settings switch subtitle."},
+
+  "buttonLabelsToggleTitle": "Button labels",
+  "@buttonLabelsToggleTitle": {"description": "Settings switch title."},
+
+  "buttonLabelsToggleSubtitle": "Off makes cells square and lets the icon fill them",
+  "@buttonLabelsToggleSubtitle": {"description": "Settings switch subtitle."},
+
+  "pageDotsToggleTitle": "Page dots",
+  "@pageDotsToggleTitle": {"description": "Settings switch title."},
+
+  "pageDotsToggleSubtitle": "Off hides the page indicator below a multi-page deck — swiping between pages still works",
+  "@pageDotsToggleSubtitle": {"description": "Settings switch subtitle."},
+
+  "backgroundImageSectionHeader": "Background image",
+  "@backgroundImageSectionHeader": {"description": "Settings dialog section header."},
+
+  "chooseImageAction": "Choose image...",
+  "@chooseImageAction": {"description": "Button that opens a file picker when no background image is set."},
+
+  "changeImageAction": "Change...",
+  "@changeImageAction": {"description": "Button that opens a file picker when a background image is already set."},
+
+  "removeImageAction": "Remove",
+  "@removeImageAction": {"description": "Button that clears the background image."},
+
+  "opacityLabel": "Opacity",
+  "@opacityLabel": {"description": "Label on the background image opacity slider."},
+
+  "backgroundFitCover": "Fill screen",
+  "@backgroundFitCover": {"description": "Background image scaling option that crops to fill the screen."},
+
+  "backgroundFitContain": "Fit whole image",
+  "@backgroundFitContain": {"description": "Background image scaling option that shows the whole image, letterboxed."},
+
+  "backgroundFitStretch": "Stretch",
+  "@backgroundFitStretch": {"description": "Background image scaling option that stretches to fill the screen."},
+
+  "gridSectionHeader": "Grid",
+  "@gridSectionHeader": {"description": "Settings dialog section header."},
+
+  "columnsLabel": "Columns",
+  "@columnsLabel": {"description": "Grid size stepper label."},
+
+  "rowsLabel": "Rows",
+  "@rowsLabel": {"description": "Grid size stepper label."},
+
+  "pagesLabel": "Pages",
+  "@pagesLabel": {"description": "Grid size stepper label."},
+
+  "backupSectionHeader": "Backup",
+  "@backupSectionHeader": {"description": "Settings dialog section header."},
+
+  "exportSettingsTitle": "Export settings...",
+  "@exportSettingsTitle": {"description": "Settings dialog list tile title."},
+
+  "exportSettingsSubtitle": "Save appearance, layout, and custom icons to a file",
+  "@exportSettingsSubtitle": {"description": "Settings dialog list tile subtitle."},
+
+  "importSettingsTitle": "Import settings...",
+  "@importSettingsTitle": {"description": "Settings dialog list tile title."},
+
+  "importSettingsSubtitle": "Replace the current setup from a backup file",
+  "@importSettingsSubtitle": {"description": "Settings dialog list tile subtitle."},
+
+  "serviceDetailsTitle": "Service details",
+  "@serviceDetailsTitle": {"description": "Settings dialog list tile title."},
+
+  "serviceDetailsSubtitle": "Advertising state, connected clients, activity log",
+  "@serviceDetailsSubtitle": {"description": "Settings dialog list tile subtitle."}
 }

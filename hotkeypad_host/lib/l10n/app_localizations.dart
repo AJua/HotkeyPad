@@ -239,11 +239,203 @@ abstract class AppLocalizations {
   /// **'Scan to connect'**
   String get scanToConnect;
 
-  /// QR code dialog close button.
+  /// Generic dialog close button labeled 'Done'.
   ///
   /// In en, this message translates to:
   /// **'Done'**
   String get done;
+
+  /// Deck layout screen's heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Deck layout'**
+  String get deckLayoutTitle;
+
+  /// Deck layout screen's instructional subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Click a cell to choose what it does. Drag a button to move it, including onto another page.'**
+  String get deckLayoutHint;
+
+  /// Tooltip on the settings gear icon, and the Settings dialog's title.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// Settings dialog section header.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get appearanceSectionHeader;
+
+  /// Appearance option that follows the OS light/dark setting.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get themeSystem;
+
+  /// Appearance option for the light theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// Appearance option for the dark theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// Settings switch title.
+  ///
+  /// In en, this message translates to:
+  /// **'App bar'**
+  String get appBarToggleTitle;
+
+  /// Settings switch subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Off hides the title and debug console button, and gives the whole screen to the deck'**
+  String get appBarToggleSubtitle;
+
+  /// Settings switch title.
+  ///
+  /// In en, this message translates to:
+  /// **'Button labels'**
+  String get buttonLabelsToggleTitle;
+
+  /// Settings switch subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Off makes cells square and lets the icon fill them'**
+  String get buttonLabelsToggleSubtitle;
+
+  /// Settings switch title.
+  ///
+  /// In en, this message translates to:
+  /// **'Page dots'**
+  String get pageDotsToggleTitle;
+
+  /// Settings switch subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Off hides the page indicator below a multi-page deck — swiping between pages still works'**
+  String get pageDotsToggleSubtitle;
+
+  /// Settings dialog section header.
+  ///
+  /// In en, this message translates to:
+  /// **'Background image'**
+  String get backgroundImageSectionHeader;
+
+  /// Button that opens a file picker when no background image is set.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose image...'**
+  String get chooseImageAction;
+
+  /// Button that opens a file picker when a background image is already set.
+  ///
+  /// In en, this message translates to:
+  /// **'Change...'**
+  String get changeImageAction;
+
+  /// Button that clears the background image.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeImageAction;
+
+  /// Label on the background image opacity slider.
+  ///
+  /// In en, this message translates to:
+  /// **'Opacity'**
+  String get opacityLabel;
+
+  /// Background image scaling option that crops to fill the screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill screen'**
+  String get backgroundFitCover;
+
+  /// Background image scaling option that shows the whole image, letterboxed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit whole image'**
+  String get backgroundFitContain;
+
+  /// Background image scaling option that stretches to fill the screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Stretch'**
+  String get backgroundFitStretch;
+
+  /// Settings dialog section header.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get gridSectionHeader;
+
+  /// Grid size stepper label.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get columnsLabel;
+
+  /// Grid size stepper label.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get rowsLabel;
+
+  /// Grid size stepper label.
+  ///
+  /// In en, this message translates to:
+  /// **'Pages'**
+  String get pagesLabel;
+
+  /// Settings dialog section header.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get backupSectionHeader;
+
+  /// Settings dialog list tile title.
+  ///
+  /// In en, this message translates to:
+  /// **'Export settings...'**
+  String get exportSettingsTitle;
+
+  /// Settings dialog list tile subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save appearance, layout, and custom icons to a file'**
+  String get exportSettingsSubtitle;
+
+  /// Settings dialog list tile title.
+  ///
+  /// In en, this message translates to:
+  /// **'Import settings...'**
+  String get importSettingsTitle;
+
+  /// Settings dialog list tile subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace the current setup from a backup file'**
+  String get importSettingsSubtitle;
+
+  /// Settings dialog list tile title.
+  ///
+  /// In en, this message translates to:
+  /// **'Service details'**
+  String get serviceDetailsTitle;
+
+  /// Settings dialog list tile subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Advertising state, connected clients, activity log'**
+  String get serviceDetailsSubtitle;
 }
 
 class _AppLocalizationsDelegate

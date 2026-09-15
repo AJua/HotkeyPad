@@ -88,4 +88,107 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get done => 'Done';
+
+  @override
+  String get deckLayoutTitle => 'Deck layout';
+
+  @override
+  String get deckLayoutHint =>
+      'Click a cell to choose what it does. Drag a button to move it, including onto another page.';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get appearanceSectionHeader => 'Appearance';
+
+  @override
+  String get themeSystem => 'System';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get appBarToggleTitle => 'App bar';
+
+  @override
+  String get appBarToggleSubtitle =>
+      'Off hides the title and debug console button, and gives the whole screen to the deck';
+
+  @override
+  String get buttonLabelsToggleTitle => 'Button labels';
+
+  @override
+  String get buttonLabelsToggleSubtitle =>
+      'Off makes cells square and lets the icon fill them';
+
+  @override
+  String get pageDotsToggleTitle => 'Page dots';
+
+  @override
+  String get pageDotsToggleSubtitle =>
+      'Off hides the page indicator below a multi-page deck — swiping between pages still works';
+
+  @override
+  String get backgroundImageSectionHeader => 'Background image';
+
+  @override
+  String get chooseImageAction => 'Choose image...';
+
+  @override
+  String get changeImageAction => 'Change...';
+
+  @override
+  String get removeImageAction => 'Remove';
+
+  @override
+  String get opacityLabel => 'Opacity';
+
+  @override
+  String get backgroundFitCover => 'Fill screen';
+
+  @override
+  String get backgroundFitContain => 'Fit whole image';
+
+  @override
+  String get backgroundFitStretch => 'Stretch';
+
+  @override
+  String get gridSectionHeader => 'Grid';
+
+  @override
+  String get columnsLabel => 'Columns';
+
+  @override
+  String get rowsLabel => 'Rows';
+
+  @override
+  String get pagesLabel => 'Pages';
+
+  @override
+  String get backupSectionHeader => 'Backup';
+
+  @override
+  String get exportSettingsTitle => 'Export settings...';
+
+  @override
+  String get exportSettingsSubtitle =>
+      'Save appearance, layout, and custom icons to a file';
+
+  @override
+  String get importSettingsTitle => 'Import settings...';
+
+  @override
+  String get importSettingsSubtitle =>
+      'Replace the current setup from a backup file';
+
+  @override
+  String get serviceDetailsTitle => 'Service details';
+
+  @override
+  String get serviceDetailsSubtitle =>
+      'Advertising state, connected clients, activity log';
 }

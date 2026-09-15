@@ -88,4 +88,103 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get done => '完了';
+
+  @override
+  String get deckLayoutTitle => 'デッキレイアウト';
+
+  @override
+  String get deckLayoutHint =>
+      'セルをクリックして機能を選択します。ボタンをドラッグすると移動できます(別のページへの移動も可能です)。';
+
+  @override
+  String get settingsTitle => '設定';
+
+  @override
+  String get appearanceSectionHeader => '外観';
+
+  @override
+  String get themeSystem => '自動';
+
+  @override
+  String get themeLight => 'ライト';
+
+  @override
+  String get themeDark => 'ダーク';
+
+  @override
+  String get appBarToggleTitle => 'アプリバー';
+
+  @override
+  String get appBarToggleSubtitle =>
+      'オフにするとタイトルとデバッグコンソールボタンが非表示になり、画面全体がデッキに使われます';
+
+  @override
+  String get buttonLabelsToggleTitle => 'ボタンラベル';
+
+  @override
+  String get buttonLabelsToggleSubtitle => 'オフにするとセルが正方形になり、アイコンがセル全体を埋めます';
+
+  @override
+  String get pageDotsToggleTitle => 'ページドット';
+
+  @override
+  String get pageDotsToggleSubtitle =>
+      'オフにすると複数ページのデッキ下部のページインジケーターが非表示になります(ページ間のスワイプは引き続き機能します)';
+
+  @override
+  String get backgroundImageSectionHeader => '背景画像';
+
+  @override
+  String get chooseImageAction => '画像を選択…';
+
+  @override
+  String get changeImageAction => '変更…';
+
+  @override
+  String get removeImageAction => '削除';
+
+  @override
+  String get opacityLabel => '不透明度';
+
+  @override
+  String get backgroundFitCover => '画面いっぱいに表示';
+
+  @override
+  String get backgroundFitContain => '画像全体を表示';
+
+  @override
+  String get backgroundFitStretch => '引き伸ばす';
+
+  @override
+  String get gridSectionHeader => 'グリッド';
+
+  @override
+  String get columnsLabel => '列';
+
+  @override
+  String get rowsLabel => '行';
+
+  @override
+  String get pagesLabel => 'ページ数';
+
+  @override
+  String get backupSectionHeader => 'バックアップ';
+
+  @override
+  String get exportSettingsTitle => '設定をエクスポート…';
+
+  @override
+  String get exportSettingsSubtitle => '外観、レイアウト、カスタムアイコンをファイルに保存します';
+
+  @override
+  String get importSettingsTitle => '設定をインポート…';
+
+  @override
+  String get importSettingsSubtitle => 'バックアップファイルで現在の設定を置き換えます';
+
+  @override
+  String get serviceDetailsTitle => 'サービスの詳細';
+
+  @override
+  String get serviceDetailsSubtitle => 'アドバタイズ状態、接続中のデバイス、アクティビティログ';
 }
