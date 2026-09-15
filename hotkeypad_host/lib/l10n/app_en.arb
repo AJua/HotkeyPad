@@ -1,0 +1,87 @@
+{
+  "@@locale": "en",
+
+  "serviceTitle": "Service",
+  "@serviceTitle": {"description": "Service screen's app bar title."},
+
+  "backToDeck": "Back to the deck",
+  "@backToDeck": {"description": "Tooltip on the service screen's back button."},
+
+  "language": "Language",
+  "@language": {"description": "Tooltip on the language-picker button."},
+
+  "systemDefaultLanguage": "System default",
+  "@systemDefaultLanguage": {"description": "Option in the language picker that follows the OS language."},
+
+  "accessibilityNotGranted": "Accessibility is not granted",
+  "@accessibilityNotGranted": {"description": "Warning card title."},
+
+  "accessibilityNotGrantedBody": "Media keys and key combinations will do nothing until this app is allowed in System Settings",
+  "@accessibilityNotGrantedBody": {"description": "Warning card body."},
+
+  "grant": "Grant",
+  "@grant": {"description": "Button requesting the Accessibility permission."},
+
+  "connectedClients": "Connected clients ({count})",
+  "@connectedClients": {
+    "description": "Section header.",
+    "placeholders": {"count": {"type": "int"}}
+  },
+
+  "noClientConnected": "No client has connected yet.",
+  "@noClientConnected": {"description": "Empty state for the connected-clients list."},
+
+  "notifySubscribed": "Notify {count} subscribed client(s)",
+  "@notifySubscribed": {
+    "description": "Broadcast message field hint, at least one client subscribed.",
+    "placeholders": {"count": {"type": "int"}}
+  },
+
+  "noSubscribedClient": "No subscribed client yet",
+  "@noSubscribedClient": {"description": "Broadcast message field hint, no client subscribed."},
+
+  "activity": "Activity",
+  "@activity": {"description": "Section header for the debug log."},
+
+  "nothingYet": "Nothing yet.",
+  "@nothingYet": {"description": "Empty state for the activity log."},
+
+  "wifiPinNewDevice": "{name} wants to connect over WiFi — code:",
+  "@wifiPinNewDevice": {
+    "description": "WiFi pairing banner, before the PIN itself.",
+    "placeholders": {"name": {"type": "String"}}
+  },
+
+  "newDeviceFallback": "A new device",
+  "@newDeviceFallback": {"description": "Used in place of a name the connecting device didn't give."},
+
+  "wifiPinReject": "Reject — don't let this device connect",
+  "@wifiPinReject": {"description": "Tooltip on the WiFi pairing banner's close button."},
+
+  "updateAvailable": "HotkeyPad Host {version} is available.",
+  "@updateAvailable": {
+    "description": "Update banner text.",
+    "placeholders": {"version": {"type": "String"}}
+  },
+
+  "viewAction": "View",
+  "@viewAction": {"description": "Update banner button opening the release page."},
+
+  "dismiss": "Dismiss",
+  "@dismiss": {"description": "Tooltip on the update banner's close button."},
+
+  "pairViaQr": "Pair via QR",
+  "@pairViaQr": {"description": "QR pairing card title."},
+
+  "pairViaQrSubtitle": "Scan with the HotkeyPad app to connect",
+  "@pairViaQrSubtitle": {"description": "QR pairing card subtitle."},
+
+  "show": "Show",
+  "@show": {"description": "Button revealing the QR code."},
+
+  "scanToConnect": "Scan to connect",
+  "@scanToConnect": {"description": "QR code dialog title."},
+
+  "done": "Done",
+  "@done": {"description": "QR code dialog close button."}
+}

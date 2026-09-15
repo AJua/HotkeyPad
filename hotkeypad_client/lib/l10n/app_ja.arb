@@ -36,5 +36,7 @@
   "pointCameraAtQr": "host に表示されている QR コードにカメラを向けてください",
   "invalidHostQr": "これは HotkeyPad host の QR コードではありません",
   "cameraPermissionDenied": "QR コードのスキャンにはカメラへのアクセスが必要です",
-  "openSettings": "設定を開く"
+  "openSettings": "設定を開く",
+  "language": "言語",
+  "systemDefaultLanguage": "システム標準"
 }

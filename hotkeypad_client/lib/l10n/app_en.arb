@@ -125,5 +125,11 @@
   "@cameraPermissionDenied": {"description": "Shown when camera permission is refused."},
 
   "openSettings": "Open settings",
-  "@openSettings": {"description": "Button to open the system settings app."}
+  "@openSettings": {"description": "Button to open the system settings app."},
+
+  "language": "Language",
+  "@language": {"description": "Tooltip on the app bar's language-picker button."},
+
+  "systemDefaultLanguage": "System default",
+  "@systemDefaultLanguage": {"description": "Option in the language picker that follows the phone's own language."}
 }

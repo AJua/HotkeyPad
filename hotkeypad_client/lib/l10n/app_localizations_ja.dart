@@ -125,4 +125,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get openSettings => '設定を開く';
+
+  @override
+  String get language => '言語';
+
+  @override
+  String get systemDefaultLanguage => 'システム標準';
 }

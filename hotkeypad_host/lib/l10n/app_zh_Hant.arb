@@ -1,0 +1,28 @@
+{
+  "@@locale": "zh_Hant",
+
+  "serviceTitle": "服務",
+  "backToDeck": "返回面板",
+  "language": "語言",
+  "systemDefaultLanguage": "跟隨系統",
+  "accessibilityNotGranted": "尚未授予輔助使用權限",
+  "accessibilityNotGrantedBody": "在系統設定中允許這個 App 之前,媒體鍵與組合鍵都不會有作用",
+  "grant": "授予權限",
+  "connectedClients": "已連線裝置({count})",
+  "noClientConnected": "目前還沒有裝置連線。",
+  "notifySubscribed": "通知 {count} 個已訂閱的裝置",
+  "noSubscribedClient": "目前沒有已訂閱的裝置",
+  "activity": "活動紀錄",
+  "nothingYet": "還沒有任何紀錄。",
+  "wifiPinNewDevice": "{name} 想要透過 WiFi 連線——代碼:",
+  "newDeviceFallback": "有新裝置",
+  "wifiPinReject": "拒絕——不允許這個裝置連線",
+  "updateAvailable": "有新版本 HotkeyPad Host {version} 可以更新。",
+  "viewAction": "查看",
+  "dismiss": "關閉",
+  "pairViaQr": "以 QR Code 配對",
+  "pairViaQrSubtitle": "用 HotkeyPad App 掃描即可連線",
+  "show": "顯示",
+  "scanToConnect": "掃描以連線",
+  "done": "完成"
+}

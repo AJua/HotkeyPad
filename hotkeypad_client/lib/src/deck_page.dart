@@ -13,6 +13,7 @@ import 'debug_page.dart';
 import 'edge_bar.dart';
 import 'host_history_store.dart';
 import 'link_target.dart';
+import 'locale_store.dart';
 import 'qr_scan_page.dart';
 import 'safe_insets.dart';
 import 'deck_icons.dart';
@@ -37,10 +38,23 @@ int resolveManualPort(String input) {
 /// one: there is normally exactly one Mac to talk to, and choosing it from a
 /// list of every radio in the room is a chore, not a feature.
 class DeckPage extends StatefulWidget {
-  const DeckPage({super.key, required this.onTheme});
+  const DeckPage({
+    super.key,
+    required this.onTheme,
+    required this.locale,
+    required this.onLocale,
+  });
 
   /// Reports the appearance the host asked for, so the app can apply it.
   final ValueChanged<DeckTheme> onTheme;
+
+  /// The user's own manually-picked language, if any — see
+  /// [HotkeyPadClientApp]'s field of the same name. Threaded down (rather
+  /// than read fresh from [LocaleStore] wherever it's needed) so the
+  /// language-picker button and [MaterialApp] always agree on what's
+  /// currently selected without a second source of truth.
+  final Locale? locale;
+  final ValueChanged<Locale?> onLocale;
 
   @override
   State<DeckPage> createState() => _DeckPageState();
@@ -372,7 +386,12 @@ class _DeckPageState extends State<DeckPage> {
           leading: _appIcon(onTap: _jumpToFirstPage),
           actions: [
             IconButton(
-              tooltip: 'Debug console',
+              tooltip: AppLocalizations.of(context)!.language,
+              onPressed: () => _showLanguagePicker(context),
+              icon: const Icon(Icons.language),
+            ),
+            IconButton(
+              tooltip: AppLocalizations.of(context)!.debugConsole,
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => DebugPage(session: session)),
               ),
@@ -481,6 +500,44 @@ class _DeckPageState extends State<DeckPage> {
     );
   }
 
+  /// Entirely client-side — see [HotkeyPadClientApp._locale]'s doc
+  /// comment on why this is never sent to or learned from the host.
+  /// Each option's own label is written in that language itself, not
+  /// run through [AppLocalizations], so someone who can't read the
+  /// app's *current* language can still recognize and pick their own —
+  /// the one line in this sheet that *is* localized is "System default"
+  /// itself, since that's a concept, not a language name.
+  Future<void> _showLanguagePicker(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final current = widget.locale;
+    Widget option(Locale? locale, String label) =>
+        RadioListTile<Locale?>(value: locale, title: Text(label));
+    final result = await showModalBottomSheet<({bool picked, Locale? locale})>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: RadioGroup<Locale?>(
+          groupValue: current,
+          onChanged: (value) =>
+              Navigator.of(context).pop((picked: true, locale: value)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              option(null, l10n.systemDefaultLanguage),
+              option(const Locale('en'), 'English'),
+              option(
+                const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+                '繁體中文',
+              ),
+              option(const Locale('ja'), '日本語'),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (result != null && result.picked) widget.onLocale(result.locale);
+  }
+
   Widget _searchScaffold(BuildContext context) {
     final error = _searchError;
     final l10n = AppLocalizations.of(context)!;
@@ -489,6 +546,11 @@ class _DeckPageState extends State<DeckPage> {
       title: 'HotkeyPad',
       leading: _appIcon(),
       actions: [
+        IconButton(
+          tooltip: l10n.language,
+          onPressed: () => _showLanguagePicker(context),
+          icon: const Icon(Icons.language),
+        ),
         IconButton(
           tooltip: l10n.debugConsole,
           onPressed: () => Navigator.of(context).push(

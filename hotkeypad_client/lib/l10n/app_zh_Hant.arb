@@ -36,5 +36,7 @@
   "pointCameraAtQr": "將相機對準 host 上顯示的 QR Code",
   "invalidHostQr": "這不是 HotkeyPad host 的 QR Code",
   "cameraPermissionDenied": "需要相機權限才能掃描 QR Code",
-  "openSettings": "開啟設定"
+  "openSettings": "開啟設定",
+  "language": "語言",
+  "systemDefaultLanguage": "跟隨系統"
 }

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../l10n/app_localizations.dart';
 import 'app_launcher.dart';
 import 'background_image_store.dart';
 import 'command_runner.dart';
@@ -16,6 +17,7 @@ import 'custom_icon_store.dart';
 import 'host_identity.dart';
 import 'layout_page.dart';
 import 'layout_store.dart';
+import 'locale_store.dart';
 import 'media_control.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'settings_store.dart';
@@ -183,10 +185,22 @@ class ConnectedClient {
 }
 
 class HostPage extends StatefulWidget {
-  const HostPage({super.key, required this.onThemeChanged});
+  const HostPage({
+    super.key,
+    required this.onThemeChanged,
+    required this.locale,
+    required this.onLocale,
+  });
 
   /// Lets the app above re-dress itself when the theme is changed here.
   final ValueChanged<DeckTheme> onThemeChanged;
+
+  /// The user's own manually-picked language, if any — see
+  /// [LocaleStore]'s doc comment. Threaded down rather than read fresh
+  /// from the store wherever it's needed, so the language-picker button
+  /// and [MaterialApp] always agree on what's currently selected.
+  final Locale? locale;
+  final ValueChanged<Locale?> onLocale;
 
   @override
   State<HostPage> createState() => _HostPageState();
@@ -338,6 +352,44 @@ class _HostPageState extends State<HostPage> {
   Future<void> _dismissUpdate(LatestRelease release) async {
     await UpdateStore.dismiss(release.version);
     if (mounted) setState(() => _updateAvailable = null);
+  }
+
+  /// Entirely host-side — see [LocaleStore]'s doc comment on why this is
+  /// never synced with the client's own language setting. Each option's
+  /// own label is written in that language itself, not run through
+  /// [AppLocalizations], so someone who can't read the app's *current*
+  /// language can still recognize and pick their own — the one line in
+  /// this sheet that *is* localized is "System default" itself, since
+  /// that's a concept, not a language name.
+  Future<void> _showLanguagePicker(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final current = widget.locale;
+    Widget option(Locale? locale, String label) =>
+        RadioListTile<Locale?>(value: locale, title: Text(label));
+    final result = await showModalBottomSheet<({bool picked, Locale? locale})>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: RadioGroup<Locale?>(
+          groupValue: current,
+          onChanged: (value) =>
+              Navigator.of(context).pop((picked: true, locale: value)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              option(null, l10n.systemDefaultLanguage),
+              option(const Locale('en'), 'English'),
+              option(
+                const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+                '繁體中文',
+              ),
+              option(const Locale('ja'), '日本語'),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (result != null && result.picked) widget.onLocale(result.locale);
   }
 
   Future<void> _refreshAccessibility() async {
@@ -1164,14 +1216,22 @@ class _HostPageState extends State<HostPage> {
     final subscribedCount = clients.where((c) => c.subscribed).length;
 
     if (_showingService) {
+      final l10n = AppLocalizations.of(context)!;
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Service'),
+          title: Text(l10n.serviceTitle),
           leading: IconButton(
-            tooltip: 'Back to the deck',
+            tooltip: l10n.backToDeck,
             onPressed: () => setState(() => _showingService = false),
             icon: const Icon(Icons.arrow_back),
           ),
+          actions: [
+            IconButton(
+              tooltip: l10n.language,
+              onPressed: () => _showLanguagePicker(context),
+              icon: const Icon(Icons.language),
+            ),
+          ],
         ),
         body: Column(
           children: [
@@ -1226,6 +1286,7 @@ class _HostPageState extends State<HostPage> {
   /// click. The (X) is for a device the user does not recognize at all.
   Widget _wifiPinBanner(BuildContext context) {
     if (_pendingWifiPins.isEmpty) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final onContainer = theme.colorScheme.onPrimaryContainer;
     return Material(
@@ -1251,8 +1312,7 @@ class _HostPageState extends State<HostPage> {
                           children: [
                             TextSpan(
                               text:
-                                  '${pending.name?.isNotEmpty == true ? pending.name : 'A new device'} '
-                                  'wants to connect over WiFi — code: ',
+                                  '${l10n.wifiPinNewDevice(pending.name?.isNotEmpty == true ? pending.name! : l10n.newDeviceFallback)} ',
                             ),
                             TextSpan(
                               text: pending.pin,
@@ -1266,7 +1326,7 @@ class _HostPageState extends State<HostPage> {
                       ),
                     ),
                     IconButton(
-                      tooltip: "Reject — don't let this device connect",
+                      tooltip: l10n.wifiPinReject,
                       icon: Icon(Icons.close, color: onContainer),
                       onPressed: () => _rejectPendingWifiPin(pending),
                     ),
@@ -1285,6 +1345,7 @@ class _HostPageState extends State<HostPage> {
   Widget _updateBanner(BuildContext context) {
     final release = _updateAvailable;
     if (release == null) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final onContainer = theme.colorScheme.onSecondaryContainer;
     return Material(
@@ -1299,16 +1360,16 @@ class _HostPageState extends State<HostPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'HotkeyPad Host ${release.version} is available.',
+                  l10n.updateAvailable(release.version),
                   style: TextStyle(color: onContainer),
                 ),
               ),
               TextButton(
                 onPressed: () => Process.run('open', [release.htmlUrl]),
-                child: const Text('View'),
+                child: Text(l10n.viewAction),
               ),
               IconButton(
-                tooltip: 'Dismiss',
+                tooltip: l10n.dismiss,
                 icon: Icon(Icons.close, color: onContainer),
                 onPressed: () => _dismissUpdate(release),
               ),
@@ -1336,6 +1397,7 @@ class _HostPageState extends State<HostPage> {
     List<ConnectedClient> clients,
     int subscribedCount,
   ) {
+    final l10n = AppLocalizations.of(context)!;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1344,17 +1406,14 @@ class _HostPageState extends State<HostPage> {
             color: Theme.of(context).colorScheme.errorContainer,
             child: ListTile(
               leading: const Icon(Icons.lock_outline),
-              title: const Text('Accessibility is not granted'),
-              subtitle: const Text(
-                'Media keys and key combinations will do nothing until '
-                'this app is allowed in System Settings',
-              ),
+              title: Text(l10n.accessibilityNotGranted),
+              subtitle: Text(l10n.accessibilityNotGrantedBody),
               trailing: FilledButton(
                 onPressed: () async {
                   await MediaControl.requestTrust();
                   await _refreshAccessibility();
                 },
-                child: const Text('Grant'),
+                child: Text(l10n.grant),
               ),
             ),
           ),
@@ -1385,14 +1444,14 @@ class _HostPageState extends State<HostPage> {
         ],
         const SizedBox(height: 24),
         Text(
-          'Connected clients (${clients.length})',
+          l10n.connectedClients(clients.length),
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
         if (clients.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: Text('No client has connected yet.')),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text(l10n.noClientConnected)),
           )
         else ...[
           // Meaningful the moment a second device shows up; kept visible
@@ -1426,8 +1485,8 @@ class _HostPageState extends State<HostPage> {
                 onSubmitted: (_) => _broadcast(),
                 decoration: InputDecoration(
                   hintText: subscribedCount > 0
-                      ? 'Notify $subscribedCount subscribed client(s)'
-                      : 'No subscribed client yet',
+                      ? l10n.notifySubscribed(subscribedCount)
+                      : l10n.noSubscribedClient,
                   border: const OutlineInputBorder(),
                   isDense: true,
                 ),
@@ -1441,10 +1500,10 @@ class _HostPageState extends State<HostPage> {
           ],
         ),
         const SizedBox(height: 24),
-        Text('Activity', style: Theme.of(context).textTheme.titleMedium),
+        Text(l10n.activity, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         if (_log.isEmpty)
-          const Text('Nothing yet.')
+          Text(l10n.nothingYet)
         else
           ..._log.map(
             (line) => Padding(
@@ -1475,15 +1534,16 @@ class _QrPairingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       child: ListTile(
         leading: const Icon(Icons.qr_code_2_outlined),
-        title: const Text('Pair via QR'),
-        subtitle: const Text('Scan with the HotkeyPad app to connect'),
+        title: Text(l10n.pairViaQr),
+        subtitle: Text(l10n.pairViaQrSubtitle),
         trailing: FilledButton.tonalIcon(
           onPressed: () => _showQr(context),
           icon: const Icon(Icons.qr_code_2),
-          label: const Text('Show'),
+          label: Text(l10n.show),
         ),
         onTap: () => _showQr(context),
       ),
@@ -1491,10 +1551,11 @@ class _QrPairingCard extends StatelessWidget {
   }
 
   void _showQr(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Scan to connect'),
+        title: Text(l10n.scanToConnect),
         content: SizedBox(
           width: 240,
           height: 240,
@@ -1507,7 +1568,7 @@ class _QrPairingCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Done'),
+            child: Text(l10n.done),
           ),
         ],
       ),
