@@ -1,0 +1,1 @@
+macro,deck,hotkey,shortcut,mac,remote,control,bluetooth,wifi,productivity

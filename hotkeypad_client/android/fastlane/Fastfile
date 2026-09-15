@@ -1,0 +1,55 @@
+# Fastfile for hotkeypad_client on Google Play. See fastlane/README.md
+# for one-time setup (release keystore, Play Console service account)
+# and what each lane does before running any of these for real.
+#
+# As with the iOS side, the .aab itself is built with `flutter build
+# appbundle`, not a fastlane/Gradle action — Flutter's own build step is
+# what assembles the app in the first place. fastlane's job starts once
+# that .aab exists: uploading it and the store listing to Play Console.
+
+opt_out_usage
+default_platform(:android)
+
+CLIENT_DIR = File.expand_path("..", __dir__)
+AAB_PATH = File.join(
+  CLIENT_DIR, "build", "app", "outputs", "bundle", "release", "app-release.aab"
+)
+
+platform :android do
+  desc "Build the release .aab with Flutter (flutter build appbundle)"
+  lane :build do
+    Dir.chdir(CLIENT_DIR) do
+      sh("flutter", "build", "appbundle", "--release")
+    end
+  end
+
+  desc "Push store listing text/screenshots only — no binary, no build"
+  lane :metadata do
+    supply(
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_images: false,
+      skip_upload_screenshots: false,
+    )
+  end
+
+  desc "Build and upload to a Play Console testing track (default: internal)"
+  lane :beta do |options|
+    build
+    supply(
+      aab: AAB_PATH,
+      track: options[:track] || "internal",
+    )
+  end
+
+  desc "Build and upload to production"
+  desc "Defaults to a staged rollout (10%) — pass rollout:1.0 to release to everyone at once."
+  lane :release do |options|
+    build
+    supply(
+      aab: AAB_PATH,
+      track: "production",
+      rollout: (options[:rollout] || 0.1).to_s,
+    )
+  end
+end

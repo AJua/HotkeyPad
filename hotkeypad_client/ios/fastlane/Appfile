@@ -1,0 +1,10 @@
+# Fill these in before running any lane — fastlane needs both to know
+# which app and team to talk to. See fastlane/README.md for where to find
+# them in App Store Connect / the Apple Developer portal.
+app_identifier("com.chienhunglin.hotkeypad")
+apple_id(ENV["FASTLANE_APPLE_ID"] || "TODO_your_apple_id@example.com")
+team_id(ENV["FASTLANE_TEAM_ID"] || "TODO_apple_developer_team_id")
+
+# itc_team_id only needs setting if the Apple ID belongs to more than one
+# App Store Connect team and the wrong one gets picked automatically.
+# itc_team_id("TODO_app_store_connect_team_id")

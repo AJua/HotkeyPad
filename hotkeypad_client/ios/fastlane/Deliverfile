@@ -1,0 +1,15 @@
+# Non-secret App Store Connect settings that don't belong in the Fastfile
+# itself. Metadata text and screenshots come from fastlane/metadata and
+# fastlane/screenshots by directory convention — nothing to configure for
+# those here.
+
+app_identifier("com.chienhunglin.hotkeypad")
+default_locale("en-US")
+
+# https://developer.apple.com/app-store/categories/
+primary_category("UTILITIES")
+
+# TODO: App Store Connect requires an age rating questionnaire answered
+# at least once before a version can be submitted — deliver can't fill
+# this in for you the first time. Do it once in the App Store Connect web
+# UI (App Information -> Age Rating), it carries forward after that.

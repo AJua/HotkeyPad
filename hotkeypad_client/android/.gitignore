@@ -12,3 +12,11 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# fastlane
+/vendor/bundle/
+fastlane/report.xml
+fastlane/test_output
+# The Play Console service account key — never commit it, see
+# fastlane/README.md for how it's supplied instead.
+fastlane/play-store-credentials.json

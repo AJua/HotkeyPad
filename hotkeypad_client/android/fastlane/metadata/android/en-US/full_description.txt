@@ -1,0 +1,15 @@
+HotkeyPad turns your phone into a custom macro deck for your Mac — a grid of buttons you design yourself, each one launching an app, running a keyboard shortcut, controlling media playback, or firing off a whole sequence of steps at once.
+
+Pair it with the free HotkeyPad Host app on your Mac (over Bluetooth or WiFi, whichever the two find first) and start building:
+
+• App launcher buttons — jump straight to any app on your Mac
+• Keyboard shortcuts and key combinations
+• Media controls — play/pause, skip, volume
+• Shell commands, for anything else your Mac can run
+• Combo buttons that chain several steps together with your own timing
+• Multiple pages, so your most-used shortcuts are never more than a swipe away
+• Custom icons and a background image, so your deck looks like yours
+
+No account, no cloud, no subscription — HotkeyPad talks directly to your own Mac on your own network.
+
+Requires the HotkeyPad Host app running on a Mac.

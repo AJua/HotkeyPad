@@ -1,0 +1,72 @@
+# Fastfile for hotkeypad_client (the iOS/Android phone app). See
+# fastlane/README.md for one-time setup (Apple ID, Team ID, API key) and
+# what each lane actually does before running any of these for real.
+#
+# This is a Flutter project, not a plain Xcode one — the actual .ipa is
+# built with `flutter build ipa`, not fastlane's own `gym`/`build_app`,
+# since Flutter's own build step is what assembles the Dart bundle into
+# the app in the first place. fastlane's job here starts once that .ipa
+# exists: uploading it and the store listing.
+
+opt_out_usage
+default_platform(:ios)
+
+REPO_ROOT = File.expand_path("../../..", __dir__)
+CLIENT_DIR = File.expand_path("..", __dir__)
+IPA_DIR = File.join(CLIENT_DIR, "build", "ios", "ipa")
+
+# If fastlane/api_key.json exists (see README — never commit it), use App
+# Store Connect API key auth: no Apple ID password or 2FA prompt, and it
+# works the same locally or in CI. Falls back to the Appfile's apple_id
+# (interactive login) when the key file isn't present yet.
+def api_key
+  path = ENV["APP_STORE_CONNECT_API_KEY_PATH"] || File.join(__dir__, "api_key.json")
+  return nil unless File.exist?(path)
+  app_store_connect_api_key(json_key_path: path)
+end
+
+platform :ios do
+  desc "Build the release .ipa with Flutter (flutter build ipa)"
+  lane :build do
+    Dir.chdir(CLIENT_DIR) do
+      sh("flutter", "build", "ipa", "--release")
+    end
+  end
+
+  desc "Push store listing text/screenshots only — no binary, no build"
+  desc "Useful for getting metadata approved/updated ahead of a release, or fixing a typo without a new build."
+  lane :metadata do
+    key = api_key
+    deliver(
+      api_key: key,
+      skip_binary_upload: true,
+      skip_screenshots: false,
+      force: true, # don't open the changes in a browser for confirmation
+    )
+  end
+
+  desc "Build and upload the latest build to TestFlight"
+  lane :beta do
+    build
+    key = api_key
+    pilot(
+      api_key: key,
+      ipa: Dir.glob(File.join(IPA_DIR, "*.ipa")).first,
+      skip_waiting_for_build_processing: true,
+    )
+  end
+
+  desc "Build, then upload binary + full store listing to App Store Connect"
+  desc "Pass submit: true to also submit the new version for review."
+  lane :release do |options|
+    build
+    key = api_key
+    deliver(
+      api_key: key,
+      ipa: Dir.glob(File.join(IPA_DIR, "*.ipa")).first,
+      submit_for_review: options[:submit] == true,
+      automatic_release: false,
+      force: true,
+    )
+  end
+end

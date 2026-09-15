@@ -32,3 +32,16 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# fastlane
+vendor/bundle/
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/screenshots/**/*.html
+fastlane/test_output
+# Real App Store Connect credentials never belong in git — see
+# fastlane/README.md for how these are supplied instead.
+fastlane/api_key.json
+fastlane/.env
+fastlane/.env.default
