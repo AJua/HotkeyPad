@@ -982,6 +982,82 @@ void main() {
     });
   });
 
+  group('WifiPairingQr', () {
+    test('round-trips through encode/tryParse', () {
+      const qr = WifiPairingQr(
+        hostId: 'host_123',
+        name: "Ray's MacBook Pro",
+        address: '192.168.1.23',
+        port: 54871,
+      );
+
+      final decoded = WifiPairingQr.tryParse(qr.encode().toString());
+
+      expect(decoded, isNotNull);
+      expect(decoded!.hostId, 'host_123');
+      expect(decoded.name, "Ray's MacBook Pro");
+      expect(decoded.address, '192.168.1.23');
+      expect(decoded.port, 54871);
+    });
+
+    test('rejects a URI with the wrong scheme', () {
+      expect(
+        WifiPairingQr.tryParse(
+          'https://connect?host=x&address=1.2.3.4&port=1',
+        ),
+        isNull,
+      );
+    });
+
+    test('rejects a URI with the wrong host', () {
+      expect(
+        WifiPairingQr.tryParse(
+          'hotkeypad://pair?host=x&address=1.2.3.4&port=1',
+        ),
+        isNull,
+      );
+    });
+
+    test('rejects a completely unrelated string, not a crash', () {
+      expect(WifiPairingQr.tryParse('WIFI:T:WPA;S:MyNetwork;P:secret;;'), isNull);
+      expect(WifiPairingQr.tryParse(''), isNull);
+    });
+
+    test('rejects a missing host id', () {
+      expect(
+        WifiPairingQr.tryParse('hotkeypad://connect?address=1.2.3.4&port=1'),
+        isNull,
+      );
+    });
+
+    test('rejects a missing address', () {
+      expect(
+        WifiPairingQr.tryParse('hotkeypad://connect?host=x&port=1'),
+        isNull,
+      );
+    });
+
+    test('rejects a missing or non-numeric port', () {
+      expect(
+        WifiPairingQr.tryParse('hotkeypad://connect?host=x&address=1.2.3.4'),
+        isNull,
+      );
+      expect(
+        WifiPairingQr.tryParse(
+          'hotkeypad://connect?host=x&address=1.2.3.4&port=nope',
+        ),
+        isNull,
+      );
+    });
+
+    test('falls back to the advertised name when none is given', () {
+      final decoded = WifiPairingQr.tryParse(
+        'hotkeypad://connect?host=x&address=1.2.3.4&port=54871',
+      );
+      expect(decoded!.name, HotkeyPad.advertisedName);
+    });
+  });
+
   group('LinkTransport', () {
     test('is offered as bluetooth, wifi', () {
       expect(LinkTransport.values.map((t) => t.label), ['bluetooth', 'wifi']);

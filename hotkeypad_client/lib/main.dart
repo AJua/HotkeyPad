@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'l10n/app_localizations.dart';
 import 'src/deck_page.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
@@ -28,6 +29,8 @@ class _HotkeyPadClientAppState extends State<HotkeyPadClientApp> {
       },
       title: 'HotkeyPad',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
         colorSchemeSeed: Colors.indigo,
         brightness: Brightness.light,

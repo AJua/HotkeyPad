@@ -23,6 +23,14 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Scanning a host's pairing QR code. Not required: the manual IP
+         entry and beacon-discovery paths work fine without a camera. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus"
+        android:required="false" />
+
     <application
         android:label="HotkeyPad"
         android:name="${applicationName}"

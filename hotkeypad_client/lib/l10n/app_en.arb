@@ -1,0 +1,129 @@
+{
+  "@@locale": "en",
+
+  "lookingForHost": "Looking for a host",
+  "@lookingForHost": {"description": "Search screen heading while searching."},
+
+  "startHostOnMac": "Start the HotkeyPad host on your Mac.",
+  "@startHostOnMac": {"description": "Search screen subtitle while searching."},
+
+  "noHostFound": "No host found",
+  "@noHostFound": {"description": "Search screen heading after a failed search."},
+
+  "searchAgain": "Search again",
+  "@searchAgain": {"description": "Button to retry discovery."},
+
+  "enterHostIpManually": "Enter host IP manually",
+  "@enterHostIpManually": {"description": "Button opening the manual-entry dialog."},
+
+  "scanQrCode": "Scan QR code",
+  "@scanQrCode": {"description": "Button opening the QR-scan screen."},
+
+  "debugConsole": "Debug console",
+  "@debugConsole": {"description": "Tooltip on the bug icon in the app bar."},
+
+  "previousHosts": "Previous hosts",
+  "@previousHosts": {"description": "Heading above the list of previously-connected hosts."},
+
+  "forgetHost": "Forget",
+  "@forgetHost": {"description": "Action to remove one entry from the previous-hosts list."},
+
+  "enterHostIpTitle": "Enter host IP",
+  "@enterHostIpTitle": {"description": "Manual-entry dialog title."},
+
+  "enterHostIpHint": "Shown on the host itself, under WiFi in its status card.",
+  "@enterHostIpHint": {"description": "Manual-entry dialog helper text."},
+
+  "ipAddressLabel": "IP address",
+  "@ipAddressLabel": {"description": "Text field label."},
+
+  "advancedCustomPort": "Advanced: custom port",
+  "@advancedCustomPort": {"description": "Button revealing the optional port field."},
+
+  "portLabel": "Port",
+  "@portLabel": {"description": "Text field label."},
+
+  "cancel": "Cancel",
+  "@cancel": {"description": "Dialog cancel button."},
+
+  "connectAction": "Connect",
+  "@connectAction": {"description": "Dialog confirm button."},
+
+  "connectingTo": "Connecting to {name}",
+  "@connectingTo": {
+    "description": "Connection overlay heading.",
+    "placeholders": {"name": {"type": "String"}}
+  },
+
+  "reconnectingTo": "Reconnecting to {name}",
+  "@reconnectingTo": {
+    "description": "Connection overlay heading on a retry.",
+    "placeholders": {"name": {"type": "String"}}
+  },
+
+  "discoveringServices": "Discovering services",
+  "@discoveringServices": {"description": "Connection overlay heading."},
+
+  "subscribingStage": "Subscribing",
+  "@subscribingStage": {"description": "Connection overlay heading."},
+
+  "enterCodeShownOn": "Enter the code shown on {name}",
+  "@enterCodeShownOn": {
+    "description": "Connection overlay heading while awaiting a PIN.",
+    "placeholders": {"name": {"type": "String"}}
+  },
+
+  "disconnectedStage": "Disconnected",
+  "@disconnectedStage": {"description": "Connection overlay heading."},
+
+  "couldNotConnect": "Could not connect",
+  "@couldNotConnect": {"description": "Connection overlay heading on failure."},
+
+  "linkLostTo": "The link to {name} was lost.",
+  "@linkLostTo": {
+    "description": "Connection overlay body text.",
+    "placeholders": {"name": {"type": "String"}}
+  },
+
+  "retryingNow": "Retrying now...",
+  "@retryingNow": {"description": "Connection overlay status line."},
+
+  "retryingInSeconds": "Retrying in {seconds}s · attempt {attempt}",
+  "@retryingInSeconds": {
+    "description": "Connection overlay status line.",
+    "placeholders": {
+      "seconds": {"type": "int"},
+      "attempt": {"type": "int"}
+    }
+  },
+
+  "back": "Back",
+  "@back": {"description": "Connection overlay button."},
+
+  "retry": "Retry",
+  "@retry": {"description": "Connection overlay button."},
+
+  "retryNow": "Retry now",
+  "@retryNow": {"description": "Connection overlay button when a retry is already scheduled."},
+
+  "syncing": "Syncing…",
+  "@syncing": {"description": "Badge shown while the layout/icons are being fetched."},
+
+  "pairViaQr": "Pair via QR",
+  "@pairViaQr": {"description": "Host-side button label to show a pairing QR code."},
+
+  "scanHostQrTitle": "Scan host QR code",
+  "@scanHostQrTitle": {"description": "Title of the QR-scan screen."},
+
+  "pointCameraAtQr": "Point your camera at the QR code shown on the host",
+  "@pointCameraAtQr": {"description": "Instruction on the QR-scan screen."},
+
+  "invalidHostQr": "That QR code isn't a HotkeyPad host",
+  "@invalidHostQr": {"description": "Shown when a scanned code cannot be parsed."},
+
+  "cameraPermissionDenied": "Camera access is needed to scan a QR code",
+  "@cameraPermissionDenied": {"description": "Shown when camera permission is refused."},
+
+  "openSettings": "Open settings",
+  "@openSettings": {"description": "Button to open the system settings app."}
+}

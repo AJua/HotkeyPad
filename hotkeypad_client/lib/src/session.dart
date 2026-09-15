@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import 'client_identity.dart';
 import 'deck_store.dart';
 import 'device_info.dart';
+import 'host_history_store.dart';
 import 'icon_cache.dart';
 import 'link_target.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
@@ -372,6 +373,7 @@ class HotkeyPadSession extends ChangeNotifier {
         if (ok) {
           _stage = LinkStage.ready;
           _pinError = null;
+          _recordWifiHistory();
           _append('PIN accepted', inbound: true);
           // Whatever this session's own connect() sent right after Hello
           // was ignored by the host while this connection was still
@@ -634,6 +636,7 @@ class HotkeyPadSession extends ChangeNotifier {
       if (attempt != _attempt) return;
       _stage = LinkStage.ready;
       _reconnectAttempt = 0;
+      _recordWifiHistory();
       notifyListeners();
 
       // So the host can tell this device apart from any other connected at
@@ -657,6 +660,32 @@ class HotkeyPadSession extends ChangeNotifier {
       // transient failures are worth retrying. A timeout is transient.
       if (error is! StateError) _scheduleReconnect();
     }
+  }
+
+  /// Remembers a WiFi host reached over TCP, so a future manual reconnect
+  /// on a network discovery can't cross (AP client isolation, a different
+  /// subnet) is a tap instead of retyping an IP.
+  ///
+  /// Recorded as soon as the TCP handshake and protocol round-trip prove
+  /// this is a real HotkeyPad host — the same point [LinkStage.ready] is
+  /// reached from either path (never needing a PIN, or a PIN just
+  /// accepted). A host that goes on to demand a PIN the user then cancels
+  /// still gets remembered: it's still demonstrably a real host at this
+  /// address, which is exactly what a "connect again" shortcut needs to
+  /// know, independent of the host's own trust decision. [upsertHistory]
+  /// makes the second call site's re-record after a PIN a harmless no-op
+  /// beyond refreshing the timestamp.
+  void _recordWifiHistory() {
+    final target = this.target;
+    if (target is! WifiTarget) return;
+    unawaited(
+      HostHistoryStore.recordConnected(
+        hostId: target.hostId,
+        address: target.address,
+        port: target.port,
+        name: name,
+      ),
+    );
   }
 
   Future<void> _connectBle(

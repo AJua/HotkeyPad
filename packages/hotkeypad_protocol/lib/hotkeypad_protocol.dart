@@ -1320,3 +1320,69 @@ class WifiBeacon {
     }
   }
 }
+
+/// A host's WiFi pairing QR code, scanned instead of typed in — see the
+/// host's "Pair via QR" button and the client's QR-scan screen.
+///
+/// Distinct from [WifiBeacon]: a beacon's sender address is inferred from
+/// the UDP packet's own envelope, but a QR code has no such envelope, so
+/// [address] has to travel in the payload here. Kept in this shared
+/// package, not duplicated on each side, for the same reason [WifiBeacon]
+/// is: the host encodes it and the client decodes it, and a format change
+/// on one side without the other would otherwise fail silently (an
+/// unrecognized QR code just looks like "not a HotkeyPad host").
+class WifiPairingQr {
+  const WifiPairingQr({
+    required this.hostId,
+    required this.name,
+    required this.address,
+    required this.port,
+  });
+
+  /// Same identity a beacon-discovered connection would get — see
+  /// [WifiBeacon.hostId] — so a QR-paired connection's cached layout/icons
+  /// land in the same place a later beacon-discovered reconnect would use,
+  /// rather than a separate `manual:`-prefixed entry.
+  final String hostId;
+
+  final String name;
+  final String address;
+  final int port;
+
+  /// A `hotkeypad://connect?...` URI — human-unreadable is fine, it is
+  /// only ever produced as a QR code and consumed by [tryParse], never
+  /// typed or displayed as text.
+  Uri encode() => Uri(
+    scheme: 'hotkeypad',
+    host: 'connect',
+    queryParameters: {
+      'host': hostId,
+      'name': name,
+      'address': address,
+      'port': '$port',
+    },
+  );
+
+  /// Returns null for anything that is not a well-formed pairing URI, so
+  /// scanning an arbitrary QR code in the wild (a URL, a WiFi-password
+  /// code, anything) is reported as "not a HotkeyPad host" rather than
+  /// crashing or connecting somewhere nonsensical.
+  static WifiPairingQr? tryParse(String data) {
+    final uri = Uri.tryParse(data.trim());
+    if (uri == null) return null;
+    if (uri.scheme != 'hotkeypad' || uri.host != 'connect') return null;
+    final hostId = uri.queryParameters['host'];
+    final address = uri.queryParameters['address'];
+    final port = int.tryParse(uri.queryParameters['port'] ?? '');
+    if (hostId == null || hostId.isEmpty) return null;
+    if (address == null || address.isEmpty) return null;
+    if (port == null || port <= 0) return null;
+    final name = uri.queryParameters['name'];
+    return WifiPairingQr(
+      hostId: hostId,
+      name: (name == null || name.isEmpty) ? HotkeyPad.advertisedName : name,
+      address: address,
+      port: port,
+    );
+  }
+}

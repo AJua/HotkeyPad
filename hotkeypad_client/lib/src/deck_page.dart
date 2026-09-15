@@ -7,10 +7,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/app_localizations.dart';
 import 'background_fit.dart';
 import 'debug_page.dart';
 import 'edge_bar.dart';
+import 'host_history_store.dart';
 import 'link_target.dart';
+import 'qr_scan_page.dart';
 import 'safe_insets.dart';
 import 'deck_icons.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
@@ -63,6 +66,11 @@ class _DeckPageState extends State<DeckPage> {
   /// machine below; see [_startWifiDiscovery].
   RawDatagramSocket? _wifiDiscovery;
 
+  /// WiFi hosts this app has connected to before — see [HostHistoryStore].
+  /// Loaded once at startup and refreshed whenever the search screen comes
+  /// back (a fresh connection may have just been added to it).
+  List<HostHistoryEntry> _history = [];
+
   @override
   void initState() {
     super.initState();
@@ -88,6 +96,12 @@ class _DeckPageState extends State<DeckPage> {
     // the same host, so it starts regardless of whether this platform even
     // has a Bluetooth implementation.
     unawaited(_startWifiDiscovery());
+    unawaited(_loadHistory());
+  }
+
+  Future<void> _loadHistory() async {
+    final history = await HostHistoryStore.load();
+    if (mounted) setState(() => _history = history);
   }
 
   @override
@@ -378,6 +392,10 @@ class _DeckPageState extends State<DeckPage> {
     setState(() => _session = null);
     _search();
     unawaited(_startWifiDiscovery());
+    // A session that just reached this state may have added itself to
+    // history moments ago — the search screen this returns to should
+    // show it.
+    unawaited(_loadHistory());
   }
 
   /// The fallback for when discovery cannot reach the host at all — an
@@ -412,77 +430,160 @@ class _DeckPageState extends State<DeckPage> {
     if (result != null) _connectManually(result.address, result.port);
   }
 
+  /// A previously-connected host from [_history], or a freshly-scanned QR
+  /// code — either way a full [WifiPairingQr]-equivalent identity is
+  /// already known, unlike [_connectManually]'s synthetic
+  /// [manualWifiHostId], so this lands in the same cache entry a beacon-
+  /// discovered connection to the same host would use.
+  void _connectKnownWifiHost({
+    required String hostId,
+    required String address,
+    required int port,
+    required String name,
+  }) {
+    if (_session != null) return;
+    _stopSearch();
+    _stopWifiDiscovery();
+    if (!mounted) return;
+    setState(() {
+      _session =
+          HotkeyPadSession(
+              target: WifiTarget(hostId: hostId, address: address, port: port),
+              name: name,
+            )
+            ..onTheme = widget.onTheme
+            ..start();
+    });
+  }
+
+  void _connectToHistoryEntry(HostHistoryEntry entry) => _connectKnownWifiHost(
+    hostId: entry.hostId,
+    address: entry.address,
+    port: entry.port,
+    name: entry.name,
+  );
+
+  Future<void> _forgetHistoryEntry(HostHistoryEntry entry) async {
+    await HostHistoryStore.forget(entry.address, entry.port);
+    await _loadHistory();
+  }
+
+  Future<void> _scanQrCode() async {
+    final result = await Navigator.of(
+      context,
+    ).push<WifiPairingQr>(MaterialPageRoute(builder: (_) => const QrScanPage()));
+    if (result == null) return;
+    _connectKnownWifiHost(
+      hostId: result.hostId,
+      address: result.address,
+      port: result.port,
+      name: result.name,
+    );
+  }
+
   Widget _searchScaffold(BuildContext context) {
     final error = _searchError;
+    final l10n = AppLocalizations.of(context)!;
     return EdgeBarScaffold(
       side: barSideFor(context),
       title: 'HotkeyPad',
       leading: _appIcon(),
       actions: [
         IconButton(
-          tooltip: 'Debug console',
+          tooltip: l10n.debugConsole,
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const DebugPage(session: null)),
           ),
           icon: const Icon(Icons.bug_report_outlined),
         ),
       ],
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (error == null) ...[
-                const SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: CircularProgressIndicator(strokeWidth: 3),
+      // A scroll view, not a bare Center, because the previous-hosts list
+      // below can grow past what a small phone in landscape has room for
+      // — LayoutBuilder + a min-height ConstrainedBox keeps everything
+      // centered when it fits and scrollable when it doesn't.
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (error == null) ...[
+                        const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(strokeWidth: 3),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          l10n.lookingForHost,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          l10n.startHostOnMac,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ] else ...[
+                        Icon(
+                          Icons.bluetooth_disabled,
+                          size: 48,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          l10n.noHostFound,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          error is StateError ? error.message : '$error',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton.icon(
+                          onPressed: _search,
+                          icon: const Icon(Icons.refresh),
+                          label: Text(l10n.searchAgain),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _showManualEntryDialog,
+                            icon: const Icon(Icons.keyboard_outlined),
+                            label: Text(l10n.enterHostIpManually),
+                          ),
+                          TextButton.icon(
+                            onPressed: _scanQrCode,
+                            icon: const Icon(Icons.qr_code_scanner_outlined),
+                            label: Text(l10n.scanQrCode),
+                          ),
+                        ],
+                      ),
+                      if (_history.isNotEmpty) ...[
+                        const SizedBox(height: 28),
+                        _PreviousHostsList(
+                          entries: _history,
+                          onSelect: _connectToHistoryEntry,
+                          onForget: _forgetHistoryEntry,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Looking for a host',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Start the HotkeyPad host on your Mac.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ] else ...[
-                Icon(
-                  Icons.bluetooth_disabled,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No host found',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  error is StateError ? error.message : '$error',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: _search,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Search again'),
-                ),
-              ],
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: _showManualEntryDialog,
-                icon: const Icon(Icons.keyboard_outlined),
-                label: const Text('Enter host IP manually'),
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -739,7 +840,7 @@ class _SyncingBadge extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Syncing…',
+                  AppLocalizations.of(context)!.syncing,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onInverseSurface,
                   ),
@@ -1115,6 +1216,7 @@ class _ConnectionOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final stage = session.stage;
     final working =
         stage == LinkStage.connecting ||
@@ -1168,14 +1270,14 @@ class _ConnectionOverlay extends StatelessWidget {
                         switch (stage) {
                           LinkStage.connecting =>
                             session.reconnectAttempt > 0
-                                ? 'Reconnecting to $deviceName'
-                                : 'Connecting to $deviceName',
-                          LinkStage.discovering => 'Discovering services',
-                          LinkStage.subscribing => 'Subscribing',
+                                ? l10n.reconnectingTo(deviceName)
+                                : l10n.connectingTo(deviceName),
+                          LinkStage.discovering => l10n.discoveringServices,
+                          LinkStage.subscribing => l10n.subscribingStage,
                           LinkStage.awaitingPin =>
-                            'Enter the code shown on $deviceName',
-                          LinkStage.disconnected => 'Disconnected',
-                          LinkStage.failed => 'Could not connect',
+                            l10n.enterCodeShownOn(deviceName),
+                          LinkStage.disconnected => l10n.disconnectedStage,
+                          LinkStage.failed => l10n.couldNotConnect,
                           LinkStage.ready => '',
                         },
                         textAlign: TextAlign.center,
@@ -1190,7 +1292,7 @@ class _ConnectionOverlay extends StatelessWidget {
                           child: SingleChildScrollView(
                             child: Text(
                               session.errorSummary ??
-                                  'The link to $deviceName was lost.',
+                                  l10n.linkLostTo(deviceName),
                               textAlign: TextAlign.center,
                               style: theme.textTheme.bodySmall,
                             ),
@@ -1200,9 +1302,11 @@ class _ConnectionOverlay extends StatelessWidget {
                           const SizedBox(height: 12),
                           Text(
                             waiting == 0
-                                ? 'Retrying now...'
-                                : 'Retrying in ${waiting}s'
-                                      ' · attempt ${session.reconnectAttempt}',
+                                ? l10n.retryingNow
+                                : l10n.retryingInSeconds(
+                                    waiting,
+                                    session.reconnectAttempt,
+                                  ),
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: theme.colorScheme.primary,
                             ),
@@ -1214,14 +1318,14 @@ class _ConnectionOverlay extends StatelessWidget {
                           children: [
                             TextButton(
                               onPressed: onBack,
-                              child: const Text('Back'),
+                              child: Text(l10n.back),
                             ),
                             const SizedBox(width: 8),
                             FilledButton.icon(
                               onPressed: session.connect,
                               icon: const Icon(Icons.refresh),
                               label: Text(
-                                waiting == null ? 'Retry' : 'Retry now',
+                                waiting == null ? l10n.retry : l10n.retryNow,
                               ),
                             ),
                           ],
@@ -1235,6 +1339,67 @@ class _ConnectionOverlay extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Every WiFi host [HostHistoryStore] remembers, offered as a one-tap
+/// reconnect — see [_DeckPageState._connectToHistoryEntry]. Most recent
+/// first, matching the order [HostHistoryStore.load] already returns.
+class _PreviousHostsList extends StatelessWidget {
+  const _PreviousHostsList({
+    required this.entries,
+    required this.onSelect,
+    required this.onForget,
+  });
+
+  final List<HostHistoryEntry> entries;
+  final ValueChanged<HostHistoryEntry> onSelect;
+  final ValueChanged<HostHistoryEntry> onForget;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              l10n.previousHosts,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Card(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final entry in entries)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.history),
+                    title: Text(entry.name, overflow: TextOverflow.ellipsis),
+                    subtitle: Text('${entry.address}:${entry.port}'),
+                    onTap: () => onSelect(entry),
+                    trailing: IconButton(
+                      tooltip: l10n.forgetHost,
+                      icon: const Icon(Icons.close),
+                      onPressed: () => onForget(entry),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1272,13 +1437,14 @@ class _ManualHostDialogState extends State<_ManualHostDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: const Text('Enter host IP'),
+      title: Text(l10n.enterHostIpTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Shown on the host itself, under WiFi in its status card.',
+            l10n.enterHostIpHint,
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
@@ -1287,10 +1453,10 @@ class _ManualHostDialogState extends State<_ManualHostDialog> {
             autofocus: true,
             keyboardType: TextInputType.numberWithOptions(decimal: true),
             onSubmitted: (_) => _submit(),
-            decoration: const InputDecoration(
-              labelText: 'IP address',
+            decoration: InputDecoration(
+              labelText: l10n.ipAddressLabel,
               hintText: '192.168.1.23',
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
@@ -1302,7 +1468,7 @@ class _ManualHostDialogState extends State<_ManualHostDialog> {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onSubmitted: (_) => _submit(),
               decoration: InputDecoration(
-                labelText: 'Port',
+                labelText: l10n.portLabel,
                 hintText: '${WifiLink.tcpPort}',
                 border: const OutlineInputBorder(),
                 isDense: true,
@@ -1313,7 +1479,7 @@ class _ManualHostDialogState extends State<_ManualHostDialog> {
               alignment: Alignment.centerLeft,
               child: TextButton(
                 onPressed: () => setState(() => _showPort = true),
-                child: const Text('Advanced: custom port'),
+                child: Text(l10n.advancedCustomPort),
               ),
             ),
         ],
@@ -1321,9 +1487,9 @@ class _ManualHostDialogState extends State<_ManualHostDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Connect')),
+        FilledButton(onPressed: _submit, child: Text(l10n.connectAction)),
       ],
     );
   }

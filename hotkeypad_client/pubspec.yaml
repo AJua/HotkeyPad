@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any # version pinned transitively by flutter_localizations
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -37,6 +40,7 @@ dependencies:
   bluetooth_low_energy: ^6.2.1
   shared_preferences: ^2.5.5
   path_provider: ^2.1.6
+  mobile_scanner: ^7.1.2
   hotkeypad_protocol:
     path: ../packages/hotkeypad_protocol
 
@@ -61,6 +65,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Generates AppLocalizations from lib/l10n/*.arb — see l10n.yaml.
+  generate: true
 
   # To add assets to your application, add an assets section, like this:
   # assets:

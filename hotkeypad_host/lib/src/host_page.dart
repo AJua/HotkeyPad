@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 // Flutter's own ConnectionState (used by StreamBuilder) collides with the BLE one.
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'app_launcher.dart';
 import 'background_image_store.dart';
@@ -215,6 +216,11 @@ class _HostPageState extends State<HostPage> {
   /// never change mid-run, same reasoning as [WifiServer]'s own
   /// broadcast-target list.
   List<String> _localAddresses = [];
+
+  /// This Mac's own persistent id — see [HostIdentity] — cached from
+  /// [_startWifi] so the QR-pairing card can use it without an async gap
+  /// of its own every time it builds.
+  String? _hostId;
 
   /// Every WiFi client id the host has ever decided about — loaded once at
   /// startup, kept in memory, and written through to [WifiTrustStore] on
@@ -465,6 +471,7 @@ class _HostPageState extends State<HostPage> {
         setState(() {
           _wifiError = null;
           _localAddresses = addresses;
+          _hostId = hostId;
           _addLog('WiFi listening on port ${WifiLink.tcpPort}');
         });
       }
@@ -1365,6 +1372,17 @@ class _HostPageState extends State<HostPage> {
           wifiError: _wifiError,
           localAddresses: _localAddresses,
         ),
+        if (_wifiServer.running && _localAddresses.isNotEmpty && _hostId != null) ...[
+          const SizedBox(height: 12),
+          _QrPairingCard(
+            payload: WifiPairingQr(
+              hostId: _hostId!,
+              name: Platform.localHostname,
+              address: _localAddresses.first,
+              port: WifiLink.tcpPort,
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         Text(
           'Connected clients (${clients.length})',
@@ -1438,6 +1456,61 @@ class _HostPageState extends State<HostPage> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// A button revealing a QR code a phone can scan instead of typing this
+/// host's address in — see [WifiPairingQr]. Behind a tap rather than
+/// shown outright mainly for a tidier status screen: it carries no more
+/// than the plaintext address already visible above it, and scanning it
+/// still goes through the exact same `Hello`/trust-on-first-use PIN
+/// challenge any other WiFi connection does (see `_onWifiHello`) — this
+/// only replaces typing the IP in, nothing about how the connection is
+/// authorized.
+class _QrPairingCard extends StatelessWidget {
+  const _QrPairingCard({required this.payload});
+
+  final WifiPairingQr payload;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.qr_code_2_outlined),
+        title: const Text('Pair via QR'),
+        subtitle: const Text('Scan with the HotkeyPad app to connect'),
+        trailing: FilledButton.tonalIcon(
+          onPressed: () => _showQr(context),
+          icon: const Icon(Icons.qr_code_2),
+          label: const Text('Show'),
+        ),
+        onTap: () => _showQr(context),
+      ),
+    );
+  }
+
+  void _showQr(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Scan to connect'),
+        content: SizedBox(
+          width: 240,
+          height: 240,
+          child: QrImageView(
+            data: payload.encode().toString(),
+            version: QrVersions.auto,
+            backgroundColor: Colors.white,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
     );
   }
 }
