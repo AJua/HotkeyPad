@@ -1123,13 +1123,15 @@ class _DeckButton extends StatelessWidget {
       theme.brightness == Brightness.dark ? 0.3 : 0.85,
     ).toColor();
 
+    // A real icon brings its own colour, shape, and often its own padding —
+    // a filled neutral square behind it just showed through that padding as
+    // a flat grey box. The tint is what makes a letter placeholder
+    // distinguishable at a glance, so it stays until a real icon arrives —
+    // behind just the icon, not the label below it.
+    final showIconBackground = icon == null;
+
     return Material(
-      // A real icon brings its own colour, shape, and often its own
-      // padding — a filled neutral square behind it just showed through
-      // that padding as a flat grey box. The tint is what makes a letter
-      // placeholder distinguishable at a glance, so it stays until a real
-      // icon arrives.
-      color: icon != null ? Colors.transparent : tint,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -1149,9 +1151,20 @@ class _DeckButton extends StatelessWidget {
                 final iconSize = constraints.maxWidth;
                 return Column(
                   children: [
-                    SizedBox(
+                    Container(
                       width: iconSize,
                       height: iconSize,
+                      decoration: !showIconBackground
+                          ? null
+                          : BoxDecoration(
+                              color: tint,
+                              borderRadius: BorderRadius.circular(
+                                iconSize * 0.22,
+                              ),
+                            ),
+                      clipBehavior: showIconBackground
+                          ? Clip.antiAlias
+                          : Clip.none,
                       child: item.emoji != null
                           // Sized explicitly rather than with a FittedBox:
                           // an emoji's advance box is wider than its glyph,

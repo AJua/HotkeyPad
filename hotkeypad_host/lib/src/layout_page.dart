@@ -1012,17 +1012,15 @@ class _Cell extends StatelessWidget {
     // a filled neutral square behind it just showed through that padding as
     // a flat grey box.
     final hasRealIcon = filled && icon != null;
+    // Only a glyph/emoji/letter fallback gets a background square: it has
+    // no colour of its own, unlike a real icon, and the square sits behind
+    // just the icon rather than the whole cell so the label below it stays
+    // on the plain cell background.
+    final showIconBackground = filled && !hasRealIcon;
 
     return Material(
       color: highlighted
           ? theme.colorScheme.primaryContainer
-          : hasRealIcon
-          ? Colors.transparent
-          : filled
-          ? theme.colorScheme.surfaceContainerHighest
-          // An empty cell is just a "+" hint, not a button — a filled grey
-          // background behind it (especially next to real icons that carry
-          // their own colour) read as a plain, unfinished-looking box.
           : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
@@ -1044,9 +1042,21 @@ class _Cell extends StatelessWidget {
                   return Column(
                     children: [
                       SizedBox(height: margin),
-                      SizedBox(
+                      Container(
                         width: iconSize,
                         height: iconSize,
+                        decoration: !showIconBackground
+                            ? null
+                            : BoxDecoration(
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(
+                                  iconSize * 0.22,
+                                ),
+                              ),
+                        clipBehavior: showIconBackground
+                            ? Clip.antiAlias
+                            : Clip.none,
                         child: item!.emoji != null
                             // Sized explicitly: an emoji's advance box is
                             // wider than its glyph, so fitting the box
