@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:hotkeypad_host/src/layout_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -128,39 +130,49 @@ void main() {
       expect(find.text('🧭'), findsOneWidget);
     });
 
-    testWidgets('Choose image asks the native picker', (tester) async {
-      const channel = MethodChannel('btlink/icons');
-      var invoked = false;
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
-        call,
-      ) async {
-        if (call.method == 'pickImage') invoked = true;
-        return null; // Simulates the user cancelling the native panel.
-      });
-      addTearDown(() {
+    testWidgets(
+      'Choose image asks the native picker',
+      (tester) async {
+        const channel = MethodChannel('btlink/icons');
+        var invoked = false;
         tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           channel,
-          null,
+          (call) async {
+            if (call.method == 'pickImage') invoked = true;
+            return null; // Simulates the user cancelling the native panel.
+          },
         );
-      });
-      var called = false;
-      await tester.pumpWidget(
-        harness(
-          emoji: null,
-          customIconId: null,
-          onChanged: (_, _) => called = true,
-        ),
-      );
+        addTearDown(() {
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          );
+        });
+        var called = false;
+        await tester.pumpWidget(
+          harness(
+            emoji: null,
+            customIconId: null,
+            onChanged: (_, _) => called = true,
+          ),
+        );
 
-      await tester.tap(find.byType(IconPicker));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Choose image...'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byType(IconPicker));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Choose image...'));
+        await tester.pumpAndSettle();
 
-      expect(invoked, isTrue);
-      // A cancel on the native side must not report a change, and — since
-      // it never reaches CustomIconStore.save — never touches real disk.
-      expect(called, isFalse);
-    });
+        expect(invoked, isTrue);
+        // A cancel on the native side must not report a change, and — since
+        // it never reaches CustomIconStore.save — never touches real disk.
+        expect(called, isFalse);
+      },
+      // CustomIconStore.pickRaw() gates the whole native-picker call behind
+      // Platform.isMacOS — see its doc comment — so on any other platform
+      // (CI's Linux runner included) the method channel is never invoked at
+      // all, and this test's "invoked" expectation would fail through no
+      // fault of the widget under test.
+      skip: !Platform.isMacOS,
+    );
   });
 }

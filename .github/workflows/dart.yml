@@ -18,6 +18,9 @@ jobs:
     # This is a monorepo with no pubspec.yaml at the repo root — each of
     # these is its own Flutter package, analyzed/tested independently.
     strategy:
+      # A failure in one package (e.g. hotkeypad_host) shouldn't cancel the
+      # others mid-run — each package's result should be judged on its own.
+      fail-fast: false
       matrix:
         package:
           - packages/hotkeypad_protocol
