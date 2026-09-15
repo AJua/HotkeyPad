@@ -1,28 +1,32 @@
-# BTLink
+# HotkeyPad
 
-Two Flutter apps that talk to each other over Bluetooth Low Energy.
+Two Flutter apps that talk to each other over Bluetooth Low Energy or WiFi —
+whichever the two happen to find first (see [Message protocol](#message-protocol)
+for how a WiFi link differs on the wire).
 
 | Project     | Role                | BLE role   |
 | ----------- | ------------------- | ---------- |
-| `bt_host`   | the host service    | peripheral |
-| `bt_client` | the client app      | central    |
+| `hotkeypad_host`   | the host service    | peripheral |
+| `hotkeypad_client` | the client app      | central    |
 
-`bt_host` publishes a GATT service, advertises it, and is where the deck is
-arranged. `bt_client` finds that service by itself and renders whatever it is
-sent.
+`hotkeypad_host` publishes a GATT service (and, over WiFi, a TCP listener plus a
+discovery beacon), and is where the deck is arranged. `hotkeypad_client` finds
+that service by itself, over whichever transport answers first, and renders
+whatever it is sent.
 
 ## What it does
 
 A Stream Deck for your Mac: the phone is the deck, the Mac runs the service,
-and the two talk over BLE. A button can launch an app, work the media keys,
-send a keyboard combination, run a shell command, or fire a macOS Shortcut.
+and the two talk over BLE or WiFi. A button can launch an app, work the media
+keys, send a keyboard combination, run a shell command, or fire a macOS
+Shortcut.
 
 - **The client opens straight onto the deck.** It scans in the background,
-  takes the first host that advertises the BTLink service, and connects. With
+  takes the first host that advertises the HotkeyPad service, and connects. With
   one Mac in the room there is nothing to choose between, so a device picker
   was a step to dismiss rather than a feature.
 - The scanner survives as a diagnostic under the debug console: what this
-  radio can see, and which of it speaks BTLink. It is for working out why the
+  radio can see, and which of it speaks HotkeyPad. It is for working out why the
   automatic connection did not happen, not for making it happen.
 - On connect the client asks for the layout and the app catalogue; the host
   streams both back.
@@ -73,8 +77,8 @@ folders/pages of buttons, reconnect on wake, and bonding.
 
 ## Message protocol
 
-`protocol.dart` (in the shared `bt_link_protocol` package, see below) defines
-a sealed `BtMessage` hierarchy encoded as single-line JSON, one message per
+`protocol.dart` (in the shared `hotkeypad_protocol` package, see below) defines
+a sealed `HotkeyPadMessage` hierarchy encoded as single-line JSON, one message per
 ATT operation:
 
 | Message     | Direction       | Purpose                          |
@@ -99,7 +103,7 @@ larger than `getMaximumNotifyLength` reports rather than truncating it. The
 catalogue is therefore streamed as one small notification per app, paced at
 20ms so the notification queue does not overflow.
 
-Keys are one or two characters, and `BtMessage.decode` returns null for
+Keys are one or two characters, and `HotkeyPadMessage.decode` returns null for
 anything it does not recognise, so a version mismatch degrades instead of
 crashing.
 
@@ -124,7 +128,7 @@ channel (`macos/Runner/AppIconChannel.swift`) rather than reading
 `Assets.car`, where the plist route finds nothing, and AppKit also returns a
 sensible generic icon for apps that have none.
 
-`BtLink.iconSize` (128) is shared by both projects. Deck buttons fill their
+`HotkeyPad.iconSize` (128) is shared by both projects. Deck buttons fill their
 whole tappable area with the icon, so on a 3x phone screen it is scaled to
 roughly 300 physical pixels and 64px was visibly soft. The cost is ~15KB per
 icon instead of ~5KB — around 87 frames and under two seconds each at the MTU
@@ -278,7 +282,7 @@ deck is opened or not.
 
 ## A pinned dependency worth revisiting
 
-`bt_client/pubspec.yaml` holds `path_provider_foundation` at **2.5.1** via
+`hotkeypad_client/pubspec.yaml` holds `path_provider_foundation` at **2.5.1** via
 `dependency_overrides`. From 2.6.0 that package loads a dylib through
 Flutter's native-assets mechanism (via `objective_c`); on this toolchain
 (Flutter 3.38.5) it fails to resolve on macOS and crashes the app at launch
@@ -323,7 +327,7 @@ is centrals attached to this app's GATT server.
 
 ## The shared contract
 
-`protocol.dart` lives in `packages/bt_link_protocol`, a small Dart package
+`protocol.dart` lives in `packages/hotkeypad_protocol`, a small Dart package
 both apps depend on by path. Change a UUID or a message shape once and it
 reaches both sides — this used to be a file duplicated verbatim in both
 projects, which is also why the package's own tests are the original
@@ -402,8 +406,8 @@ those gaps rather than assuming every platform behaves like Android.
 Two devices are needed — a radio cannot usefully discover itself.
 
 ```sh
-cd bt_host   && flutter run -d <device-a>   # tap "Start advertising"
-cd bt_client && flutter run -d <device-b>   # tap "Scan"
+cd hotkeypad_host   && flutter run -d <device-a>   # tap "Start advertising"
+cd hotkeypad_client && flutter run -d <device-b>   # tap "Scan"
 ```
 
 The host should appear in the client's list with a `HOST` badge. Filter the
@@ -416,9 +420,7 @@ icon opens the debug console.
 ### iOS client
 
 `flutter build ios` works. The Runner target is signed with a personal team
-(`com.chienhunglin.btClient`), which is what a physical device needs; the
-RunnerTests target still carries the original `com.titansoft` prefix, which
-only matters if you run the XCTest target.
+(`com.chienhunglin.hotkeypad`), which is what a physical device needs.
 
 iOS has no MTU request API, so the stage indicator shows no MTU number there —
 CoreBluetooth negotiates on its own, and what it settles on is comfortably
