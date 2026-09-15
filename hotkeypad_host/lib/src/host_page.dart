@@ -1244,10 +1244,20 @@ class _HostPageState extends State<HostPage> {
     // service details — lives behind the gear. The language picker lives
     // in this app bar rather than the service screen's, since the deck is
     // what a user actually looks at day to day.
+    final lockPickerClients = [
+      for (final client in clients) (id: client.id, label: _labelFor(client)),
+    ];
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.deckLayoutTitle),
         actions: [
+          if (lockPickerClients.isNotEmpty)
+            DeviceLockPicker(
+              compact: true,
+              clients: lockPickerClients,
+              lockedClientId: _lockedClientId,
+              onChanged: (value) => setState(() => _lockedClientId = value),
+            ),
           IconButton(
             tooltip: l10n.language,
             onPressed: () => _showLanguagePicker(context),
@@ -1274,12 +1284,6 @@ class _HostPageState extends State<HostPage> {
                     _broadcastAppearance();
                   },
               onShowService: () => setState(() => _showingService = true),
-              connectedClients: [
-                for (final client in clients)
-                  (id: client.id, label: _labelFor(client)),
-              ],
-              lockedClientId: _lockedClientId,
-              onLockChanged: (value) => setState(() => _lockedClientId = value),
               // Only meaningful once a lock names one unambiguous device to
               // match — see LayoutPage's own doc comment on this field.
               lockedClientPortrait: _lockedClientId == null

@@ -270,9 +270,6 @@ class LayoutPage extends StatefulWidget {
     required this.onChanged,
     required this.onAppearanceChanged,
     required this.onShowService,
-    required this.connectedClients,
-    required this.lockedClientId,
-    required this.onLockChanged,
     required this.lockedClientPortrait,
   });
 
@@ -293,17 +290,6 @@ class LayoutPage extends StatefulWidget {
   /// Opens the service view, which is reached from the settings dialog now
   /// that there are no tabs.
   final VoidCallback onShowService;
-
-  /// Every client currently connected, for the device-lock picker — kept as
-  /// plain id/label pairs rather than the host's own `ConnectedClient` so
-  /// this file does not need to import host_page.dart back.
-  final List<({String id, String label})> connectedClients;
-
-  /// The client [PressSlot]s are currently restricted to, or null to accept
-  /// any of them — mirrors the same picker in the service tab.
-  final String? lockedClientId;
-
-  final ValueChanged<String?> onLockChanged;
 
   /// The locked client's own orientation, so the grid can be shown turned
   /// the same way that phone is actually displaying it — see
@@ -811,21 +797,6 @@ class LayoutPageState extends State<LayoutPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.connectedClients.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                DeviceLockPicker(
-                  compact: true,
-                  clients: widget.connectedClients,
-                  lockedClientId: widget.lockedClientId,
-                  onChanged: widget.onLockChanged,
-                ),
-              ],
-            ),
-          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
