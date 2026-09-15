@@ -21,6 +21,19 @@ abstract final class AppLauncher {
     '/System/Applications',
     '/Applications/Utilities',
     '/System/Applications/Utilities',
+    '/System/Library/CoreServices/Applications',
+  ];
+
+  /// Bundles that live directly under `/System/Library/CoreServices`, mixed
+  /// in with hundreds of background agents and helpers a user would never
+  /// want on a button — so, unlike [_searchPaths], these are named
+  /// explicitly rather than found by scanning the whole directory.
+  static const _extraApps = [
+    (
+      name: 'Finder',
+      category: 'Apps',
+      path: '/System/Library/CoreServices/Finder.app',
+    ),
   ];
 
   /// Returns the installed applications, de-duplicated and sorted by name.
@@ -60,7 +73,11 @@ abstract final class AppLauncher {
       final directory = Directory(path);
       if (!directory.existsSync()) continue;
 
-      final category = path.endsWith('Utilities') ? 'Utilities' : 'Apps';
+      final category =
+          path.endsWith('Utilities') ||
+              path == '/System/Library/CoreServices/Applications'
+          ? 'Utilities'
+          : 'Apps';
       try {
         for (final entry in directory.listSync(followLinks: false)) {
           final base = entry.path.split('/').last;
@@ -73,6 +90,12 @@ abstract final class AppLauncher {
         // An unreadable directory is not worth failing the whole catalogue.
         continue;
       }
+    }
+
+    for (final app in _extraApps) {
+      if (!seen.add(app.name)) continue;
+      if (!Directory(app.path).existsSync()) continue;
+      apps.add(app);
     }
 
     apps.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
