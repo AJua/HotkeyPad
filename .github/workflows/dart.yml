@@ -28,7 +28,7 @@ jobs:
           - hotkeypad_client
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # All three packages depend on the Flutter SDK (not just Dart's),
       # so this needs Flutter installed rather than dart-lang/setup-dart.
