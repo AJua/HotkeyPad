@@ -201,6 +201,16 @@ class HotkeyPadSession extends ChangeNotifier {
   bool get loadingLayout => _loadingLayout;
   Uint8List? iconFor(String appName) => _icons[appName];
 
+  /// True while the host is actively pushing something — a fresh layout,
+  /// or an icon/background image the deck doesn't have cached yet — so
+  /// the deck can show a quiet "syncing" hint rather than an update
+  /// (a moved button, a new background) just silently appearing with no
+  /// feedback that anything happened. Deliberately not the same as
+  /// [loadingLayout] alone: a background image change arrives as its own
+  /// [SetAppearance] message once the layout has already finished
+  /// loading, and is fetched the same way an icon is (see [ensureIcon]).
+  bool get isSyncing => _loadingLayout || _fetching != null;
+
   /// Identifies this host's layout in storage.
   /// BLE keeps today's bare peripheral uuid, unprefixed — changing its
   /// shape would silently orphan every existing user's cached layout and
@@ -505,6 +515,10 @@ class HotkeyPadSession extends ChangeNotifier {
       _iconQueue.removeAt(0);
     }
     _fetching = next;
+    // Only reason this needs its own notify: nothing else in this call
+    // path changes anything else the UI reads (see isSyncing), so without
+    // it the badge would wait for some unrelated rebuild to catch up.
+    notifyListeners();
     await _send(RequestIcon(name: appName));
     // The host answers with frames; _finishIconFetch releases the queue. A
     // host that never answers must not wedge it, hence the timeout.

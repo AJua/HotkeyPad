@@ -519,19 +519,37 @@ class _DeckPageState extends State<DeckPage> {
     // child unbounded height and _deck needs a bounded one to size cells.
     // Vertical pull and the PageView's horizontal swipe are different axes,
     // so neither steals gestures from the other.
-    return LayoutBuilder(
-      builder: (context, outer) {
-        return RefreshIndicator(
-          onRefresh: session.refreshIcons,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: SizedBox(
-              height: outer.maxHeight,
-              child: _deck(session, layout),
-            ),
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: LayoutBuilder(
+            builder: (context, outer) {
+              return RefreshIndicator(
+                onRefresh: session.refreshIcons,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: outer.maxHeight,
+                    child: _deck(session, layout),
+                  ),
+                ),
+              );
+            },
           ),
-        );
-      },
+        ),
+        // Bottom-right rather than blocking anything: a layout/appearance
+        // edit already lands on the deck without asking (see
+        // HotkeyPadSession.isSyncing's own doc comment on why this isn't
+        // just loadingLayout) — this is only a quiet acknowledgement that
+        // something changed, not a gate the user has to wait past. Only
+        // shown once there's a layout to show it over; while there is
+        // none yet, the "Loading the deck..." text above already says so.
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: _SyncingBadge(visible: session.isSyncing),
+        ),
+      ],
     );
   }
 
@@ -652,6 +670,56 @@ class _DeckPageState extends State<DeckPage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// A quiet "something is coming in" hint for the corner of the deck,
+/// rather than a spinner or banner that would compete with the buttons
+/// for attention — see [HotkeyPadSession.isSyncing]. [IgnorePointer]
+/// because it sits directly over the button grid's own corner; without
+/// it, this would steal the tap a button underneath was meant to get.
+class _SyncingBadge extends StatelessWidget {
+  const _SyncingBadge({required this.visible});
+
+  final bool visible;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: visible ? 1 : 0,
+        child: Material(
+          elevation: 2,
+          color: theme.colorScheme.inverseSurface,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.colorScheme.onInverseSurface,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Syncing…',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onInverseSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
