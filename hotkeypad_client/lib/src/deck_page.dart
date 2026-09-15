@@ -283,6 +283,33 @@ class _DeckPageState extends State<DeckPage> {
     });
   }
 
+  /// The app's own icon, shown at the start of the bar in place of a
+  /// generic leading widget — in landscape it is all the bar has room to
+  /// show (see [EdgeBarScaffold]'s side bar), so it also doubles as the
+  /// shortcut back to the first page that a launcher icon would otherwise
+  /// have no equivalent for once you're already inside the deck.
+  Widget _appIcon({VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.all(4),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Image.asset(
+            'assets/icon/app_icon.png',
+            width: 32,
+            height: 32,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _jumpToFirstPage() {
+    if (_pages.hasClients) _pages.jumpToPage(0);
+  }
+
   Future<void> _press(HotkeyPadSession session, int id, DeckItem item) async {
     // Fires before the round trip: the deck should feel like a button, not
     // like a form that submits.
@@ -328,6 +355,7 @@ class _DeckPageState extends State<DeckPage> {
         return EdgeBarScaffold(
           side: barSideFor(context),
           title: session.name,
+          leading: _appIcon(onTap: _jumpToFirstPage),
           actions: [
             IconButton(
               tooltip: 'Debug console',
@@ -389,6 +417,7 @@ class _DeckPageState extends State<DeckPage> {
     return EdgeBarScaffold(
       side: barSideFor(context),
       title: 'HotkeyPad',
+      leading: _appIcon(),
       actions: [
         IconButton(
           tooltip: 'Debug console',

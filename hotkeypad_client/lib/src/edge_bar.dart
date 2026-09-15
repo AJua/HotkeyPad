@@ -120,27 +120,12 @@ class EdgeBarScaffold extends StatelessWidget {
         ),
         child: SizedBox(
           width: _thickness,
+          // The title text is dropped on the side edges — there is no
+          // room to spell it out at only _thickness wide without either
+          // truncating it to nothing useful or crowding out the icon and
+          // actions, so landscape shows just the app icon in its place.
           child: Column(
-            children: [
-              ?leading,
-              // Reads bottom-to-top on the left edge and top-to-bottom on
-              // the right, the way a spine label does, so the text always
-              // runs away from the screen's centre.
-              Expanded(
-                child: RotatedBox(
-                  quarterTurns: onLeft ? 3 : 1,
-                  child: Center(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge,
-                    ),
-                  ),
-                ),
-              ),
-              ...actions,
-            ],
+            children: [?leading, const Spacer(), ...actions],
           ),
         ),
       ),
