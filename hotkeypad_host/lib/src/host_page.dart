@@ -1214,9 +1214,9 @@ class _HostPageState extends State<HostPage> {
     final clients = _clients.values.toList()
       ..sort((a, b) => a.since.compareTo(b.since));
     final subscribedCount = clients.where((c) => c.subscribed).length;
+    final l10n = AppLocalizations.of(context)!;
 
     if (_showingService) {
-      final l10n = AppLocalizations.of(context)!;
       return Scaffold(
         appBar: AppBar(
           title: Text(l10n.serviceTitle),
@@ -1225,13 +1225,6 @@ class _HostPageState extends State<HostPage> {
             onPressed: () => setState(() => _showingService = false),
             icon: const Icon(Icons.arrow_back),
           ),
-          actions: [
-            IconButton(
-              tooltip: l10n.language,
-              onPressed: () => _showLanguagePicker(context),
-              icon: const Icon(Icons.language),
-            ),
-          ],
         ),
         body: Column(
           children: [
@@ -1244,8 +1237,20 @@ class _HostPageState extends State<HostPage> {
     }
 
     // The window is the deck. Everything else — grid size, appearance, the
-    // service details — lives behind the gear.
+    // service details — lives behind the gear. The language picker lives
+    // in this app bar rather than the service screen's, since the deck is
+    // what a user actually looks at day to day.
     return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.deckLayoutTitle),
+        actions: [
+          IconButton(
+            tooltip: l10n.language,
+            onPressed: () => _showLanguagePicker(context),
+            icon: const Icon(Icons.language),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           _wifiPinBanner(context),

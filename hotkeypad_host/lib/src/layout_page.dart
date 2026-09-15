@@ -810,12 +810,8 @@ class _LayoutPageState extends State<LayoutPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Text(
-                l10n.deckLayoutTitle,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const Spacer(),
               if (widget.connectedClients.isNotEmpty)
                 DeviceLockPicker(
                   compact: true,
