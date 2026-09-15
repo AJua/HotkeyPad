@@ -10,6 +10,23 @@ import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 /// The host owns the layout, so this is the only copy that matters; the
 /// client caches what it is sent but never edits it.
 abstract final class LayoutStore {
+  /// Shown before anything has ever been saved, so a first install is not
+  /// a blank grid — a handful of stock Apple apps to start from.
+  static final _defaultLayout =
+      DeckLayout.fromJson({
+        'columns': 3,
+        'rows': 2,
+        'pages': 1,
+        'slots': [
+          'app:App Store',
+          'app:Finder',
+          'app:Safari',
+          'app:Maps',
+          'app:Mail',
+          'app:Calendar',
+        ],
+      })!;
+
   /// Used when there is no filesystem — the web build, which exists only to
   /// develop the editor UI.
   static DeckLayout? _inMemory;
@@ -23,9 +40,9 @@ abstract final class LayoutStore {
 
   static Future<DeckLayout> load() async {
     final file = _file;
-    if (file == null) return _inMemory ??= DeckLayout.empty();
+    if (file == null) return _inMemory ??= _defaultLayout;
     try {
-      if (!file.existsSync()) return DeckLayout.empty();
+      if (!file.existsSync()) return _defaultLayout;
       final decoded = jsonDecode(await file.readAsString());
       return DeckLayout.fromJson(decoded) ?? DeckLayout.empty();
     } catch (_) {
