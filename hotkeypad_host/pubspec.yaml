@@ -38,6 +38,8 @@ dependencies:
   hotkeypad_protocol:
     path: ../packages/hotkeypad_protocol
   flutter_svg: ^2.3.0
+  http: ^1.6.0
+  package_info_plus: ^8.3.0
 
 dev_dependencies:
   flutter_test:

@@ -6,6 +6,7 @@ import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
 // Flutter's own ConnectionState (used by StreamBuilder) collides with the BLE one.
 import 'package:flutter/material.dart' hide ConnectionState;
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'app_launcher.dart';
 import 'background_image_store.dart';
@@ -18,6 +19,8 @@ import 'media_control.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'settings_store.dart';
 import 'unsupported_page.dart';
+import 'update_checker.dart';
+import 'update_store.dart';
 import 'wifi_server.dart';
 import 'wifi_trust_store.dart';
 
@@ -249,6 +252,11 @@ class _HostPageState extends State<HostPage> {
   /// System Settings rather than here.
   bool _accessibility = true;
 
+  /// Set once [_checkForUpdate] finds a release newer than this build and
+  /// not already dismissed — see [_updateBanner]. Null the rest of the
+  /// time, including while a check is still in flight.
+  LatestRelease? _updateAvailable;
+
   /// App name -> bundle path, filled when the catalogue is built so an icon
   /// request does not have to rescan the disk.
   final _appPaths = <String, String>{};
@@ -290,6 +298,7 @@ class _HostPageState extends State<HostPage> {
       }
       _autoStart();
       _refreshAccessibility();
+      _checkForUpdate();
     });
   }
 
@@ -300,6 +309,29 @@ class _HostPageState extends State<HostPage> {
     if (_state != BluetoothLowEnergyState.poweredOn) return;
     _autoStarted = true;
     _toggleAdvertising();
+  }
+
+  /// Best-effort, non-blocking check against GitHub Releases — see
+  /// `UpdateChecker`'s doc comment for why a failure here is always
+  /// silent. Reuses a cached result instead of hitting the network again
+  /// when [shouldCheckNow] says the last real check is still fresh.
+  Future<void> _checkForUpdate() async {
+    final state = await UpdateStore.load();
+    var latest = state.latest;
+    if (shouldCheckNow(state.lastCheckedAt, DateTime.now())) {
+      latest = await UpdateChecker.fetchLatest();
+      await UpdateStore.recordCheck(DateTime.now(), latest);
+    }
+    if (latest == null || !mounted) return;
+    final current = (await PackageInfo.fromPlatform()).version;
+    if (!isNewerVersion(current, latest.version)) return;
+    if (!shouldShowBanner(state.dismissedVersion, latest.version)) return;
+    if (mounted) setState(() => _updateAvailable = latest);
+  }
+
+  Future<void> _dismissUpdate(LatestRelease release) async {
+    await UpdateStore.dismiss(release.version);
+    if (mounted) setState(() => _updateAvailable = null);
   }
 
   Future<void> _refreshAccessibility() async {
@@ -1137,6 +1169,7 @@ class _HostPageState extends State<HostPage> {
         body: Column(
           children: [
             _wifiPinBanner(context),
+            _updateBanner(context),
             Expanded(child: _serviceTab(context, clients, subscribedCount)),
           ],
         ),
@@ -1149,6 +1182,7 @@ class _HostPageState extends State<HostPage> {
       body: Column(
         children: [
           _wifiPinBanner(context),
+          _updateBanner(context),
           Expanded(
             child: LayoutPage(
               onChanged: _broadcastLayout,
@@ -1233,6 +1267,46 @@ class _HostPageState extends State<HostPage> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// A quiet notice that a newer host version is out — see
+  /// [_checkForUpdate]. Below [_wifiPinBanner] rather than above it: an
+  /// unapproved connection is time-sensitive, a new release isn't.
+  Widget _updateBanner(BuildContext context) {
+    final release = _updateAvailable;
+    if (release == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final onContainer = theme.colorScheme.onSecondaryContainer;
+    return Material(
+      color: theme.colorScheme.secondaryContainer,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Icon(Icons.new_releases_outlined, color: onContainer),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'HotkeyPad Host ${release.version} is available.',
+                  style: TextStyle(color: onContainer),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Process.run('open', [release.htmlUrl]),
+                child: const Text('View'),
+              ),
+              IconButton(
+                tooltip: 'Dismiss',
+                icon: Icon(Icons.close, color: onContainer),
+                onPressed: () => _dismissUpdate(release),
+              ),
+            ],
+          ),
         ),
       ),
     );
