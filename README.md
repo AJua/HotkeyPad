@@ -444,3 +444,7 @@ but is reassigned if the app is reinstalled.
   `com.apple.security.device.bluetooth` sandbox entitlement.
 
 The apps call `authorize()` on Android before scanning or advertising.
+
+## License
+
+[MIT](LICENSE)
