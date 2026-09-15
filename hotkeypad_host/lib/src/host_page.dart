@@ -210,6 +210,10 @@ class _HostPageState extends State<HostPage> {
   PeripheralManager? _peripheral;
   Object? _initError;
 
+  /// Lets the app bar's gear button reach into [LayoutPage], which owns the
+  /// settings dialog and the state it edits.
+  final _layoutPageKey = GlobalKey<LayoutPageState>();
+
   final _wifiServer = WifiServer();
 
   /// WiFi has no MTU negotiation the way BLE does — a TCP write simply
@@ -1249,6 +1253,11 @@ class _HostPageState extends State<HostPage> {
             onPressed: () => _showLanguagePicker(context),
             icon: const Icon(Icons.language),
           ),
+          IconButton(
+            tooltip: l10n.settingsTitle,
+            onPressed: () => _layoutPageKey.currentState?.openSettings(),
+            icon: const Icon(Icons.settings_outlined),
+          ),
         ],
       ),
       body: Column(
@@ -1257,6 +1266,7 @@ class _HostPageState extends State<HostPage> {
           _updateBanner(context),
           Expanded(
             child: LayoutPage(
+              key: _layoutPageKey,
               onChanged: _broadcastLayout,
               onAppearanceChanged:
                   (theme, showLabels, showAppBar, showPageDots) {

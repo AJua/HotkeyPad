@@ -307,14 +307,14 @@ class LayoutPage extends StatefulWidget {
 
   /// The locked client's own orientation, so the grid can be shown turned
   /// the same way that phone is actually displaying it — see
-  /// [_LayoutPageState._displayLayout]. Null whenever there is no single
+  /// [LayoutPageState._displayLayout]. Null whenever there is no single
   /// locked device to match (nothing picked, or its own [SetOrientation]
   /// has not arrived yet), in which case the canonical, un-turned shape is
   /// shown, same as before this existed.
   final bool? lockedClientPortrait;
 
   @override
-  State<LayoutPage> createState() => _LayoutPageState();
+  State<LayoutPage> createState() => LayoutPageState();
 }
 
 /// [DeckTheme.label] is a wire/debug string shared with the client and the
@@ -334,7 +334,10 @@ String _backgroundFitLabel(AppLocalizations l10n, BackgroundFit fit) =>
       BackgroundFit.stretch => l10n.backgroundFitStretch,
     };
 
-class _LayoutPageState extends State<LayoutPage> {
+/// Public so the host can hold a `GlobalKey<LayoutPageState>` and call
+/// [openSettings] from the app bar's gear button, which lives a level above
+/// this widget in the tree.
+class LayoutPageState extends State<LayoutPage> {
   DeckLayout _layout = DeckLayout.empty();
   DeckTheme _theme = DeckTheme.system;
   bool _showLabels = true;
@@ -444,8 +447,9 @@ class _LayoutPageState extends State<LayoutPage> {
   }
 
   /// Grid size, appearance and the service view all live behind the gear,
-  /// so the window is the deck and nothing else.
-  Future<void> _openSettings() async {
+  /// so the window is the deck and nothing else. Public: the gear button
+  /// that calls this now lives in the host's app bar, not this widget.
+  Future<void> openSettings() async {
     await showDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -807,26 +811,21 @@ class _LayoutPageState extends State<LayoutPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (widget.connectedClients.isNotEmpty)
+        if (widget.connectedClients.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
                 DeviceLockPicker(
                   compact: true,
                   clients: widget.connectedClients,
                   lockedClientId: widget.lockedClientId,
                   onChanged: widget.onLockChanged,
                 ),
-              IconButton(
-                tooltip: l10n.settingsTitle,
-                onPressed: _openSettings,
-                icon: const Icon(Icons.settings_outlined),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
