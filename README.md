@@ -292,26 +292,25 @@ than preferences: shared_preferences is loaded into memory wholesale at
 startup, so a deck of thirty icons would weigh on every launch whether the
 deck is opened or not.
 
-## A pinned dependency worth revisiting
+## A pinned dependency that got retired
 
-`hotkeypad_client/pubspec.yaml` holds `path_provider_foundation` at **2.5.1** via
-`dependency_overrides`. From 2.6.0 that package loads a dylib through
-Flutter's native-assets mechanism (via `objective_c`); on this toolchain
-(Flutter 3.38.5) it fails to resolve on macOS and crashes the app at launch
-on iOS with `EXC_BAD_ACCESS`. 2.5.1 is the last plain method-channel release.
+`hotkeypad_client/pubspec.yaml` used to hold `path_provider_foundation` at
+**2.5.1** via `dependency_overrides`. From 2.6.0 that package loads a dylib
+through Flutter's native-assets mechanism (via `objective_c`); on Flutter
+3.38.5 that failed to resolve on macOS and crashed the app at launch on iOS
+with `EXC_BAD_ACCESS`. 2.5.1 was the last plain method-channel release.
 
-`dependency_overrides` silently wins over the whole resolution graph, so this
-is the kind of pin that rots unnoticed. To retire it: drop the override, run
-`flutter pub get`, and check that `pubspec.lock` gains no `objective_c` and
-that `build/ios/iphoneos/Runner.app/Frameworks` gains no
-`objective_c.framework`. Then run it on a physical iPhone — the macOS
-symptom and the iOS symptom were different, and only the device showed the
-crash.
-
-Note that removing a native dependency does not remove its framework from an
-existing build directory. `flutter clean` is required, or the stale framework
-loads against a Dart side that no longer registers it and the app opens to a
-white screen.
+On Flutter 3.47.2 the override is gone: `path_provider_foundation` resolves
+to 2.6.0, `objective_c` is a normal transitive dependency, and
+`objective_c.framework` shows up in both the macOS and iOS build output
+without incident. Verified end-to-end after a `flutter clean` (removing a
+native dependency doesn't remove its framework from an existing build
+directory, or the stale framework loads against a Dart side that no longer
+registers it and the app opens to a white screen): `hotkeypad_client` on
+macOS and on the iOS Simulator both launch, pair with a host over WiFi
+(PIN entry included), sync a layout, and dispatch a button press
+end-to-end. Not re-verified on a physical iPhone this time around — that's
+the one gap left if this toolchain ever regresses again.
 
 ## The macOS host is not sandboxed
 
