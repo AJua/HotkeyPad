@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
+import 'config_dir.dart';
 
 /// A persistent id for this Mac, independent of any one transport.
 ///
@@ -16,10 +16,9 @@ abstract final class HostIdentity {
   static String? _cached;
 
   static File? get _file {
-    if (kIsWeb) return null;
-    final home = Platform.environment['HOME'];
-    if (home == null) return null;
-    return File('$home/.config/HotkeyPad/host_id');
+    final dir = ConfigDir.path;
+    if (dir == null) return null;
+    return File('$dir/host_id');
   }
 
   static Future<String> id() async {

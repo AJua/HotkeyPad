@@ -1,7 +1,8 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+
+import 'config_dir.dart';
 
 /// The user's manually-picked app language, distinct from — and
 /// overriding — this Mac's own system language. Entirely independent of
@@ -15,10 +16,9 @@ import 'package:flutter/widgets.dart';
 /// not JSON, since there is exactly one value to hold.
 abstract final class LocaleStore {
   static File? get _file {
-    if (kIsWeb) return null;
-    final home = Platform.environment['HOME'];
-    if (home == null) return null;
-    return File('$home/.config/HotkeyPad/locale');
+    final dir = ConfigDir.path;
+    if (dir == null) return null;
+    return File('$dir/locale');
   }
 
   /// Null means "follow the system" — the default, and the only

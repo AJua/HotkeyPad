@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
+
+import 'config_dir.dart';
 
 /// Everything this store persists, bundled together because [load] and
 /// [save] only ever deal in the whole set at once — every field here rides
@@ -29,10 +29,9 @@ abstract final class SettingsStore {
   static Appearance? _inMemory;
 
   static File? get _file {
-    if (kIsWeb) return null;
-    final home = Platform.environment['HOME'];
-    if (home == null) return null;
-    return File('$home/.config/HotkeyPad/settings.json');
+    final dir = ConfigDir.path;
+    if (dir == null) return null;
+    return File('$dir/settings.json');
   }
 
   static const _fallback = (

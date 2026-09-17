@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-
+import 'config_dir.dart';
 import 'update_checker.dart';
 
 /// How often [shouldCheckNow] allows a real network call — once a day is
@@ -48,10 +47,9 @@ bool shouldShowBanner(String? dismissedVersion, String latestVersion) =>
 /// outward.
 abstract final class UpdateStore {
   static File? get _file {
-    if (kIsWeb) return null;
-    final home = Platform.environment['HOME'];
-    if (home == null) return null;
-    return File('$home/.config/HotkeyPad/update.json');
+    final dir = ConfigDir.path;
+    if (dir == null) return null;
+    return File('$dir/update.json');
   }
 
   static Future<UpdateState> load() async {

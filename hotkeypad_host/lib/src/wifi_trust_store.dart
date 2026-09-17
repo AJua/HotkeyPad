@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'config_dir.dart';
 
 /// Whether a WiFi client — identified by its MAC address, see
 /// `wifi_server.dart` — should be let through without asking, given what
@@ -25,10 +25,9 @@ WifiTrust wifiTrustFor(String mac, Map<String, bool> known) {
 /// different concern back out.
 abstract final class WifiTrustStore {
   static File? get _file {
-    if (kIsWeb) return null;
-    final home = Platform.environment['HOME'];
-    if (home == null) return null;
-    return File('$home/.config/HotkeyPad/wifi_trust.json');
+    final dir = ConfigDir.path;
+    if (dir == null) return null;
+    return File('$dir/wifi_trust.json');
   }
 
   /// mac (lowercase `xx:xx:xx:xx:xx:xx`) -> trusted (`true`) or blocked

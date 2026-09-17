@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 
+import 'config_dir.dart';
 import 'custom_icon_store.dart';
 import 'image_decode.dart';
 
@@ -28,10 +29,9 @@ abstract final class BackgroundImageStore {
   static bool get supported => CustomIconStore.supported;
 
   static Directory? get _directory {
-    if (kIsWeb) return null;
-    final home = Platform.environment['HOME'];
-    if (home == null) return null;
-    return Directory('$home/.config/HotkeyPad/backgrounds');
+    final dir = ConfigDir.path;
+    if (dir == null) return null;
+    return Directory('$dir/backgrounds');
   }
 
   static String _fileName(String id) => '$id.png';

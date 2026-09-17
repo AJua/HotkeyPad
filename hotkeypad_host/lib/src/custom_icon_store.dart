@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'config_dir.dart';
 import 'image_decode.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
@@ -23,10 +24,9 @@ abstract final class CustomIconStore {
   static bool get supported => !kIsWeb && Platform.isMacOS;
 
   static Directory? get _directory {
-    if (kIsWeb) return null;
-    final home = Platform.environment['HOME'];
-    if (home == null) return null;
-    return Directory('$home/.config/HotkeyPad/custom_icons');
+    final dir = ConfigDir.path;
+    if (dir == null) return null;
+    return Directory('$dir/custom_icons');
   }
 
   static String _fileName(String id) => '$id.png';
