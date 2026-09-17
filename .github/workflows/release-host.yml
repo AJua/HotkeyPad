@@ -57,7 +57,11 @@ jobs:
 
   build-windows:
     needs: version
-    runs-on: windows-latest
+    # Not windows-latest: its current MSVC toolset (14.51, "VS 18") turns
+    # bluetooth_low_energy_windows's use of the deprecated /await flag +
+    # <experimental/coroutine> into a hard compile error (STL1011) instead
+    # of a warning. windows-2022's older toolset still accepts it.
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v5
 
