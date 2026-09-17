@@ -26,6 +26,19 @@ import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 bool isUnresolvableHostError(Object error) =>
     error is SocketException && error.message.contains('Failed host lookup');
 
+/// Whether a Bluetooth adapter state event should cut short a reconnect
+/// backoff already in flight, rather than wait for it to elapse.
+///
+/// Only worth acting on when the adapter has actually come back — every
+/// other state (including a spurious repeat of `poweredOn`, which
+/// [reconnectScheduled] being false already rules out) means nothing
+/// changed that a stalled attempt was waiting on. See its use in
+/// [HotkeyPadSession.start], next to [HotkeyPadSession._scheduleReconnect].
+bool shouldReconnectImmediately(
+  BluetoothLowEnergyState state, {
+  required bool reconnectScheduled,
+}) => state == BluetoothLowEnergyState.poweredOn && reconnectScheduled;
+
 /// Where the link is in the connect -> discover -> subscribe sequence.
 enum LinkStage {
   connecting('Connecting'),
@@ -306,6 +319,24 @@ class HotkeyPadSession extends ChangeNotifier {
             return;
           }
           _receive(event.value);
+        }),
+      );
+
+      // Flipping the radio off mid-link throws every CentralManager call
+      // until it comes back — connect() surfaces that as a normal failed
+      // attempt (see its catch below), but only this reconnects the moment
+      // the adapter is actually usable again rather than waiting out
+      // whatever backoff was already in flight, the same idea as
+      // onResume above.
+      _subscriptions.add(
+        _central.stateChanged.listen((event) {
+          final scheduled = _reconnectTimer?.isActive ?? false;
+          if (shouldReconnectImmediately(
+            event.state,
+            reconnectScheduled: scheduled,
+          )) {
+            _reconnectNow();
+          }
         }),
       );
     }

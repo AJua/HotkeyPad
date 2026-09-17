@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:hotkeypad_client/src/session.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -76,6 +77,44 @@ void main() {
     test('false for anything that is not a SocketException at all', () {
       expect(isUnresolvableHostError(TimeoutException('x')), isFalse);
       expect(isUnresolvableHostError(StateError('x')), isFalse);
+    });
+  });
+
+  group('shouldReconnectImmediately', () {
+    test('the adapter coming back on cuts a scheduled backoff short', () {
+      expect(
+        shouldReconnectImmediately(
+          BluetoothLowEnergyState.poweredOn,
+          reconnectScheduled: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('poweredOn with nothing waiting on it changes nothing', () {
+      // Already connected, or never disconnected in the first place —
+      // there is no stalled attempt for this event to rescue.
+      expect(
+        shouldReconnectImmediately(
+          BluetoothLowEnergyState.poweredOn,
+          reconnectScheduled: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('every other state leaves a scheduled backoff alone', () {
+      for (final state in [
+        BluetoothLowEnergyState.poweredOff,
+        BluetoothLowEnergyState.unauthorized,
+        BluetoothLowEnergyState.unsupported,
+        BluetoothLowEnergyState.unknown,
+      ]) {
+        expect(
+          shouldReconnectImmediately(state, reconnectScheduled: true),
+          isFalse,
+        );
+      }
     });
   });
 }
