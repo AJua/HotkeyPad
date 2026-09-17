@@ -328,6 +328,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'System default'**
   String get systemDefaultLanguage;
+
+  /// Heading on the first-run connection-method choice screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how to connect'**
+  String get connectionMethodTitle;
+
+  /// Subtitle on the first-run connection-method choice screen.
+  ///
+  /// In en, this message translates to:
+  /// **'You can change this later from settings.'**
+  String get connectionMethodSubtitle;
+
+  /// Bluetooth connection method option.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth'**
+  String get connectionMethodBluetooth;
+
+  /// Description of the Bluetooth connection method.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan for a host advertising nearby over Bluetooth.'**
+  String get connectionMethodBluetoothHint;
+
+  /// WiFi connection method option.
+  ///
+  /// In en, this message translates to:
+  /// **'WiFi'**
+  String get connectionMethodWifi;
+
+  /// Description of the WiFi connection method.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a host on the same network, or enter its address.'**
+  String get connectionMethodWifiHint;
+
+  /// Section heading above the connection-method radio buttons in the settings dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection method'**
+  String get connectionMethodSettingsTitle;
+
+  /// Tooltip on the gear icon, and title of the dialog it opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// Button that closes the settings dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get done;
+
+  /// Settings-dialog entry opening the Bluetooth scanner diagnostic, and title of the page it opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby devices'**
+  String get nearbyDevices;
+
+  /// Debug console body text before any session exists.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected to a host yet.'**
+  String get notConnectedToHostYet;
+
+  /// Debug console body text before any message has been logged.
+  ///
+  /// In en, this message translates to:
+  /// **'No traffic yet.'**
+  String get noTrafficYet;
+
+  /// Debug console composer field hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Send raw text to the host'**
+  String get sendRawTextHint;
+
+  /// Debug console bubble label for a message received from the host.
+  ///
+  /// In en, this message translates to:
+  /// **'host'**
+  String get messageFromHost;
+
+  /// Debug console bubble label for a message this app sent.
+  ///
+  /// In en, this message translates to:
+  /// **'sent'**
+  String get messageSent;
+
+  /// Compact link-stage label in the debug console's app bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting'**
+  String get debugStageConnecting;
+
+  /// Compact link-stage label in the debug console's app bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Discovering services'**
+  String get debugStageDiscovering;
+
+  /// Compact link-stage label in the debug console's app bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribing'**
+  String get debugStageSubscribing;
+
+  /// Compact link-stage label in the debug console's app bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code shown on the host'**
+  String get debugStageAwaitingPin;
+
+  /// Compact link-stage label in the debug console's app bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get debugStageReady;
+
+  /// Compact link-stage label in the debug console's app bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected'**
+  String get debugStageDisconnected;
+
+  /// Compact link-stage label in the debug console's app bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get debugStageFailed;
+
+  /// Appended to the debug console's stage label when the negotiated MTU is known.
+  ///
+  /// In en, this message translates to:
+  /// **'MTU {mtu}'**
+  String mtuLabel(int mtu);
+
+  /// Tooltip on the nearby-devices page's clear-list icon.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear list'**
+  String get clearDeviceList;
+
+  /// Filter chip label on the nearby-devices page.
+  ///
+  /// In en, this message translates to:
+  /// **'HotkeyPad hosts ({count})'**
+  String hotkeypadHostsCount(int count);
+
+  /// Count of devices currently listed on the nearby-devices page.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} shown'**
+  String devicesShownCount(int count);
+
+  /// Placeholder name for a discovered device with no advertised name.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown device'**
+  String get unknownDevice;
+
+  /// Short badge marking a discovered device as a HotkeyPad host.
+  ///
+  /// In en, this message translates to:
+  /// **'HOST'**
+  String get hostBadge;
+
+  /// Nearby-devices list item subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{id}\n{rssi} dBm  ·  seen {seconds}s ago'**
+  String deviceSubtitle(String id, int rssi, int seconds);
+
+  /// Snackbar shown when scanning is attempted with Bluetooth off.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn Bluetooth on first.'**
+  String get turnBluetoothOnFirst;
+
+  /// Snackbar shown when scanning is attempted without permission.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth permission denied.'**
+  String get bluetoothPermissionDeniedSnackbar;
+
+  /// Nearby-devices adapter banner.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth is turned off.'**
+  String get bluetoothOff;
+
+  /// Nearby-devices adapter banner.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth permission has not been granted yet.'**
+  String get bluetoothUnauthorized;
+
+  /// Nearby-devices adapter banner.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth Low Energy is not supported on this device.'**
+  String get bluetoothUnsupported;
+
+  /// Nearby-devices adapter banner.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking Bluetooth adapter...'**
+  String get bluetoothCheckingAdapter;
+
+  /// Button on the nearby-devices adapter banner that requests permission.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant'**
+  String get grantAction;
+
+  /// Nearby-devices empty state while a scan is running.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning for devices...'**
+  String get scanningForDevices;
+
+  /// Nearby-devices empty state before a scan has started.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Scan to look for nearby devices.'**
+  String get tapScanToLookForDevices;
+
+  /// Floating action button label while scanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop scan'**
+  String get stopScan;
+
+  /// Floating action button label while not scanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan'**
+  String get scanAction;
 }
 
 class _AppLocalizationsDelegate

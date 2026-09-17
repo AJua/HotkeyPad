@@ -4,6 +4,7 @@ import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'safe_insets.dart';
 import 'unsupported_page.dart';
@@ -127,6 +128,12 @@ class _ScanPageState extends State<ScanPage> {
   Future<void> _toggleDiscovery() async {
     final central = _central;
     if (central == null) return;
+    // Captured before any `await` below — the lints correctly flag reading
+    // an inherited widget's context after a gap, since this State may no
+    // longer be mounted (or in the same tree position) by the time it
+    // resumes; _showMessage's own `mounted` check guards the SnackBar call
+    // itself, but not this lookup.
+    final l10n = AppLocalizations.of(context)!;
     try {
       if (_discovering) {
         await central.stopDiscovery();
@@ -137,11 +144,11 @@ class _ScanPageState extends State<ScanPage> {
       }
 
       if (_state == BluetoothLowEnergyState.poweredOff) {
-        _showMessage('Turn Bluetooth on first.');
+        _showMessage(l10n.turnBluetoothOnFirst);
         return;
       }
       if (!await _ensureAuthorized()) {
-        _showMessage('Bluetooth permission denied.');
+        _showMessage(l10n.bluetoothPermissionDeniedSnackbar);
         return;
       }
 
@@ -190,15 +197,16 @@ class _ScanPageState extends State<ScanPage> {
       return UnsupportedPage(details: '$_initError');
     }
 
+    final l10n = AppLocalizations.of(context)!;
     final devices = _visibleDevices;
     final hostCount = _devices.values.where((d) => d.isHost).length;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nearby devices'),
+        title: Text(l10n.nearbyDevices),
         actions: [
           IconButton(
-            tooltip: 'Clear list',
+            tooltip: l10n.clearDeviceList,
             onPressed:
                 _devices.isEmpty ? null : () => setState(_devices.clear),
             icon: const Icon(Icons.delete_sweep_outlined),
@@ -212,13 +220,13 @@ class _ScanPageState extends State<ScanPage> {
               children: [
                 FilterChip(
                   selected: _hostsOnly,
-                  label: Text('HotkeyPad hosts ($hostCount)'),
+                  label: Text(l10n.hotkeypadHostsCount(hostCount)),
                   avatar: const Icon(Icons.dns_outlined, size: 18),
                   onSelected: (value) => setState(() => _hostsOnly = value),
                 ),
                 const Spacer(),
                 Text(
-                  '${devices.length} shown',
+                  l10n.devicesShownCount(devices.length),
                   style: Theme.of(context).textTheme.labelMedium,
                 ),
               ],
@@ -252,7 +260,7 @@ class _ScanPageState extends State<ScanPage> {
             ? Theme.of(context).disabledColor
             : null,
         icon: Icon(_discovering ? Icons.stop : Icons.bluetooth_searching),
-        label: Text(_discovering ? 'Stop scan' : 'Scan'),
+        label: Text(_discovering ? l10n.stopScan : l10n.scanAction),
       ),
     );
   }
@@ -265,6 +273,7 @@ class _DeviceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final age = DateTime.now().difference(device.lastSeen);
     final stale = age.inSeconds >= 10;
     final theme = Theme.of(context);
@@ -279,7 +288,7 @@ class _DeviceTile extends StatelessWidget {
               child: Text(
                 device.name?.isNotEmpty == true
                     ? device.name!
-                    : 'Unknown device',
+                    : l10n.unknownDevice,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontWeight:
@@ -298,7 +307,7 @@ class _DeviceTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  'HOST',
+                  l10n.hostBadge,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.bold,
@@ -309,7 +318,7 @@ class _DeviceTile extends StatelessWidget {
           ],
         ),
         subtitle: Text(
-          '${device.id}\n${device.rssi} dBm  ·  seen ${age.inSeconds}s ago',
+          l10n.deviceSubtitle(device.id, device.rssi, age.inSeconds),
           style: theme.textTheme.bodySmall,
         ),
         isThreeLine: true,
@@ -346,14 +355,13 @@ class _AdapterBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final message = switch (state) {
       BluetoothLowEnergyState.poweredOn => null,
-      BluetoothLowEnergyState.poweredOff => 'Bluetooth is turned off.',
-      BluetoothLowEnergyState.unauthorized =>
-        'Bluetooth permission has not been granted yet.',
-      BluetoothLowEnergyState.unsupported =>
-        'Bluetooth Low Energy is not supported on this device.',
-      BluetoothLowEnergyState.unknown => 'Checking Bluetooth adapter...',
+      BluetoothLowEnergyState.poweredOff => l10n.bluetoothOff,
+      BluetoothLowEnergyState.unauthorized => l10n.bluetoothUnauthorized,
+      BluetoothLowEnergyState.unsupported => l10n.bluetoothUnsupported,
+      BluetoothLowEnergyState.unknown => l10n.bluetoothCheckingAdapter,
     };
     if (message == null) return const SizedBox.shrink();
 
@@ -372,7 +380,7 @@ class _AdapterBanner extends StatelessWidget {
             if (state == BluetoothLowEnergyState.unauthorized)
               TextButton(
                 onPressed: () => onGrant(),
-                child: const Text('Grant'),
+                child: Text(l10n.grantAction),
               ),
           ],
         ),
@@ -388,6 +396,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -400,8 +409,8 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             discovering
-                ? 'Scanning for devices...'
-                : 'Tap Scan to look for nearby devices.',
+                ? l10n.scanningForDevices
+                : l10n.tapScanToLookForDevices,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],

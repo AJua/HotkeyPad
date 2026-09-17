@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 
 import '../l10n/app_localizations.dart';
 import 'background_fit.dart';
+import 'connection_method_store.dart';
 import 'debug_page.dart';
 import 'edge_bar.dart';
 import 'host_history_store.dart';
@@ -16,6 +17,7 @@ import 'link_target.dart';
 import 'locale_store.dart';
 import 'qr_scan_page.dart';
 import 'safe_insets.dart';
+import 'scan_page.dart';
 import 'deck_icons.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'session.dart';
@@ -74,6 +76,14 @@ class _DeckPageState extends State<DeckPage> {
   Object? _searchError;
   bool _searching = false;
 
+  /// The user's own chosen transport — see [ConnectionMethodStore]. Null
+  /// means either "still loading from disk" ([_methodLoaded] false) or
+  /// "never chosen" ([_methodLoaded] true), which is what tells [build]
+  /// to show the choice screen instead of racing both transports the way
+  /// this screen used to.
+  ConnectionMethod? _method;
+  bool _methodLoaded = false;
+
   /// WiFi's own discovery, alongside Bluetooth's — bound independently of
   /// [_central]/[_state] since WiFi needs neither an adapter nor a runtime
   /// permission, so it must not be gated behind Bluetooth's own state
@@ -88,12 +98,79 @@ class _DeckPageState extends State<DeckPage> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadMethod());
+  }
+
+  Future<void> _loadMethod() async {
+    final method = await ConnectionMethodStore.load();
+    if (!mounted) return;
+    setState(() {
+      _method = method;
+      _methodLoaded = true;
+    });
+    if (method != null) _startForMethod(method);
+  }
+
+  /// Called once the user picks a method for the first time (from
+  /// [_methodChoiceScaffold]) or switches it later (from
+  /// [_showConnectionMethodSettings]) — either way, persist it before
+  /// starting so a crash mid-connect does not lose the choice.
+  Future<void> _chooseMethod(ConnectionMethod method) async {
+    await ConnectionMethodStore.save(method);
+    if (!mounted) return;
+    setState(() => _method = method);
+    _startForMethod(method);
+  }
+
+  /// Tears down whatever the previous method had running before starting
+  /// the new one — the settings sheet is the only caller that can reach
+  /// this with something already in flight; [_chooseMethod] on a fresh
+  /// launch has nothing to stop.
+  Future<void> _switchMethod(ConnectionMethod method) async {
+    _stopSearch();
+    _stopWifiDiscovery();
+    _session?.dispose();
+    await ConnectionMethodStore.save(method);
+    if (!mounted) return;
+    setState(() {
+      _session = null;
+      _searchError = null;
+      _method = method;
+    });
+    _startForMethod(method);
+  }
+
+  void _startForMethod(ConnectionMethod method) {
+    switch (method) {
+      case ConnectionMethod.bluetooth:
+        // Re-entering Bluetooth after a switch away from it: the manager
+        // and its state-change listener are still alive (see the guard in
+        // that listener below), so there is nothing to recreate — just
+        // resume from whatever state it last reported.
+        if (_central == null) {
+          _initBluetooth();
+        } else {
+          _onState(_state);
+        }
+      case ConnectionMethod.wifi:
+        unawaited(_startWifiDiscovery());
+        unawaited(_loadHistory());
+    }
+  }
+
+  /// Bluetooth's own setup, split out of [_startForMethod] so switching to
+  /// WiFi and back does not pay for a second [CentralManager] — see that
+  /// method's bluetooth case.
+  void _initBluetooth() {
     try {
       final central = CentralManager();
       _central = central;
       _state = central.state;
       _stateChanges = central.stateChanged.listen((event) {
-        if (!mounted) return;
+        // A stray adapter event while the user is on WiFi must not resume
+        // scanning behind their back — the manager stays alive across a
+        // switch (see [_startForMethod]), only this guard does.
+        if (!mounted || _method != ConnectionMethod.bluetooth) return;
         setState(() => _state = event.state);
         _onState(event.state);
       });
@@ -106,11 +183,6 @@ class _DeckPageState extends State<DeckPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_central != null) _onState(_state);
     });
-    // Independent of the Bluetooth branch above — WiFi races Bluetooth for
-    // the same host, so it starts regardless of whether this platform even
-    // has a Bluetooth implementation.
-    unawaited(_startWifiDiscovery());
-    unawaited(_loadHistory());
   }
 
   Future<void> _loadHistory() async {
@@ -348,7 +420,11 @@ class _DeckPageState extends State<DeckPage> {
   @override
   Widget build(BuildContext context) {
     final session = _session;
-    if (session == null) return _searchScaffold(context);
+    if (session == null) {
+      if (!_methodLoaded) return _loadingScaffold(context);
+      if (_method == null) return _methodChoiceScaffold(context);
+      return _searchScaffold(context);
+    }
 
     return ListenableBuilder(
       listenable: session,
@@ -382,7 +458,10 @@ class _DeckPageState extends State<DeckPage> {
         );
         return EdgeBarScaffold(
           side: barSideFor(context),
-          title: session.name,
+          title: 'HotkeyPad',
+          // Which Mac this is, not what app it is — the brand name above
+          // it already says that, the same as every other screen.
+          subtitle: session.name,
           leading: _appIcon(onTap: _jumpToFirstPage),
           actions: [
             IconButton(
@@ -391,11 +470,10 @@ class _DeckPageState extends State<DeckPage> {
               icon: const Icon(Icons.language),
             ),
             IconButton(
-              tooltip: AppLocalizations.of(context)!.debugConsole,
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => DebugPage(session: session)),
-              ),
-              icon: const Icon(Icons.bug_report_outlined),
+              tooltip: AppLocalizations.of(context)!.settingsTitle,
+              onPressed: () =>
+                  _showSettingsMenu(context, session: session),
+              icon: const Icon(Icons.settings_outlined),
             ),
           ],
           child: deck,
@@ -409,12 +487,9 @@ class _DeckPageState extends State<DeckPage> {
   void _forget() {
     _session?.dispose();
     setState(() => _session = null);
-    _search();
-    unawaited(_startWifiDiscovery());
-    // A session that just reached this state may have added itself to
-    // history moments ago — the search screen this returns to should
-    // show it.
-    unawaited(_loadHistory());
+    // Non-null: reaching a session at all means a method was already
+    // chosen and started.
+    _startForMethod(_method!);
   }
 
   /// The fallback for when discovery cannot reach the host at all — an
@@ -538,8 +613,141 @@ class _DeckPageState extends State<DeckPage> {
     if (result != null && result.picked) widget.onLocale(result.locale);
   }
 
-  Widget _searchScaffold(BuildContext context) {
-    final error = _searchError;
+  /// The gear button's popup, on every screen that has one — mirrors
+  /// `hotkeypad_host`'s own settings dialog (`layout_page.dart`'s
+  /// `openSettings`): one small dialog holds everything that would
+  /// otherwise be a separate app bar icon of its own, the debug console
+  /// included, rather than the bar accumulating one icon per setting.
+  ///
+  /// [session] is whatever the caller currently has — null from the
+  /// pre-connection search screen, the live session once connected —
+  /// and is only used to open the right [DebugPage].
+  Future<void> _showSettingsMenu(
+    BuildContext context, {
+    required HotkeyPadSession? session,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    Widget option(ConnectionMethod method, IconData icon, String label) =>
+        RadioListTile<ConnectionMethod>(
+          contentPadding: EdgeInsets.zero,
+          value: method,
+          secondary: Icon(icon),
+          title: Text(label),
+        );
+    await showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text(l10n.settingsTitle),
+            content: SizedBox(
+              width: 380,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.connectionMethodSettingsTitle,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    RadioGroup<ConnectionMethod>(
+                      groupValue: _method,
+                      // _switchMethod persists and awaits before touching
+                      // _method, so the dialog is told to redraw only
+                      // after the field it reads has actually changed —
+                      // calling setDialogState any earlier would just
+                      // repaint the old selection.
+                      onChanged: (value) async {
+                        if (value == null || value == _method) return;
+                        await _switchMethod(value);
+                        setDialogState(() {});
+                      },
+                      child: Column(
+                        children: [
+                          option(
+                            ConnectionMethod.bluetooth,
+                            Icons.bluetooth,
+                            l10n.connectionMethodBluetooth,
+                          ),
+                          option(
+                            ConnectionMethod.wifi,
+                            Icons.wifi,
+                            l10n.connectionMethodWifi,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 32),
+                    // Two flat diagnostics, like the host's own "Service
+                    // details" — for working out why the deck is
+                    // misbehaving, not for daily use, so they live behind
+                    // the gear rather than as permanent app bar icons of
+                    // their own. Both are direct entries here rather than
+                    // one nested inside the other (ScanPage used to be
+                    // reachable only via an icon inside DebugPage) so
+                    // reaching either is one tap from the gear, not two.
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.bluetooth_searching),
+                      title: Text(l10n.nearbyDevices),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ScanPage()),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.bug_report_outlined),
+                      title: Text(l10n.debugConsole),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => DebugPage(session: session),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(l10n.done),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Shown for as long as [ConnectionMethodStore.load] is still in
+  /// flight — a plain-preferences read, so this is on screen for a few
+  /// milliseconds at most, not worth its own chrome.
+  Widget _loadingScaffold(BuildContext context) {
+    return EdgeBarScaffold(
+      side: barSideFor(context),
+      title: 'HotkeyPad',
+      leading: _appIcon(),
+      actions: const [],
+      child: const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  /// The first thing a fresh install sees: which transport to use, since
+  /// nothing has been chosen yet. Shown exactly once per install (barring
+  /// a deliberate change from [_showConnectionMethodSettings]) — see
+  /// [_chooseMethod].
+  Widget _methodChoiceScaffold(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return EdgeBarScaffold(
       side: barSideFor(context),
@@ -551,12 +759,66 @@ class _DeckPageState extends State<DeckPage> {
           onPressed: () => _showLanguagePicker(context),
           icon: const Icon(Icons.language),
         ),
-        IconButton(
-          tooltip: l10n.debugConsole,
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const DebugPage(session: null)),
+      ],
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.connectionMethodTitle,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.connectionMethodSubtitle,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 24),
+                _MethodCard(
+                  icon: Icons.bluetooth,
+                  title: l10n.connectionMethodBluetooth,
+                  subtitle: l10n.connectionMethodBluetoothHint,
+                  onTap: () => _chooseMethod(ConnectionMethod.bluetooth),
+                ),
+                const SizedBox(height: 12),
+                _MethodCard(
+                  icon: Icons.wifi,
+                  title: l10n.connectionMethodWifi,
+                  subtitle: l10n.connectionMethodWifiHint,
+                  onTap: () => _chooseMethod(ConnectionMethod.wifi),
+                ),
+              ],
+            ),
           ),
-          icon: const Icon(Icons.bug_report_outlined),
+        ),
+      ),
+    );
+  }
+
+  Widget _searchScaffold(BuildContext context) {
+    final error = _searchError;
+    final l10n = AppLocalizations.of(context)!;
+    final method = _method!; // only reached once a method is chosen
+    return EdgeBarScaffold(
+      side: barSideFor(context),
+      title: 'HotkeyPad',
+      leading: _appIcon(),
+      actions: [
+        IconButton(
+          tooltip: l10n.language,
+          onPressed: () => _showLanguagePicker(context),
+          icon: const Icon(Icons.language),
+        ),
+        IconButton(
+          tooltip: l10n.settingsTitle,
+          onPressed: () => _showSettingsMenu(context, session: null),
+          icon: const Icon(Icons.settings_outlined),
         ),
       ],
       // A scroll view, not a bare Center, because the previous-hosts list
@@ -593,7 +855,9 @@ class _DeckPageState extends State<DeckPage> {
                         ),
                       ] else ...[
                         Icon(
-                          Icons.bluetooth_disabled,
+                          method == ConnectionMethod.bluetooth
+                              ? Icons.bluetooth_disabled
+                              : Icons.wifi_off,
                           size: 48,
                           color: Theme.of(context).colorScheme.error,
                         ),
@@ -609,35 +873,44 @@ class _DeckPageState extends State<DeckPage> {
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 20),
-                        FilledButton.icon(
-                          onPressed: _search,
-                          icon: const Icon(Icons.refresh),
-                          label: Text(l10n.searchAgain),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        children: [
-                          TextButton.icon(
-                            onPressed: _showManualEntryDialog,
-                            icon: const Icon(Icons.keyboard_outlined),
-                            label: Text(l10n.enterHostIpManually),
+                        // Only Bluetooth has a give-up timeout (_giveUp) to
+                        // retry from — WiFi discovery just keeps listening,
+                        // with the manual/QR fallbacks below always there.
+                        if (method == ConnectionMethod.bluetooth)
+                          FilledButton.icon(
+                            onPressed: _search,
+                            icon: const Icon(Icons.refresh),
+                            label: Text(l10n.searchAgain),
                           ),
-                          TextButton.icon(
-                            onPressed: _scanQrCode,
-                            icon: const Icon(Icons.qr_code_scanner_outlined),
-                            label: Text(l10n.scanQrCode),
+                      ],
+                      // WiFi-only: Bluetooth has no manual address or QR
+                      // equivalent to fall back to — it either finds a
+                      // host advertising nearby or it does not.
+                      if (method == ConnectionMethod.wifi) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          children: [
+                            TextButton.icon(
+                              onPressed: _showManualEntryDialog,
+                              icon: const Icon(Icons.keyboard_outlined),
+                              label: Text(l10n.enterHostIpManually),
+                            ),
+                            TextButton.icon(
+                              onPressed: _scanQrCode,
+                              icon: const Icon(Icons.qr_code_scanner_outlined),
+                              label: Text(l10n.scanQrCode),
+                            ),
+                          ],
+                        ),
+                        if (_history.isNotEmpty) ...[
+                          const SizedBox(height: 28),
+                          _PreviousHostsList(
+                            entries: _history,
+                            onSelect: _connectToHistoryEntry,
+                            onForget: _forgetHistoryEntry,
                           ),
                         ],
-                      ),
-                      if (_history.isNotEmpty) ...[
-                        const SizedBox(height: 28),
-                        _PreviousHostsList(
-                          entries: _history,
-                          onSelect: _connectToHistoryEntry,
-                          onForget: _forgetHistoryEntry,
-                        ),
                       ],
                     ],
                   ),
@@ -1474,6 +1747,56 @@ class _PreviousHostsList extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One option on [_DeckPageState._methodChoiceScaffold] — a big enough
+/// tap target that picking a transport reads as a deliberate, considered
+/// choice rather than a compact settings row.
+class _MethodCard extends StatelessWidget {
+  const _MethodCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(icon, size: 32, color: theme.colorScheme.primary),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title, style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,8 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import 'safe_insets.dart';
-import 'scan_page.dart';
 import 'session.dart';
+
+/// [LinkStage] itself carries only a fixed English label — this maps it to
+/// the localized, compact form shown in the debug console's app bar
+/// instead (the full-sentence, name-taking versions on `_ConnectionOverlay`
+/// don't fit a one-line status bar).
+String _stageLabel(AppLocalizations l10n, LinkStage stage) => switch (stage) {
+  LinkStage.connecting => l10n.debugStageConnecting,
+  LinkStage.discovering => l10n.debugStageDiscovering,
+  LinkStage.subscribing => l10n.debugStageSubscribing,
+  LinkStage.awaitingPin => l10n.debugStageAwaitingPin,
+  LinkStage.ready => l10n.debugStageReady,
+  LinkStage.disconnected => l10n.debugStageDisconnected,
+  LinkStage.failed => l10n.debugStageFailed,
+};
 
 /// The old chat screen, kept as a diagnostic tool: it shows every message on
 /// the link and can push free text at the host.
@@ -42,14 +56,12 @@ class _DebugPageState extends State<DebugPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final session = widget.session;
     if (session == null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Debug console'),
-          actions: [_scanAction(context)],
-        ),
-        body: const Center(child: Text('Not connected to a host yet.')),
+        appBar: AppBar(title: Text(l10n.debugConsole)),
+        body: Center(child: Text(l10n.notConnectedToHostYet)),
       );
     }
 
@@ -58,18 +70,18 @@ class _DebugPageState extends State<DebugPage> {
       builder: (context, _) {
         final log = session.log;
         final ready = session.ready;
+        final mtu = session.mtu;
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Debug console'),
-            actions: [_scanAction(context)],
+            title: Text(l10n.debugConsole),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(24),
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
-                  '${session.stage.label}'
-                  '${session.mtu != null ? ' · MTU ${session.mtu}' : ''}',
+                  '${_stageLabel(l10n, session.stage)}'
+                  '${mtu != null ? ' · ${l10n.mtuLabel(mtu)}' : ''}',
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
               ),
@@ -79,7 +91,7 @@ class _DebugPageState extends State<DebugPage> {
             children: [
               Expanded(
                 child: log.isEmpty
-                    ? const Center(child: Text('No traffic yet.'))
+                    ? Center(child: Text(l10n.noTrafficYet))
                     : ListView.builder(
                         padding: safeScrollPadding(
                           context,
@@ -103,9 +115,9 @@ class _DebugPageState extends State<DebugPage> {
                           controller: _composer,
                           enabled: ready && !_sending,
                           onSubmitted: (_) => _send(),
-                          decoration: const InputDecoration(
-                            hintText: 'Send raw text to the host',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            hintText: l10n.sendRawTextHint,
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                         ),
@@ -126,15 +138,6 @@ class _DebugPageState extends State<DebugPage> {
     );
   }
 
-  Widget _scanAction(BuildContext context) {
-    return IconButton(
-      tooltip: 'Nearby devices',
-      onPressed: () => Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const ScanPage())),
-      icon: const Icon(Icons.bluetooth_searching),
-    );
-  }
 }
 
 class _Bubble extends StatelessWidget {
@@ -144,6 +147,7 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final time = TimeOfDay.fromDateTime(message.at);
     return Align(
@@ -166,7 +170,7 @@ class _Bubble extends StatelessWidget {
             Text(message.text, style: const TextStyle(fontSize: 13)),
             const SizedBox(height: 2),
             Text(
-              '${message.inbound ? 'host' : 'sent'} · '
+              '${message.inbound ? l10n.messageFromHost : l10n.messageSent} · '
               '${time.hour.toString().padLeft(2, '0')}:'
               '${time.minute.toString().padLeft(2, '0')}',
               style: theme.textTheme.labelSmall,

@@ -134,4 +134,138 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get systemDefaultLanguage => 'System default';
+
+  @override
+  String get connectionMethodTitle => 'Choose how to connect';
+
+  @override
+  String get connectionMethodSubtitle =>
+      'You can change this later from settings.';
+
+  @override
+  String get connectionMethodBluetooth => 'Bluetooth';
+
+  @override
+  String get connectionMethodBluetoothHint =>
+      'Scan for a host advertising nearby over Bluetooth.';
+
+  @override
+  String get connectionMethodWifi => 'WiFi';
+
+  @override
+  String get connectionMethodWifiHint =>
+      'Find a host on the same network, or enter its address.';
+
+  @override
+  String get connectionMethodSettingsTitle => 'Connection method';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get nearbyDevices => 'Nearby devices';
+
+  @override
+  String get notConnectedToHostYet => 'Not connected to a host yet.';
+
+  @override
+  String get noTrafficYet => 'No traffic yet.';
+
+  @override
+  String get sendRawTextHint => 'Send raw text to the host';
+
+  @override
+  String get messageFromHost => 'host';
+
+  @override
+  String get messageSent => 'sent';
+
+  @override
+  String get debugStageConnecting => 'Connecting';
+
+  @override
+  String get debugStageDiscovering => 'Discovering services';
+
+  @override
+  String get debugStageSubscribing => 'Subscribing';
+
+  @override
+  String get debugStageAwaitingPin => 'Enter the code shown on the host';
+
+  @override
+  String get debugStageReady => 'Connected';
+
+  @override
+  String get debugStageDisconnected => 'Disconnected';
+
+  @override
+  String get debugStageFailed => 'Failed';
+
+  @override
+  String mtuLabel(int mtu) {
+    return 'MTU $mtu';
+  }
+
+  @override
+  String get clearDeviceList => 'Clear list';
+
+  @override
+  String hotkeypadHostsCount(int count) {
+    return 'HotkeyPad hosts ($count)';
+  }
+
+  @override
+  String devicesShownCount(int count) {
+    return '$count shown';
+  }
+
+  @override
+  String get unknownDevice => 'Unknown device';
+
+  @override
+  String get hostBadge => 'HOST';
+
+  @override
+  String deviceSubtitle(String id, int rssi, int seconds) {
+    return '$id\n$rssi dBm  ·  seen ${seconds}s ago';
+  }
+
+  @override
+  String get turnBluetoothOnFirst => 'Turn Bluetooth on first.';
+
+  @override
+  String get bluetoothPermissionDeniedSnackbar =>
+      'Bluetooth permission denied.';
+
+  @override
+  String get bluetoothOff => 'Bluetooth is turned off.';
+
+  @override
+  String get bluetoothUnauthorized =>
+      'Bluetooth permission has not been granted yet.';
+
+  @override
+  String get bluetoothUnsupported =>
+      'Bluetooth Low Energy is not supported on this device.';
+
+  @override
+  String get bluetoothCheckingAdapter => 'Checking Bluetooth adapter...';
+
+  @override
+  String get grantAction => 'Grant';
+
+  @override
+  String get scanningForDevices => 'Scanning for devices...';
+
+  @override
+  String get tapScanToLookForDevices => 'Tap Scan to look for nearby devices.';
+
+  @override
+  String get stopScan => 'Stop scan';
+
+  @override
+  String get scanAction => 'Scan';
 }

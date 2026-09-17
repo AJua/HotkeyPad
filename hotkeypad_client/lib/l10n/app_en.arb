@@ -131,5 +131,141 @@
   "@language": {"description": "Tooltip on the app bar's language-picker button."},
 
   "systemDefaultLanguage": "System default",
-  "@systemDefaultLanguage": {"description": "Option in the language picker that follows the phone's own language."}
+  "@systemDefaultLanguage": {"description": "Option in the language picker that follows the phone's own language."},
+
+  "connectionMethodTitle": "Choose how to connect",
+  "@connectionMethodTitle": {"description": "Heading on the first-run connection-method choice screen."},
+
+  "connectionMethodSubtitle": "You can change this later from settings.",
+  "@connectionMethodSubtitle": {"description": "Subtitle on the first-run connection-method choice screen."},
+
+  "connectionMethodBluetooth": "Bluetooth",
+  "@connectionMethodBluetooth": {"description": "Bluetooth connection method option."},
+
+  "connectionMethodBluetoothHint": "Scan for a host advertising nearby over Bluetooth.",
+  "@connectionMethodBluetoothHint": {"description": "Description of the Bluetooth connection method."},
+
+  "connectionMethodWifi": "WiFi",
+  "@connectionMethodWifi": {"description": "WiFi connection method option."},
+
+  "connectionMethodWifiHint": "Find a host on the same network, or enter its address.",
+  "@connectionMethodWifiHint": {"description": "Description of the WiFi connection method."},
+
+  "connectionMethodSettingsTitle": "Connection method",
+  "@connectionMethodSettingsTitle": {"description": "Section heading above the connection-method radio buttons in the settings dialog."},
+
+  "settingsTitle": "Settings",
+  "@settingsTitle": {"description": "Tooltip on the gear icon, and title of the dialog it opens."},
+
+  "done": "Done",
+  "@done": {"description": "Button that closes the settings dialog."},
+
+  "nearbyDevices": "Nearby devices",
+  "@nearbyDevices": {"description": "Settings-dialog entry opening the Bluetooth scanner diagnostic, and title of the page it opens."},
+
+  "notConnectedToHostYet": "Not connected to a host yet.",
+  "@notConnectedToHostYet": {"description": "Debug console body text before any session exists."},
+
+  "noTrafficYet": "No traffic yet.",
+  "@noTrafficYet": {"description": "Debug console body text before any message has been logged."},
+
+  "sendRawTextHint": "Send raw text to the host",
+  "@sendRawTextHint": {"description": "Debug console composer field hint."},
+
+  "messageFromHost": "host",
+  "@messageFromHost": {"description": "Debug console bubble label for a message received from the host."},
+
+  "messageSent": "sent",
+  "@messageSent": {"description": "Debug console bubble label for a message this app sent."},
+
+  "debugStageConnecting": "Connecting",
+  "@debugStageConnecting": {"description": "Compact link-stage label in the debug console's app bar."},
+
+  "debugStageDiscovering": "Discovering services",
+  "@debugStageDiscovering": {"description": "Compact link-stage label in the debug console's app bar."},
+
+  "debugStageSubscribing": "Subscribing",
+  "@debugStageSubscribing": {"description": "Compact link-stage label in the debug console's app bar."},
+
+  "debugStageAwaitingPin": "Enter the code shown on the host",
+  "@debugStageAwaitingPin": {"description": "Compact link-stage label in the debug console's app bar."},
+
+  "debugStageReady": "Connected",
+  "@debugStageReady": {"description": "Compact link-stage label in the debug console's app bar."},
+
+  "debugStageDisconnected": "Disconnected",
+  "@debugStageDisconnected": {"description": "Compact link-stage label in the debug console's app bar."},
+
+  "debugStageFailed": "Failed",
+  "@debugStageFailed": {"description": "Compact link-stage label in the debug console's app bar."},
+
+  "mtuLabel": "MTU {mtu}",
+  "@mtuLabel": {
+    "description": "Appended to the debug console's stage label when the negotiated MTU is known.",
+    "placeholders": {"mtu": {"type": "int"}}
+  },
+
+  "clearDeviceList": "Clear list",
+  "@clearDeviceList": {"description": "Tooltip on the nearby-devices page's clear-list icon."},
+
+  "hotkeypadHostsCount": "HotkeyPad hosts ({count})",
+  "@hotkeypadHostsCount": {
+    "description": "Filter chip label on the nearby-devices page.",
+    "placeholders": {"count": {"type": "int"}}
+  },
+
+  "devicesShownCount": "{count} shown",
+  "@devicesShownCount": {
+    "description": "Count of devices currently listed on the nearby-devices page.",
+    "placeholders": {"count": {"type": "int"}}
+  },
+
+  "unknownDevice": "Unknown device",
+  "@unknownDevice": {"description": "Placeholder name for a discovered device with no advertised name."},
+
+  "hostBadge": "HOST",
+  "@hostBadge": {"description": "Short badge marking a discovered device as a HotkeyPad host."},
+
+  "deviceSubtitle": "{id}\n{rssi} dBm  ·  seen {seconds}s ago",
+  "@deviceSubtitle": {
+    "description": "Nearby-devices list item subtitle.",
+    "placeholders": {
+      "id": {"type": "String"},
+      "rssi": {"type": "int"},
+      "seconds": {"type": "int"}
+    }
+  },
+
+  "turnBluetoothOnFirst": "Turn Bluetooth on first.",
+  "@turnBluetoothOnFirst": {"description": "Snackbar shown when scanning is attempted with Bluetooth off."},
+
+  "bluetoothPermissionDeniedSnackbar": "Bluetooth permission denied.",
+  "@bluetoothPermissionDeniedSnackbar": {"description": "Snackbar shown when scanning is attempted without permission."},
+
+  "bluetoothOff": "Bluetooth is turned off.",
+  "@bluetoothOff": {"description": "Nearby-devices adapter banner."},
+
+  "bluetoothUnauthorized": "Bluetooth permission has not been granted yet.",
+  "@bluetoothUnauthorized": {"description": "Nearby-devices adapter banner."},
+
+  "bluetoothUnsupported": "Bluetooth Low Energy is not supported on this device.",
+  "@bluetoothUnsupported": {"description": "Nearby-devices adapter banner."},
+
+  "bluetoothCheckingAdapter": "Checking Bluetooth adapter...",
+  "@bluetoothCheckingAdapter": {"description": "Nearby-devices adapter banner."},
+
+  "grantAction": "Grant",
+  "@grantAction": {"description": "Button on the nearby-devices adapter banner that requests permission."},
+
+  "scanningForDevices": "Scanning for devices...",
+  "@scanningForDevices": {"description": "Nearby-devices empty state while a scan is running."},
+
+  "tapScanToLookForDevices": "Tap Scan to look for nearby devices.",
+  "@tapScanToLookForDevices": {"description": "Nearby-devices empty state before a scan has started."},
+
+  "stopScan": "Stop scan",
+  "@stopScan": {"description": "Floating action button label while scanning."},
+
+  "scanAction": "Scan",
+  "@scanAction": {"description": "Floating action button label while not scanning."}
 }

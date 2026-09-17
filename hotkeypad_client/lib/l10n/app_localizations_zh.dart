@@ -131,6 +131,134 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get systemDefaultLanguage => '跟隨系統';
+
+  @override
+  String get connectionMethodTitle => '選擇連線方式';
+
+  @override
+  String get connectionMethodSubtitle => '之後可以在設定中變更，這個選擇只儲存在這支手機上。';
+
+  @override
+  String get connectionMethodBluetooth => '藍牙';
+
+  @override
+  String get connectionMethodBluetoothHint => '掃描附近以藍牙廣播的 host。';
+
+  @override
+  String get connectionMethodWifi => 'WiFi';
+
+  @override
+  String get connectionMethodWifiHint => '在同一網路中尋找 host，或手動輸入位址。';
+
+  @override
+  String get connectionMethodSettingsTitle => '連線方式';
+
+  @override
+  String get settingsTitle => '設定';
+
+  @override
+  String get done => '完成';
+
+  @override
+  String get nearbyDevices => '附近裝置';
+
+  @override
+  String get notConnectedToHostYet => '尚未連上 host。';
+
+  @override
+  String get noTrafficYet => '尚無任何流量。';
+
+  @override
+  String get sendRawTextHint => '傳送原始文字給 host';
+
+  @override
+  String get messageFromHost => 'host';
+
+  @override
+  String get messageSent => '已送出';
+
+  @override
+  String get debugStageConnecting => '連線中';
+
+  @override
+  String get debugStageDiscovering => '正在探索服務';
+
+  @override
+  String get debugStageSubscribing => '訂閱中';
+
+  @override
+  String get debugStageAwaitingPin => '請輸入 host 上顯示的代碼';
+
+  @override
+  String get debugStageReady => '已連線';
+
+  @override
+  String get debugStageDisconnected => '已中斷連線';
+
+  @override
+  String get debugStageFailed => '連線失敗';
+
+  @override
+  String mtuLabel(int mtu) {
+    return 'MTU $mtu';
+  }
+
+  @override
+  String get clearDeviceList => '清除清單';
+
+  @override
+  String hotkeypadHostsCount(int count) {
+    return 'HotkeyPad host（$count）';
+  }
+
+  @override
+  String devicesShownCount(int count) {
+    return '顯示 $count 個';
+  }
+
+  @override
+  String get unknownDevice => '未知裝置';
+
+  @override
+  String get hostBadge => 'HOST';
+
+  @override
+  String deviceSubtitle(String id, int rssi, int seconds) {
+    return '$id\n$rssi dBm  ·  $seconds 秒前發現';
+  }
+
+  @override
+  String get turnBluetoothOnFirst => '請先開啟藍牙。';
+
+  @override
+  String get bluetoothPermissionDeniedSnackbar => '藍牙權限被拒絕。';
+
+  @override
+  String get bluetoothOff => '藍牙已關閉。';
+
+  @override
+  String get bluetoothUnauthorized => '尚未取得藍牙權限。';
+
+  @override
+  String get bluetoothUnsupported => '這個裝置不支援低功耗藍牙。';
+
+  @override
+  String get bluetoothCheckingAdapter => '正在確認藍牙狀態...';
+
+  @override
+  String get grantAction => '授權';
+
+  @override
+  String get scanningForDevices => '正在掃描裝置...';
+
+  @override
+  String get tapScanToLookForDevices => '點選「掃描」尋找附近裝置。';
+
+  @override
+  String get stopScan => '停止掃描';
+
+  @override
+  String get scanAction => '掃描';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -260,4 +388,132 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get systemDefaultLanguage => '跟隨系統';
+
+  @override
+  String get connectionMethodTitle => '選擇連線方式';
+
+  @override
+  String get connectionMethodSubtitle => '之後可以在設定中變更，這個選擇只儲存在這支手機上。';
+
+  @override
+  String get connectionMethodBluetooth => '藍牙';
+
+  @override
+  String get connectionMethodBluetoothHint => '掃描附近以藍牙廣播的 host。';
+
+  @override
+  String get connectionMethodWifi => 'WiFi';
+
+  @override
+  String get connectionMethodWifiHint => '在同一網路中尋找 host，或手動輸入位址。';
+
+  @override
+  String get connectionMethodSettingsTitle => '連線方式';
+
+  @override
+  String get settingsTitle => '設定';
+
+  @override
+  String get done => '完成';
+
+  @override
+  String get nearbyDevices => '附近裝置';
+
+  @override
+  String get notConnectedToHostYet => '尚未連上 host。';
+
+  @override
+  String get noTrafficYet => '尚無任何流量。';
+
+  @override
+  String get sendRawTextHint => '傳送原始文字給 host';
+
+  @override
+  String get messageFromHost => 'host';
+
+  @override
+  String get messageSent => '已送出';
+
+  @override
+  String get debugStageConnecting => '連線中';
+
+  @override
+  String get debugStageDiscovering => '正在探索服務';
+
+  @override
+  String get debugStageSubscribing => '訂閱中';
+
+  @override
+  String get debugStageAwaitingPin => '請輸入 host 上顯示的代碼';
+
+  @override
+  String get debugStageReady => '已連線';
+
+  @override
+  String get debugStageDisconnected => '已中斷連線';
+
+  @override
+  String get debugStageFailed => '連線失敗';
+
+  @override
+  String mtuLabel(int mtu) {
+    return 'MTU $mtu';
+  }
+
+  @override
+  String get clearDeviceList => '清除清單';
+
+  @override
+  String hotkeypadHostsCount(int count) {
+    return 'HotkeyPad host（$count）';
+  }
+
+  @override
+  String devicesShownCount(int count) {
+    return '顯示 $count 個';
+  }
+
+  @override
+  String get unknownDevice => '未知裝置';
+
+  @override
+  String get hostBadge => 'HOST';
+
+  @override
+  String deviceSubtitle(String id, int rssi, int seconds) {
+    return '$id\n$rssi dBm  ·  $seconds 秒前發現';
+  }
+
+  @override
+  String get turnBluetoothOnFirst => '請先開啟藍牙。';
+
+  @override
+  String get bluetoothPermissionDeniedSnackbar => '藍牙權限被拒絕。';
+
+  @override
+  String get bluetoothOff => '藍牙已關閉。';
+
+  @override
+  String get bluetoothUnauthorized => '尚未取得藍牙權限。';
+
+  @override
+  String get bluetoothUnsupported => '這個裝置不支援低功耗藍牙。';
+
+  @override
+  String get bluetoothCheckingAdapter => '正在確認藍牙狀態...';
+
+  @override
+  String get grantAction => '授權';
+
+  @override
+  String get scanningForDevices => '正在掃描裝置...';
+
+  @override
+  String get tapScanToLookForDevices => '點選「掃描」尋找附近裝置。';
+
+  @override
+  String get stopScan => '停止掃描';
+
+  @override
+  String get scanAction => '掃描';
 }

@@ -43,10 +43,18 @@ class EdgeBarScaffold extends StatelessWidget {
     required this.actions,
     required this.child,
     this.leading,
+    this.subtitle,
   });
 
   final BarSide side;
   final String title;
+
+  /// A second, smaller line under [title] — e.g. which host the deck is
+  /// currently talking to, kept separate from the app's own brand name
+  /// rather than replacing it (see `DeckPage`'s connected-deck app bar).
+  /// Only drawn on [BarSide.top]: the side bars already drop [title]
+  /// itself for lack of room, so a subtitle would have even less.
+  final String? subtitle;
   final List<Widget> actions;
   final Widget? leading;
   final Widget child;
@@ -73,16 +81,31 @@ class EdgeBarScaffold extends StatelessWidget {
       BarSide.right => Row(children: [content, _bar(context)]),
     };
 
-    // The bar absorbs the inset on its own edge; the content keeps the rest.
-    return Scaffold(body: body);
+    // A step above the plain surface color Scaffold defaults to — the
+    // deck's own background image (when set) still draws over this, but
+    // an unconfigured deck no longer reads as flat white/black margins
+    // around the grid, particularly in landscape where the grid leaves
+    // the most of that space empty (see the grid's own centering logic
+    // in deck_page.dart — deliberately not stretched to fill it).
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      body: body,
+    );
   }
 
   Widget _bar(BuildContext context) {
     final theme = Theme.of(context);
     final insets = MediaQuery.viewPaddingOf(context);
-    final background = theme.colorScheme.surface;
+    // A tinted container color rather than the plain surface the bar used
+    // to share with the body — the bar is chrome, not deck, and reads as
+    // its own edge in every rotation (side bars included) instead of
+    // blending into whichever whitespace happens to be next to it.
+    final background = theme.colorScheme.primaryContainer;
+    final onBackground = theme.colorScheme.onPrimaryContainer;
+    final iconTheme = IconThemeData(color: onBackground);
 
     if (side == BarSide.top) {
+      final subtitle = this.subtitle;
       return Material(
         color: background,
         child: Padding(
@@ -92,16 +115,43 @@ class EdgeBarScaffold extends StatelessWidget {
             right: insets.right + 4,
           ),
           child: SizedBox(
-            height: _thickness,
-            child: Row(
-              children: [
-                ?leading,
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(title, style: theme.textTheme.titleLarge),
-                ),
-                ...actions,
-              ],
+            // A second line needs more than a single title's worth of
+            // height — grown rather than shrinking the title's own font
+            // to make room, since the title is the app's brand name and
+            // should read the same whether or not a subtitle is present.
+            height: subtitle == null ? _thickness : _thickness + 14,
+            child: IconTheme.merge(
+              data: iconTheme,
+              child: Row(
+                children: [
+                  ?leading,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: onBackground,
+                          ),
+                        ),
+                        if (subtitle != null)
+                          Text(
+                            subtitle,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: onBackground.withValues(alpha: 0.75),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  ...actions,
+                ],
+              ),
             ),
           ),
         ),
@@ -124,8 +174,11 @@ class EdgeBarScaffold extends StatelessWidget {
           // room to spell it out at only _thickness wide without either
           // truncating it to nothing useful or crowding out the icon and
           // actions, so landscape shows just the app icon in its place.
-          child: Column(
-            children: [?leading, const Spacer(), ...actions],
+          child: IconTheme.merge(
+            data: iconTheme,
+            child: Column(
+              children: [?leading, const Spacer(), ...actions],
+            ),
           ),
         ),
       ),

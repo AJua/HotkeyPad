@@ -131,4 +131,133 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get systemDefaultLanguage => 'システム標準';
+
+  @override
+  String get connectionMethodTitle => '接続方法を選択';
+
+  @override
+  String get connectionMethodSubtitle => '後で設定から変更できます。';
+
+  @override
+  String get connectionMethodBluetooth => 'Bluetooth';
+
+  @override
+  String get connectionMethodBluetoothHint =>
+      '近くで Bluetooth によりアドバタイズしている host をスキャンします。';
+
+  @override
+  String get connectionMethodWifi => 'WiFi';
+
+  @override
+  String get connectionMethodWifiHint => '同じネットワーク上の host を探すか、アドレスを直接入力します。';
+
+  @override
+  String get connectionMethodSettingsTitle => '接続方法';
+
+  @override
+  String get settingsTitle => '設定';
+
+  @override
+  String get done => '完了';
+
+  @override
+  String get nearbyDevices => '近くのデバイス';
+
+  @override
+  String get notConnectedToHostYet => 'まだ host に接続していません。';
+
+  @override
+  String get noTrafficYet => 'まだ通信がありません。';
+
+  @override
+  String get sendRawTextHint => 'host に送るテキストを入力';
+
+  @override
+  String get messageFromHost => 'host';
+
+  @override
+  String get messageSent => '送信';
+
+  @override
+  String get debugStageConnecting => '接続中';
+
+  @override
+  String get debugStageDiscovering => 'サービスを検索中';
+
+  @override
+  String get debugStageSubscribing => '購読中';
+
+  @override
+  String get debugStageAwaitingPin => 'host に表示されたコードを入力してください';
+
+  @override
+  String get debugStageReady => '接続済み';
+
+  @override
+  String get debugStageDisconnected => '切断されました';
+
+  @override
+  String get debugStageFailed => '失敗しました';
+
+  @override
+  String mtuLabel(int mtu) {
+    return 'MTU $mtu';
+  }
+
+  @override
+  String get clearDeviceList => 'リストをクリア';
+
+  @override
+  String hotkeypadHostsCount(int count) {
+    return 'HotkeyPad host ($count)';
+  }
+
+  @override
+  String devicesShownCount(int count) {
+    return '$count 件表示中';
+  }
+
+  @override
+  String get unknownDevice => '不明なデバイス';
+
+  @override
+  String get hostBadge => 'HOST';
+
+  @override
+  String deviceSubtitle(String id, int rssi, int seconds) {
+    return '$id\n$rssi dBm  ·  $seconds秒前に検出';
+  }
+
+  @override
+  String get turnBluetoothOnFirst => '先に Bluetooth をオンにしてください。';
+
+  @override
+  String get bluetoothPermissionDeniedSnackbar => 'Bluetooth の権限が拒否されました。';
+
+  @override
+  String get bluetoothOff => 'Bluetooth はオフになっています。';
+
+  @override
+  String get bluetoothUnauthorized => 'Bluetooth の権限がまだ許可されていません。';
+
+  @override
+  String get bluetoothUnsupported => 'この端末は Bluetooth Low Energy に対応していません。';
+
+  @override
+  String get bluetoothCheckingAdapter => 'Bluetooth アダプターを確認しています...';
+
+  @override
+  String get grantAction => '許可';
+
+  @override
+  String get scanningForDevices => 'デバイスをスキャン中...';
+
+  @override
+  String get tapScanToLookForDevices => 'スキャンをタップして近くのデバイスを探します。';
+
+  @override
+  String get stopScan => 'スキャン停止';
+
+  @override
+  String get scanAction => 'スキャン';
 }
