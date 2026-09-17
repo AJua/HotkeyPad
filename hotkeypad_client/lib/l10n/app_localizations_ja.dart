@@ -45,6 +45,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get ipAddressLabel => 'IP アドレス';
 
   @override
+  String get ipAddressExample => '例：192.168.1.23';
+
+  @override
+  String get invalidHostAddress => '192.168.1.23 のような正しい IP アドレスを入力してください。';
+
+  @override
   String get advancedCustomPort => '詳細設定:ポート番号を指定';
 
   @override
@@ -87,6 +93,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String linkLostTo(String name) {
     return '$name との接続が失われました。';
   }
+
+  @override
+  String get incorrectPinRetrying => 'コードが間違っています。host に新しいコードを再要求しています…';
+
+  @override
+  String get couldNotFindAddress => 'その住所が見つかりませんでした。確認してもう一度お試しください。';
 
   @override
   String get retryingNow => '再試行しています…';

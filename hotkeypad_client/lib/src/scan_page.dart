@@ -180,7 +180,13 @@ class _ScanPageState extends State<ScanPage> {
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
-    if (_discovering) _central?.stopDiscovery();
+    // Fire-and-forget, error swallowed: a device with no BLE radio throws
+    // the same platform-channel error from every CentralManager call, this
+    // one included — see deck_page.dart's _stopDiscoverySafely for the
+    // confirmed crash this same shape caused there.
+    if (_discovering) {
+      unawaited(_central?.stopDiscovery().catchError((_) {}));
+    }
     super.dispose();
   }
 

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:hotkeypad_client/src/session.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The reconnect contract, exercised on the shapes that broke it rather than
@@ -49,6 +51,31 @@ void main() {
       finish(second);
 
       expect(reported, [second]);
+    });
+  });
+
+  group('isUnresolvableHostError', () {
+    test('true for a failed DNS lookup', () {
+      expect(
+        isUnresolvableHostError(
+          const SocketException("Failed host lookup: 'not-an-ip-address'"),
+        ),
+        isTrue,
+      );
+    });
+
+    test('false for a refused/timed-out connection — worth retrying', () {
+      expect(
+        isUnresolvableHostError(
+          const SocketException('Connection refused'),
+        ),
+        isFalse,
+      );
+    });
+
+    test('false for anything that is not a SocketException at all', () {
+      expect(isUnresolvableHostError(TimeoutException('x')), isFalse);
+      expect(isUnresolvableHostError(StateError('x')), isFalse);
     });
   });
 }

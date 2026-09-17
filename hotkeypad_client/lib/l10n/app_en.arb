@@ -37,6 +37,12 @@
   "ipAddressLabel": "IP address",
   "@ipAddressLabel": {"description": "Text field label."},
 
+  "ipAddressExample": "e.g. 192.168.1.23",
+  "@ipAddressExample": {"description": "Helper text under the IP address field, distinct from the field's hint so it can't be mistaken for a typed-in value."},
+
+  "invalidHostAddress": "Enter a valid IP address, like 192.168.1.23.",
+  "@invalidHostAddress": {"description": "Inline error when the manual-entry address doesn't look like an IP address."},
+
   "advancedCustomPort": "Advanced: custom port",
   "@advancedCustomPort": {"description": "Button revealing the optional port field."},
 
@@ -84,6 +90,12 @@
     "description": "Connection overlay body text.",
     "placeholders": {"name": {"type": "String"}}
   },
+
+  "incorrectPinRetrying": "That code was wrong. Asking the host for a new one…",
+  "@incorrectPinRetrying": {"description": "Connection overlay body text shown right after a rejected PIN, in place of the generic link-lost message."},
+
+  "couldNotFindAddress": "Couldn't find that address. Check it and try again.",
+  "@couldNotFindAddress": {"description": "Connection overlay body text when a manually-entered host address fails to resolve at all."},
 
   "retryingNow": "Retrying now...",
   "@retryingNow": {"description": "Connection overlay status line."},

@@ -16,6 +16,16 @@ import 'icon_cache.dart';
 import 'link_target.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
+/// True for a [SocketException] from a DNS lookup that will never
+/// resolve — a manually-typed address that isn't a real hostname/IP at
+/// all — as opposed to one merely refused or timed out, which a host
+/// that is temporarily off or restarting produces just as easily and
+/// which *is* worth retrying (see this function's use in
+/// [HotkeyPadSession.connect] next to [HotkeyPadSession._scheduleReconnect]).
+/// A pure function of the exception so it is testable without a socket.
+bool isUnresolvableHostError(Object error) =>
+    error is SocketException && error.message.contains('Failed host lookup');
+
 /// Where the link is in the connect -> discover -> subscribe sequence.
 enum LinkStage {
   connecting('Connecting'),
@@ -90,6 +100,22 @@ class HotkeyPadSession extends ChangeNotifier {
   /// — cleared by the next [RequestPin] (a fresh attempt) or a successful
   /// [PinResult].
   String? _pinError;
+
+  /// True for the [LinkStage.disconnected] that follows a rejected PIN —
+  /// the host closes the connection right after, which would otherwise
+  /// look exactly like any other dropped link (see [_onWifiClosed]) and
+  /// bury [_pinError] before anyone reads it, on a screen that had just
+  /// asked for a code moments earlier. Cleared at the start of [connect],
+  /// same as [_pinError].
+  bool _pinRejectedDisconnect = false;
+
+  /// True for a [LinkStage.failed]/[LinkStage.disconnected] caused by a
+  /// manually-entered address that could never resolve — a typo, not a
+  /// host that is merely offline — so [_ConnectionOverlay] can show
+  /// something more useful than the raw `SocketException`, and so
+  /// [connect] knows not to schedule a retry that would just fail the
+  /// same way every time (see its use next to [_scheduleReconnect]).
+  bool _unresolvableHostError = false;
   GATTCharacteristic? _notifyCharacteristic;
   GATTCharacteristic? _writeCharacteristic;
 
@@ -157,6 +183,13 @@ class HotkeyPadSession extends ChangeNotifier {
   int? _mtu;
   String? _lastAck;
 
+  /// Bumped every time a press comes back rejected (an [Ack] with `ok:
+  /// false`) — the button's own red flash already says *that* it failed,
+  /// but not *why*; this is what lets a listener notice a fresh failure
+  /// and surface [_lastAck]'s reason once, rather than polling
+  /// [feedbackFor] and re-showing the same reason on every rebuild.
+  int _failureSeq = 0;
+
   /// The button waiting on an ack, and the outcome of the last one.
   ///
   /// Acks carry no correlation id, so this assumes one press is outstanding
@@ -176,6 +209,8 @@ class HotkeyPadSession extends ChangeNotifier {
   LinkStage get stage => _stage;
   String? get error => _error;
   String? get pinError => _pinError;
+  bool get pinRejectedDisconnect => _pinRejectedDisconnect;
+  bool get unresolvableHostError => _unresolvableHostError;
   bool get ready => _stage == LinkStage.ready;
   List<DeckApp> get apps => List.unmodifiable(_apps);
   DeckTheme get theme => _theme;
@@ -226,6 +261,7 @@ class HotkeyPadSession extends ChangeNotifier {
   List<LinkMessage> get log => List.unmodifiable(_log);
   int? get mtu => _mtu;
   String? get lastAck => _lastAck;
+  int get failureSeq => _failureSeq;
 
   /// How many reconnects have been attempted since the last good link.
   int get reconnectAttempt => _reconnectAttempt;
@@ -381,6 +417,7 @@ class HotkeyPadSession extends ChangeNotifier {
           unawaited(requestLayout());
         } else {
           _pinError = 'Incorrect PIN';
+          _pinRejectedDisconnect = true;
           _append('PIN rejected', inbound: true);
           // The host closes the connection shortly; the existing
           // reconnect flow (a fresh attempt, a fresh PIN) takes it from
@@ -618,6 +655,8 @@ class HotkeyPadSession extends ChangeNotifier {
     _stage = LinkStage.connecting;
     _error = null;
     _pinError = null;
+    _pinRejectedDisconnect = false;
+    _unresolvableHostError = false;
     // A drop mid-catalogue leaves this set; clear it so the retry can ask.
     _loadingApps = false;
     // A fresh link is a host that knows nothing about this device yet,
@@ -654,11 +693,16 @@ class HotkeyPadSession extends ChangeNotifier {
       if (attempt != _attempt) return;
       _stage = LinkStage.failed;
       _error = '$error';
+      // See _ConnectionOverlay's use of this for the message shown, and
+      // the retry guard just below.
+      _unresolvableHostError = isUnresolvableHostError(error);
       _append('connect failed: $error', inbound: true);
       notifyListeners();
       // A device that does not speak HotkeyPad will not start doing so; only
       // transient failures are worth retrying. A timeout is transient.
-      if (error is! StateError) _scheduleReconnect();
+      if (error is! StateError && !_unresolvableHostError) {
+        _scheduleReconnect();
+      }
     }
   }
 
@@ -902,6 +946,12 @@ class HotkeyPadSession extends ChangeNotifier {
     _pressing = null;
     _feedbackFor = pressed;
     _feedbackOk = ok;
+    // The button's own red flash only says the press failed, not why —
+    // bumping this is what lets DeckPage notice a fresh failure and show
+    // _lastAck's reason once (e.g. "This host is locked to another
+    // device"), instead of that reason being visible only in the debug
+    // console's raw message log.
+    if (!ok) _failureSeq++;
     notifyListeners();
     // Long enough to notice, short enough not to linger on the button.
     _feedbackTimer = Timer(const Duration(milliseconds: 1400), () {

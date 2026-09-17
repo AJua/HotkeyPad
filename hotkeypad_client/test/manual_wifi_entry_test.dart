@@ -47,4 +47,25 @@ void main() {
       expect(resolveManualPort('  8080  '), 8080);
     });
   });
+
+  group('looksLikeIpv4', () {
+    test('accepts a plain IPv4 address', () {
+      expect(looksLikeIpv4('192.168.1.23'), isTrue);
+      expect(looksLikeIpv4('10.0.2.2'), isTrue);
+    });
+
+    test('rejects text with no digit groups at all', () {
+      expect(looksLikeIpv4('not-an-ip-address'), isFalse);
+      expect(looksLikeIpv4(''), isFalse);
+    });
+
+    test('rejects a hostname mixed with letters', () {
+      expect(looksLikeIpv4('MacBook.local'), isFalse);
+    });
+
+    test('rejects the wrong number of groups', () {
+      expect(looksLikeIpv4('192.168.1'), isFalse);
+      expect(looksLikeIpv4('192.168.1.2.3'), isFalse);
+    });
+  });
 }

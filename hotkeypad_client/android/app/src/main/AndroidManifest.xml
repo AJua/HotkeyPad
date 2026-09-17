@@ -12,8 +12,12 @@
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
         android:maxSdkVersion="30" />
+    <!-- Not required: WiFi is a full alternative transport (see
+         WifiServer/WifiTarget), so a device with no BLE radio at all —
+         a Chromebook, some tablets — should still be installable and
+         usable, just without the Bluetooth path. -->
     <uses-feature android:name="android.hardware.bluetooth_le"
-        android:required="true" />
+        android:required="false" />
 
     <!-- WiFi transport: a TCP connection to the host, and listening for
          its UDP discovery beacon. No runtime prompt — Android has no

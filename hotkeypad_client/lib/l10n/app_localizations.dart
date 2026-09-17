@@ -173,6 +173,18 @@ abstract class AppLocalizations {
   /// **'IP address'**
   String get ipAddressLabel;
 
+  /// Helper text under the IP address field, distinct from the field's hint so it can't be mistaken for a typed-in value.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 192.168.1.23'**
+  String get ipAddressExample;
+
+  /// Inline error when the manual-entry address doesn't look like an IP address.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid IP address, like 192.168.1.23.'**
+  String get invalidHostAddress;
+
   /// Button revealing the optional port field.
   ///
   /// In en, this message translates to:
@@ -244,6 +256,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The link to {name} was lost.'**
   String linkLostTo(String name);
+
+  /// Connection overlay body text shown right after a rejected PIN, in place of the generic link-lost message.
+  ///
+  /// In en, this message translates to:
+  /// **'That code was wrong. Asking the host for a new one…'**
+  String get incorrectPinRetrying;
+
+  /// Connection overlay body text when a manually-entered host address fails to resolve at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t find that address. Check it and try again.'**
+  String get couldNotFindAddress;
 
   /// Connection overlay status line.
   ///

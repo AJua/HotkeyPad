@@ -45,6 +45,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ipAddressLabel => 'IP 位址';
 
   @override
+  String get ipAddressExample => '例如：192.168.1.23';
+
+  @override
+  String get invalidHostAddress => '請輸入正確的 IP 位址，例如 192.168.1.23。';
+
+  @override
   String get advancedCustomPort => '進階:自訂連接埠';
 
   @override
@@ -87,6 +93,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String linkLostTo(String name) {
     return '與 $name 的連線已中斷。';
   }
+
+  @override
+  String get incorrectPinRetrying => '驗證碼錯誤，正在向 host 重新索取新的驗證碼…';
+
+  @override
+  String get couldNotFindAddress => '找不到這個位址，請確認後再試一次。';
 
   @override
   String get retryingNow => '正在重試...';
@@ -302,6 +314,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ipAddressLabel => 'IP 位址';
 
   @override
+  String get ipAddressExample => '例如：192.168.1.23';
+
+  @override
+  String get invalidHostAddress => '請輸入正確的 IP 位址，例如 192.168.1.23。';
+
+  @override
   String get advancedCustomPort => '進階:自訂連接埠';
 
   @override
@@ -344,6 +362,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String linkLostTo(String name) {
     return '與 $name 的連線已中斷。';
   }
+
+  @override
+  String get incorrectPinRetrying => '驗證碼錯誤，正在向 host 重新索取新的驗證碼…';
+
+  @override
+  String get couldNotFindAddress => '找不到這個位址，請確認後再試一次。';
 
   @override
   String get retryingNow => '正在重試...';

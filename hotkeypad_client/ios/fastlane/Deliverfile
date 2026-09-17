@@ -13,3 +13,44 @@ primary_category("UTILITIES")
 # at least once before a version can be submitted — deliver can't fill
 # this in for you the first time. Do it once in the App Store Connect web
 # UI (App Information -> Age Rating), it carries forward after that.
+
+# What the reviewer sees on the "App Review Information" screen — spells
+# out, in plain terms, why each sensitive permission in Info.plist exists
+# (NSBluetoothAlwaysUsageDescription, NSBluetoothPeripheralUsageDescription,
+# NSLocalNetworkUsageDescription, NSCameraUsageDescription) so a reviewer
+# testing cold doesn't have to guess. Contact fields (first_name,
+# last_name, phone_number, email_address) are left unset here rather than
+# hard-coded — App Store Connect already carries whatever was last saved
+# for the account, and this is personal contact information that
+# shouldn't live in a checked-in file anyway.
+app_review_information(
+  notes: <<~NOTES.strip
+    Two Bluetooth permissions and one local-network permission, all for
+    the same purpose: finding and talking to this app's own companion
+    Mac app, "HotkeyPad Host" (free, not on the App Store — a Stream
+    Deck-style desktop app this phone app is the remote control for).
+
+    - Bluetooth (NSBluetoothAlwaysUsageDescription /
+      NSBluetoothPeripheralUsageDescription): scans for the Mac's
+      HotkeyPad Host advertising a specific GATT service UUID, connects,
+      and exchanges button-press messages over it. No pairing/bonding at
+      the OS level, and no other Bluetooth accessories are touched.
+    - Local Network (NSLocalNetworkUsageDescription): a full alternative
+      to Bluetooth on the same WiFi network — the host also advertises
+      itself with a small UDP broadcast, and this app listens for it and
+      connects over TCP the same way, for the case where Bluetooth is
+      unavailable or slower to find it.
+    - Camera (NSCameraUsageDescription): only ever used to scan a QR
+      code the host app displays on request, as a faster alternative to
+      typing its IP address by hand to pair over WiFi. No photo or video
+      is captured, stored, or leaves the device.
+
+    There is no account, login, server, or analytics of any kind — the
+    phone talks directly, peer-to-peer, to a Mac on the same network.
+
+    To test end-to-end: install the free "HotkeyPad Host" app on a Mac
+    on the same network as the test device (or the same WiFi as the
+    reviewer's Mac), open it, and this app should find and connect to
+    it automatically within a few seconds.
+  NOTES
+)

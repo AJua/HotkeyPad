@@ -36,6 +36,16 @@ int resolveManualPort(String input) {
   return (parsed != null && parsed > 0) ? parsed : WifiLink.tcpPort;
 }
 
+/// Four dot-separated 1-3 digit groups — loose on purpose (it doesn't
+/// reject an out-of-range octet like 999) since [_ManualHostDialog]'s
+/// address field already keys a numeric-only keyboard; this exists to
+/// catch what that keyboard can't prevent (pasted text) with a plain-
+/// language error instead of a raw `SocketException` reaching the user.
+/// A pure function of the trimmed field text so it is testable without a
+/// widget, the same reason [resolveManualPort] is.
+bool looksLikeIpv4(String input) =>
+    RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(input);
+
 /// The app's home. Finds a host by itself rather than making the user pick
 /// one: there is normally exactly one Mac to talk to, and choosing it from a
 /// list of every radio in the room is a chore, not a feature.
@@ -65,6 +75,11 @@ class DeckPage extends StatefulWidget {
 class _DeckPageState extends State<DeckPage> {
   final _pages = PageController();
   int _page = 0;
+
+  /// The last [HotkeyPadSession.failureSeq] a SnackBar was already shown
+  /// for — see its own use in [build] for why a sequence number rather
+  /// than just checking [HotkeyPadSession.lastAck] for null.
+  int _shownFailureSeq = 0;
 
   CentralManager? _central;
   HotkeyPadSession? _session;
@@ -195,11 +210,22 @@ class _DeckPageState extends State<DeckPage> {
     _searchTimeout?.cancel();
     _stateChanges?.cancel();
     _discovery?.cancel();
-    if (_searching) _central?.stopDiscovery();
+    if (_searching) _stopDiscoverySafely();
     _stopWifiDiscovery();
     _pages.dispose();
     _session?.dispose();
     super.dispose();
+  }
+
+  /// Best-effort, fire-and-forget stop — a device with no BLE radio at
+  /// all throws the same `getBluetoothLeScanner(...) must not be null`
+  /// from *every* [CentralManager] call, [stopDiscovery] included, not
+  /// just [startDiscovery]. Confirmed against a real crash: [_search]'s
+  /// own catch already handles the first throw and calls [_stopSearch],
+  /// but that then hit this same call unguarded and threw a second,
+  /// truly unhandled exception.
+  void _stopDiscoverySafely() {
+    unawaited(_central?.stopDiscovery().catchError((_) {}));
   }
 
   /// Listens for the host's UDP beacon (see `hotkeypad_host`'s `WifiServer`) —
@@ -336,7 +362,7 @@ class _DeckPageState extends State<DeckPage> {
     _searchTimeout = null;
     _discovery?.cancel();
     _discovery = null;
-    if (_searching) _central?.stopDiscovery();
+    if (_searching) _stopDiscoverySafely();
     if (mounted) setState(() => _searching = false);
   }
 
@@ -396,11 +422,7 @@ class _DeckPageState extends State<DeckPage> {
         customBorder: const CircleBorder(),
         child: Padding(
           padding: const EdgeInsets.all(4),
-          child: Image.asset(
-            'assets/icon/app_icon.png',
-            width: 32,
-            height: 32,
-          ),
+          child: Image.asset('assets/icon/app_icon.png', width: 32, height: 32),
         ),
       ),
     );
@@ -423,12 +445,46 @@ class _DeckPageState extends State<DeckPage> {
     if (session == null) {
       if (!_methodLoaded) return _loadingScaffold(context);
       if (_method == null) return _methodChoiceScaffold(context);
-      return _searchScaffold(context);
+      // Without this, the system/gesture back button here falls straight
+      // through to the OS and exits the app outright — this screen has
+      // no pushed route of its own to pop back to, unlike the dialogs
+      // launched from it. Stepping back to the choice screen instead
+      // matches what a user expects "back" to do mid-setup, and mirrors
+      // the settings gear's own "change this later" path.
+      return PopScope<void>(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          setState(() => _method = null);
+        },
+        child: _searchScaffold(context),
+      );
     }
 
     return ListenableBuilder(
       listenable: session,
       builder: (context, _) {
+        // A failed press already flashes the button red — that says a
+        // press failed, not why. Surfacing the host's own reason (e.g.
+        // "This host is locked to another device") here, once per fresh
+        // failure, is what used to be visible only by opening the debug
+        // console's raw message log. failureSeq — not feedbackFor, which
+        // stays the same value for the 1.4s the flash is on screen and
+        // would otherwise show this on every rebuild in that window —
+        // is what makes this fire exactly once per failure.
+        final failureSeq = session.failureSeq;
+        if (failureSeq != _shownFailureSeq) {
+          _shownFailureSeq = failureSeq;
+          final reason = session.lastAck;
+          if (reason != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(reason)));
+            });
+          }
+        }
         final overlay = session.stage != LinkStage.ready
             ? _ConnectionOverlay(
                 session: session,
@@ -471,8 +527,7 @@ class _DeckPageState extends State<DeckPage> {
             ),
             IconButton(
               tooltip: AppLocalizations.of(context)!.settingsTitle,
-              onPressed: () =>
-                  _showSettingsMenu(context, session: session),
+              onPressed: () => _showSettingsMenu(context, session: session),
               icon: const Icon(Icons.settings_outlined),
             ),
           ],
@@ -563,9 +618,9 @@ class _DeckPageState extends State<DeckPage> {
   }
 
   Future<void> _scanQrCode() async {
-    final result = await Navigator.of(
-      context,
-    ).push<WifiPairingQr>(MaterialPageRoute(builder: (_) => const QrScanPage()));
+    final result = await Navigator.of(context).push<WifiPairingQr>(
+      MaterialPageRoute(builder: (_) => const QrScanPage()),
+    );
     if (result == null) return;
     _connectKnownWifiHost(
       hostId: result.hostId,
@@ -601,7 +656,10 @@ class _DeckPageState extends State<DeckPage> {
               option(null, l10n.systemDefaultLanguage),
               option(const Locale('en'), 'English'),
               option(
-                const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+                const Locale.fromSubtags(
+                  languageCode: 'zh',
+                  scriptCode: 'Hant',
+                ),
                 '繁體中文',
               ),
               option(const Locale('ja'), '日本語'),
@@ -679,41 +737,48 @@ class _DeckPageState extends State<DeckPage> {
                         ],
                       ),
                     ),
-                    const Divider(height: 32),
-                    // Two flat diagnostics, like the host's own "Service
+                    // Developer diagnostics, like the host's own "Service
                     // details" — for working out why the deck is
-                    // misbehaving, not for daily use, so they live behind
-                    // the gear rather than as permanent app bar icons of
-                    // their own. Both are direct entries here rather than
-                    // one nested inside the other (ScanPage used to be
-                    // reachable only via an icon inside DebugPage) so
-                    // reaching either is one tap from the gear, not two.
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.bluetooth_searching),
-                      title: Text(l10n.nearbyDevices),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ScanPage()),
-                        );
-                      },
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.bug_report_outlined),
-                      title: Text(l10n.debugConsole),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => DebugPage(session: session),
-                          ),
-                        );
-                      },
-                    ),
+                    // misbehaving, not for daily use. Debug-build only:
+                    // a regular user has no use for a raw Bluetooth
+                    // scanner or a protocol-level message log (one even
+                    // has a "send raw text to the host" field), and
+                    // showing them in a release build reads as
+                    // developer tooling that leaked into the product
+                    // rather than a real feature. Both are direct
+                    // entries here rather than one nested inside the
+                    // other (ScanPage used to be reachable only via an
+                    // icon inside DebugPage) so reaching either is one
+                    // tap from the gear, not two.
+                    if (kDebugMode) ...[
+                      const Divider(height: 32),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.bluetooth_searching),
+                        title: Text(l10n.nearbyDevices),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const ScanPage()),
+                          );
+                        },
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.bug_report_outlined),
+                        title: Text(l10n.debugConsole),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DebugPage(session: session),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -768,6 +833,19 @@ class _DeckPageState extends State<DeckPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // An anchor for the page, not a hero — the first screen a
+                // fresh install shows had nothing above the title before
+                // this, which on a tall phone screen read as unfinished
+                // rather than intentionally centered.
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    'assets/icon/app_icon.png',
+                    width: 72,
+                    height: 72,
+                  ),
+                ),
+                const SizedBox(height: 20),
                 Text(
                   l10n.connectionMethodTitle,
                   textAlign: TextAlign.center,
@@ -962,6 +1040,12 @@ class _DeckPageState extends State<DeckPage> {
         ),
       );
     }
+
+    // A page count that shrank out from under a stale index (an edit on
+    // the host, or a transient mismatch across an orientation change)
+    // would otherwise hand _PageDots a "current" past the end of its own
+    // dot row — clamped here, once, rather than in every reader of _page.
+    if (_page >= layout.pages) _page = layout.pages - 1;
 
     // Every button visible at once is the point of a deck, so the grid is
     // sized to fit rather than scrolled. Cells stay square and the block is
@@ -1588,98 +1672,118 @@ class _ConnectionOverlay extends StatelessWidget {
                 elevation: 8,
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (working)
-                        const SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: CircularProgressIndicator(strokeWidth: 3),
-                        )
-                      else if (awaitingPin)
-                        Icon(
-                          Icons.pin_outlined,
-                          size: 32,
-                          color: theme.colorScheme.primary,
-                        )
-                      else
-                        Icon(
-                          stage == LinkStage.failed
-                              ? Icons.error_outline
-                              : Icons.link_off,
-                          size: 32,
-                          color: stage == LinkStage.failed
-                              ? theme.colorScheme.error
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                      const SizedBox(height: 16),
-                      Text(
-                        switch (stage) {
-                          LinkStage.connecting =>
-                            session.reconnectAttempt > 0
-                                ? l10n.reconnectingTo(deviceName)
-                                : l10n.connectingTo(deviceName),
-                          LinkStage.discovering => l10n.discoveringServices,
-                          LinkStage.subscribing => l10n.subscribingStage,
-                          LinkStage.awaitingPin =>
-                            l10n.enterCodeShownOn(deviceName),
-                          LinkStage.disconnected => l10n.disconnectedStage,
-                          LinkStage.failed => l10n.couldNotConnect,
-                          LinkStage.ready => '',
-                        },
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      if (awaitingPin) ...[
+                  // Scrollable rather than a bare Column: the maxHeight
+                  // above is a soft cap for the common case, but the PIN
+                  // form plus the keyboard it pops up together can still
+                  // exceed it on a short screen — confirmed against a
+                  // real overflow there. A plain Column would just clip
+                  // silently in a release build; this instead lets the
+                  // card scroll the few extra pixels instead of losing
+                  // content off the bottom.
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (working)
+                          const SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(strokeWidth: 3),
+                          )
+                        else if (awaitingPin)
+                          Icon(
+                            Icons.pin_outlined,
+                            size: 32,
+                            color: theme.colorScheme.primary,
+                          )
+                        else
+                          Icon(
+                            stage == LinkStage.failed
+                                ? Icons.error_outline
+                                : Icons.link_off,
+                            size: 32,
+                            color: stage == LinkStage.failed
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
                         const SizedBox(height: 16),
-                        _PinEntryForm(session: session),
-                      ] else if (!working) ...[
-                        const SizedBox(height: 8),
-                        Flexible(
-                          child: SingleChildScrollView(
-                            child: Text(
-                              session.errorSummary ??
-                                  l10n.linkLostTo(deviceName),
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall,
+                        Text(
+                          switch (stage) {
+                            LinkStage.connecting =>
+                              session.reconnectAttempt > 0
+                                  ? l10n.reconnectingTo(deviceName)
+                                  : l10n.connectingTo(deviceName),
+                            LinkStage.discovering => l10n.discoveringServices,
+                            LinkStage.subscribing => l10n.subscribingStage,
+                            LinkStage.awaitingPin => l10n.enterCodeShownOn(
+                              deviceName,
                             ),
-                          ),
+                            LinkStage.disconnected => l10n.disconnectedStage,
+                            LinkStage.failed => l10n.couldNotConnect,
+                            LinkStage.ready => '',
+                          },
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleMedium,
                         ),
-                        if (waiting != null) ...[
-                          const SizedBox(height: 12),
+                        if (awaitingPin) ...[
+                          const SizedBox(height: 16),
+                          _PinEntryForm(session: session),
+                        ] else if (!working) ...[
+                          const SizedBox(height: 8),
+                          // No Flexible/SingleChildScrollView of its own
+                          // here — the whole card scrolls now (see above),
+                          // and a Flexible nested inside that outer scroll
+                          // view would have nothing bounded to flex against.
                           Text(
-                            waiting == 0
-                                ? l10n.retryingNow
-                                : l10n.retryingInSeconds(
-                                    waiting,
-                                    session.reconnectAttempt,
-                                  ),
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.primary,
-                            ),
+                            // Both of these know exactly what went wrong
+                            // and say so plainly — a wrong PIN and a
+                            // typo'd address would otherwise look
+                            // identical to any other dropped link (see
+                            // pinRejectedDisconnect's own doc comment).
+                            session.pinRejectedDisconnect
+                                ? l10n.incorrectPinRetrying
+                                : session.unresolvableHostError
+                                ? l10n.couldNotFindAddress
+                                : session.errorSummary ??
+                                      l10n.linkLostTo(deviceName),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall,
                           ),
-                        ],
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: onBack,
-                              child: Text(l10n.back),
-                            ),
-                            const SizedBox(width: 8),
-                            FilledButton.icon(
-                              onPressed: session.connect,
-                              icon: const Icon(Icons.refresh),
-                              label: Text(
-                                waiting == null ? l10n.retry : l10n.retryNow,
+                          if (waiting != null) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              waiting == 0
+                                  ? l10n.retryingNow
+                                  : l10n.retryingInSeconds(
+                                      waiting,
+                                      session.reconnectAttempt,
+                                    ),
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: theme.colorScheme.primary,
                               ),
                             ),
                           ],
-                        ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: onBack,
+                                child: Text(l10n.back),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton.icon(
+                                onPressed: session.connect,
+                                icon: const Icon(Icons.refresh),
+                                label: Text(
+                                  waiting == null ? l10n.retry : l10n.retryNow,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -1818,6 +1922,19 @@ class _ManualHostDialogState extends State<_ManualHostDialog> {
   final _port = TextEditingController();
   bool _showPort = false;
 
+  /// Set on a failed [_submit], cleared as soon as the field changes
+  /// again — a stale error sitting under text the user has already
+  /// fixed reads as "still wrong" even after it no longer is.
+  String? _addressError;
+
+  @override
+  void initState() {
+    super.initState();
+    _address.addListener(() {
+      if (_addressError != null) setState(() => _addressError = null);
+    });
+  }
+
   @override
   void dispose() {
     _address.dispose();
@@ -1827,7 +1944,12 @@ class _ManualHostDialogState extends State<_ManualHostDialog> {
 
   void _submit() {
     final address = _address.text.trim();
-    if (address.isEmpty) return;
+    if (!looksLikeIpv4(address)) {
+      setState(
+        () => _addressError = AppLocalizations.of(context)!.invalidHostAddress,
+      );
+      return;
+    }
     Navigator.of(
       context,
     ).pop((address: address, port: resolveManualPort(_port.text)));
@@ -1838,49 +1960,64 @@ class _ManualHostDialogState extends State<_ManualHostDialog> {
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
       title: Text(l10n.enterHostIpTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            l10n.enterHostIpHint,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _address,
-            autofocus: true,
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
-            onSubmitted: (_) => _submit(),
-            decoration: InputDecoration(
-              labelText: l10n.ipAddressLabel,
-              hintText: '192.168.1.23',
-              border: const OutlineInputBorder(),
-              isDense: true,
+      // Scrollable rather than a bare Column: on a short screen the
+      // on-screen keyboard alone can take up half the height, and once
+      // the port field and an error line are both showing there is not
+      // enough room left for a fixed-height column — confirmed against
+      // a real overflow (the dialog's own buttons overlapping the
+      // "Advanced" toggle) on a small phone profile.
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              l10n.enterHostIpHint,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-          ),
-          if (_showPort) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             TextField(
-              controller: _port,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              controller: _address,
+              autofocus: true,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
               onSubmitted: (_) => _submit(),
               decoration: InputDecoration(
-                labelText: l10n.portLabel,
-                hintText: '${WifiLink.tcpPort}',
+                labelText: l10n.ipAddressLabel,
+                // A helper line rather than a realistic-looking hint
+                // value (the previous "192.168.1.23" hint) — a hint sits
+                // inside the field looking exactly like a typed value,
+                // which is easy to mistake for one already filled in; a
+                // helper line underneath can't be confused with real
+                // input.
+                helperText: l10n.ipAddressExample,
+                errorText: _addressError,
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),
             ),
-          ] else
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () => setState(() => _showPort = true),
-                child: Text(l10n.advancedCustomPort),
+            if (_showPort) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _port,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onSubmitted: (_) => _submit(),
+                decoration: InputDecoration(
+                  labelText: l10n.portLabel,
+                  hintText: '${WifiLink.tcpPort}',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
               ),
-            ),
-        ],
+            ] else
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () => setState(() => _showPort = true),
+                  child: Text(l10n.advancedCustomPort),
+                ),
+              ),
+          ],
+        ),
       ),
       actions: [
         TextButton(

@@ -46,6 +46,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ipAddressLabel => 'IP address';
 
   @override
+  String get ipAddressExample => 'e.g. 192.168.1.23';
+
+  @override
+  String get invalidHostAddress =>
+      'Enter a valid IP address, like 192.168.1.23.';
+
+  @override
   String get advancedCustomPort => 'Advanced: custom port';
 
   @override
@@ -88,6 +95,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String linkLostTo(String name) {
     return 'The link to $name was lost.';
   }
+
+  @override
+  String get incorrectPinRetrying =>
+      'That code was wrong. Asking the host for a new one…';
+
+  @override
+  String get couldNotFindAddress =>
+      'Couldn\'t find that address. Check it and try again.';
 
   @override
   String get retryingNow => 'Retrying now...';
