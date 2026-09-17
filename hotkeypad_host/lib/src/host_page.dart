@@ -1223,6 +1223,11 @@ class _HostPageState extends State<HostPage> {
     if (_showingService) {
       return Scaffold(
         appBar: AppBar(
+          // A tinted bar rather than the plain surface color it shares
+          // with the body — see the deck app bar below for the same
+          // treatment applied first.
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
           title: Text(l10n.serviceTitle),
           leading: IconButton(
             tooltip: l10n.backToDeck,
@@ -1249,6 +1254,12 @@ class _HostPageState extends State<HostPage> {
     ];
     return Scaffold(
       appBar: AppBar(
+        // A step up from the plain surface color the bar used to share
+        // with the window's own background, so it reads as its own
+        // strip of chrome rather than blending into the deck — the
+        // same contrast the client's app bar was given.
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
         title: Text(l10n.deckLayoutTitle),
         actions: [
           if (lockPickerClients.isNotEmpty)
@@ -1595,6 +1606,13 @@ class _QrPairingCard extends StatelessWidget {
   }
 }
 
+/// The fixed alias every Android emulator's virtual network maps to its
+/// host machine — not a real address of this machine, but the one that
+/// actually works from a manual WiFi entry inside an emulator, whose own
+/// NAT'd network the discovery beacon cannot cross. See its one use in
+/// [_StatusCard]'s "Emulator" row.
+const androidEmulatorHostAlias = '10.0.2.2';
+
 class _StatusCard extends StatelessWidget {
   const _StatusCard({
     required this.state,
@@ -1657,7 +1675,7 @@ class _StatusCard extends StatelessWidget {
                   ? 'listening on port ${WifiLink.tcpPort}'
                   : wifiError ?? 'not running',
             ),
-            if (wifiRunning)
+            if (wifiRunning) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2),
                 child: Row(
@@ -1681,6 +1699,35 @@ class _StatusCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // Not one of localAddresses because it is not a real address
+              // of this machine — it is the fixed alias every Android
+              // emulator maps to its host's loopback, the manual-entry
+              // value that actually works there since the emulator's own
+              // NAT'd network can neither be reached from this LAN nor
+              // deliver the discovery beacon into it (see this file's
+              // WiFi client tests / the client's manualWifiHostId doc
+              // comment on that same gap). Listed here so a client
+              // running in an emulator can read it straight off this
+              // card instead of having to already know the trick.
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(width: 90, child: Text('Emulator')),
+                    Expanded(
+                      child: SelectableText(
+                        '$androidEmulatorHostAlias (Android emulator only)',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
