@@ -1,0 +1,108 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Release Host
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "host-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # Read hotkeypad_host's own version once so every job/asset name agrees,
+  # instead of each platform job parsing pubspec.yaml itself.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: read
+        run: |
+          version=$(grep '^version:' hotkeypad_host/pubspec.yaml | sed -E 's/^version: *//' | cut -d+ -f1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build-macos:
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        working-directory: hotkeypad_host
+        run: flutter pub get
+
+      # Ad-hoc signed (CODE_SIGN_IDENTITY = "-" in the Xcode project), so
+      # this needs no Apple Developer certificate/secrets on the runner —
+      # same as building it locally. Builds and packages in one step; see
+      # .claude/skills/release-macos/SKILL.md for what the script does.
+      - name: Build & package .dmg
+        run: .claude/skills/release-macos/scripts/package_macos_dmg.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: hotkeypad_host/dist/*.dmg
+          if-no-files-found: error
+
+  build-windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        working-directory: hotkeypad_host
+        run: flutter pub get
+
+      - name: Build Windows release
+        working-directory: hotkeypad_host
+        run: flutter build windows --release
+
+      - name: Zip the release folder
+        working-directory: hotkeypad_host
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $version = "${{ needs.version.outputs.version }}"
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" `
+            -DestinationPath "dist/HotkeyPad-Host-$version-windows.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: hotkeypad_host/dist/*.zip
+          if-no-files-found: error
+
+  release:
+    needs: [version, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # Same tag on every run of the same version updates that one
+      # pre-release in place instead of piling up duplicates.
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: host-v${{ needs.version.outputs.version }}
+          name: HotkeyPad Host v${{ needs.version.outputs.version }}
+          prerelease: true
+          files: |
+            artifacts/macos-dmg/*.dmg
+            artifacts/windows-zip/*.zip
