@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HotkeyPad</title>
+<meta name="description" content="Turn your phone into a customizable button deck for your Mac or Windows PC — no cloud, no account, nothing but your two devices talking directly.">
+<link rel="icon" type="image/png" href="images/app-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f8f7fc;
+    --surface: #ffffff;
+    --surface-2: #f0eef9;
+    --fg: #16162b;
+    --muted: #5c5f7d;
+    --accent: #4f46e5;
+    --accent-strong: #3730a3;
+    --accent-soft: #e7e4fb;
+    --gold: #cc7a12;
+    --gold-soft: #fbead0;
+    --border: #e4e3f2;
+    --shadow: 0 1px 2px rgba(22,22,43,.04), 0 8px 24px rgba(22,22,43,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0e1c;
+      --surface: #15172c;
+      --surface-2: #1b1d38;
+      --fg: #eef0ff;
+      --muted: #a7abcf;
+      --accent: #948dfb;
+      --accent-strong: #b6b1ff;
+      --accent-soft: #24254a;
+      --gold: #f3b562;
+      --gold-soft: #332512;
+      --border: #2a2c4f;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0e1c;
+    --surface: #15172c;
+    --surface-2: #1b1d38;
+    --fg: #eef0ff;
+    --muted: #a7abcf;
+    --accent: #948dfb;
+    --accent-strong: #b6b1ff;
+    --accent-soft: #24254a;
+    --gold: #f3b562;
+    --gold-soft: #332512;
+    --border: #2a2c4f;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: 'Sora', sans-serif; text-wrap: balance; margin: 0; }
+  p { margin: 0; }
+  a { color: inherit; }
+  .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
+
+  /* ---------- nav ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--bg);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 4rem; }
+  .brand { display: flex; align-items: center; gap: .6rem; font-family: 'Sora'; font-weight: 700; font-size: 1.05rem; }
+  .brand img { width: 28px; height: 28px; border-radius: 8px; display: block; }
+  .navlinks { display: flex; gap: 1.75rem; align-items: center; }
+  .navlinks a { font-size: .92rem; font-weight: 600; color: var(--muted); text-decoration: none; }
+  .navlinks a:hover { color: var(--fg); }
+  .navlinks .cta {
+    background: var(--accent); color: #fff; padding: .5rem 1rem; border-radius: 999px;
+    font-size: .85rem;
+  }
+  @media (max-width: 640px) { .navlinks a:not(.cta) { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 4.5rem 0 3rem; }
+  .hero .wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 3rem; align-items: center; }
+  @media (max-width: 860px) { .hero .wrap { grid-template-columns: 1fr; } }
+  .hero h1 { font-size: clamp(2.1rem, 4.2vw, 3.1rem); font-weight: 800; line-height: 1.08; letter-spacing: -.01em; }
+  .hero h1 .accent { color: var(--accent); }
+  .hero p.lede { margin-top: 1.15rem; font-size: 1.12rem; color: var(--muted); max-width: 46ch; }
+  .hero-ctas { margin-top: 1.75rem; display: flex; gap: .85rem; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .8rem 1.35rem; border-radius: 12px; font-weight: 700; font-size: .95rem;
+    text-decoration: none; border: 1px solid transparent; transition: transform .12s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: var(--shadow); }
+  .btn-ghost { background: var(--surface); color: var(--fg); border-color: var(--border); }
+  .hero-note { margin-top: .9rem; font-size: .82rem; color: var(--muted); }
+
+  .hero-visual { position: relative; display: flex; justify-content: center; }
+  .phone-frame {
+    width: min(260px, 100%);
+    border-radius: 34px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 6px solid var(--surface);
+    outline: 1px solid var(--border);
+  }
+  .phone-frame img { display: block; width: 100%; }
+  .hero-badge {
+    position: absolute; top: -14px; right: 6%;
+    background: var(--gold-soft); color: var(--gold);
+    font-family: 'IBM Plex Mono'; font-size: .72rem; font-weight: 600;
+    padding: .35rem .6rem; border-radius: 8px; box-shadow: var(--shadow);
+  }
+
+  /* ---------- transport pill row ---------- */
+  .transports { display: flex; gap: .6rem; margin-top: 1.5rem; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: .4rem;
+    background: var(--surface-2); border: 1px solid var(--border);
+    padding: .38rem .75rem; border-radius: 999px;
+    font-family: 'IBM Plex Mono'; font-size: .72rem; font-weight: 600; color: var(--muted);
+  }
+  .pill svg { width: 14px; height: 14px; }
+
+  /* ---------- section shell ---------- */
+  section { padding: 4.5rem 0; }
+  .section-head { max-width: 62ch; margin-bottom: 2.75rem; }
+  .section-head h2 { font-size: clamp(1.6rem, 3vw, 2.15rem); margin-top: .5rem; }
+  .section-head p { color: var(--muted); margin-top: .75rem; font-size: 1.02rem; }
+
+  /* ---------- how it works ---------- */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.75rem; }
+  @media (max-width: 780px) { .steps { grid-template-columns: 1fr; } }
+  .step { display: flex; flex-direction: column; gap: .6rem; }
+  .step .num {
+    font-family: 'IBM Plex Mono'; font-weight: 600; font-size: .85rem; color: var(--accent);
+    width: 2.1rem; height: 2.1rem; border-radius: 10px; background: var(--accent-soft);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step h3 { font-size: 1.08rem; margin-top: .5rem; }
+  .step p { color: var(--muted); font-size: .95rem; }
+  .how-visual { margin-top: 3rem; display: flex; justify-content: center; }
+  .tablet-frame {
+    max-width: 640px; width: 100%; border-radius: 18px; overflow: hidden;
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+  }
+  .tablet-frame img { display: block; width: 100%; }
+
+  /* ---------- keycaps (button kinds) ---------- */
+  .keycaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; }
+  .keycap {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 1.4rem 1.3rem; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: .7rem;
+  }
+  .keycap .glyph {
+    width: 2.5rem; height: 2.5rem; border-radius: 10px; background: var(--accent-soft);
+    color: var(--accent); display: flex; align-items: center; justify-content: center;
+  }
+  .keycap .glyph svg { width: 20px; height: 20px; }
+  .keycap h3 { font-size: 1rem; }
+  .keycap p { color: var(--muted); font-size: .88rem; }
+
+  /* ---------- platform table ---------- */
+  .platform-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 780px) { .platform-grid { grid-template-columns: 1fr; } }
+  .platform-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+    padding: 1.75rem; box-shadow: var(--shadow);
+  }
+  .platform-card .kicker { display: flex; align-items: center; gap: .6rem; margin-bottom: 1.1rem; }
+  .platform-card .kicker svg { width: 22px; height: 22px; color: var(--accent); }
+  .platform-card h3 { font-size: 1.15rem; }
+  .platform-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
+  .platform-card li { display: flex; gap: .6rem; font-size: .93rem; align-items: flex-start; }
+  .check { color: var(--accent); flex: none; margin-top: .15rem; }
+  .soon-badge {
+    display: inline-block; margin-top: 1.1rem; font-family: 'IBM Plex Mono';
+    font-size: .72rem; font-weight: 600; color: var(--gold); background: var(--gold-soft);
+    padding: .3rem .6rem; border-radius: 8px;
+  }
+
+  /* ---------- privacy callout ---------- */
+  .privacy-band {
+    background: var(--accent-soft); border-radius: 20px; padding: 2.25rem;
+    display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  }
+  .privacy-band svg { width: 34px; height: 34px; color: var(--accent); flex: none; }
+  .privacy-band h3 { font-size: 1.1rem; }
+  .privacy-band p { color: var(--muted); margin-top: .35rem; font-size: .95rem; max-width: 56ch; }
+  .privacy-band a.btn { margin-left: auto; }
+  @media (max-width: 640px) { .privacy-band a.btn { margin-left: 0; } }
+
+  /* ---------- footer ---------- */
+  footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
+  footer .wrap { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+  footer .brand { font-size: .95rem; }
+  footer .foot-links { display: flex; gap: 1.5rem; font-size: .88rem; color: var(--muted); }
+  footer .foot-links a { text-decoration: none; }
+  footer .foot-links a:hover { color: var(--fg); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="brand"><img src="images/app-icon.png" alt=""> HotkeyPad</div>
+    <div class="navlinks">
+      <a href="#how">How it works</a>
+      <a href="#buttons">Buttons</a>
+      <a href="#platforms">Platforms</a>
+      <a class="cta" href="https://github.com/AJua/HotkeyPad/releases">Download</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <p class="label">Free &amp; open source</p>
+      <h1>Your phone is already<br>the best <span class="accent">Stream Deck</span><br>you own.</h1>
+      <p class="lede">HotkeyPad turns an iPhone or Android phone into a customizable
+      button deck for your Mac or Windows PC — launch apps, run Shortcuts, control
+      media, or fire off a key combination, all from a grid of buttons you lay out
+      yourself.</p>
+
+      <div class="transports">
+        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg> Bluetooth</span>
+        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M12 20h.01"/></svg> Wi‑Fi</span>
+        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4z"/></svg> No account, no cloud</span>
+      </div>
+
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="https://github.com/AJua/HotkeyPad/releases">Download the host app</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+      <p class="hero-note">Host app for Mac and Windows. Phone app for iOS and Android is coming soon.</p>
+    </div>
+
+    <div class="hero-visual">
+      <span class="hero-badge">live on the device</span>
+      <div class="phone-frame"><img src="images/screenshot-deck.png" alt="HotkeyPad deck screen on a phone, showing a grid of app icons connected to a Mac"></div>
+    </div>
+  </div>
+</header>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="label">Setup</p>
+      <h2>Two apps, one connection, no fuss.</h2>
+      <p>There's no cloud account to create and no server in between — your phone
+      talks straight to your computer.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="num">1</span>
+        <h3>Install the host</h3>
+        <p>A small app runs on your Mac or PC and quietly waits for your phone
+        to say hello.</p>
+      </div>
+      <div class="step">
+        <span class="num">2</span>
+        <h3>Install HotkeyPad</h3>
+        <p>Open the app on your phone — it looks for a host over Bluetooth or
+        your Wi‑Fi network automatically.</p>
+      </div>
+      <div class="step">
+        <span class="num">3</span>
+        <h3>Build your deck</h3>
+        <p>Drag apps, media controls, and shortcuts onto a grid. Swipe between
+        pages, rename buttons, pick your own icons.</p>
+      </div>
+    </div>
+    <div class="how-visual">
+      <div class="tablet-frame"><img src="images/screenshot-choose.png" alt="HotkeyPad's first-launch screen, asking whether to connect over Bluetooth or Wi-Fi"></div>
+    </div>
+  </div>
+</section>
+
+<section id="buttons" style="background:var(--surface-2);">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="label">On the deck</p>
+      <h2>Every button does one real thing.</h2>
+      <p>No macros to script, no plugin marketplace to dig through — five kinds
+      of button cover almost everything you'd reach for a shortcut key for.</p>
+    </div>
+    <div class="keycaps">
+      <div class="keycap">
+        <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+        <h3>Launch an app</h3>
+        <p>Or a Steam game on Windows — pick it from what's already installed.</p>
+      </div>
+      <div class="keycap">
+        <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+        <h3>Control media</h3>
+        <p>Play, pause, skip, and volume — for whatever's currently playing.</p>
+      </div>
+      <div class="keycap">
+        <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6M12 19h8"/></svg></span>
+        <h3>Run a shell command</h3>
+        <p>One line, run instantly — for the script you already reach for.</p>
+      </div>
+      <div class="keycap">
+        <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></span>
+        <h3>Run a Shortcut</h3>
+        <p>Trigger any macOS Shortcut by name, no scripting required.</p>
+      </div>
+      <div class="keycap">
+        <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/></svg></span>
+        <h3>Send a key combination</h3>
+        <p>⌘⇧4, a mute toggle, whatever chord you'd otherwise have to remember.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="platforms">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="label">Platform support</p>
+      <h2>Runs on what you already have.</h2>
+    </div>
+    <div class="platform-grid">
+      <div class="platform-card">
+        <div class="kicker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <h3>Computer &mdash; the host</h3>
+        </div>
+        <ul>
+          <li><span class="check">✓</span> macOS &mdash; the full toolkit: apps, media, Shortcuts, shell commands, key combinations</li>
+          <li><span class="check">✓</span> Windows &mdash; launch apps and Steam games today, with media and more actions on the way</li>
+        </ul>
+      </div>
+      <div class="platform-card">
+        <div class="kicker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>
+          <h3>Phone &mdash; the deck</h3>
+        </div>
+        <ul>
+          <li><span class="check">✓</span> iOS</li>
+          <li><span class="check">✓</span> Android</li>
+        </ul>
+        <span class="soon-badge">Coming soon to the App Store &amp; Google Play</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="privacy-band">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4z"/></svg>
+      <div>
+        <h3>Nothing leaves your two devices.</h3>
+        <p>No sign‑in, no analytics, no server in between. Your phone and your
+        computer talk to each other directly, over Bluetooth or your own Wi‑Fi
+        network.</p>
+      </div>
+      <a class="btn btn-ghost" href="privacy-policy.html">Read the privacy policy</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="brand"><img src="images/app-icon.png" alt="" style="width:22px;height:22px;"> HotkeyPad</div>
+    <div class="foot-links">
+      <a href="https://github.com/AJua/HotkeyPad">GitHub</a>
+      <a href="https://github.com/AJua/HotkeyPad/releases">Releases</a>
+      <a href="privacy-policy.html">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
