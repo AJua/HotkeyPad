@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HotkeyPad Privacy Policy</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1c1d21;
+    --muted: #55585f;
+    --accent: #4a55a2;
+    --card: #f4f5fa;
+    --border: #e2e3ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171b;
+      --fg: #edeef2;
+      --muted: #a9acb6;
+      --accent: #b7c0ff;
+      --card: #1f2026;
+      --border: #2c2d34;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+  h1 {
+    font-size: 1.9rem;
+    margin-bottom: 0.25rem;
+  }
+  .updated {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+  }
+  .summary {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .summary p { margin: 0; }
+  h2 {
+    font-size: 1.2rem;
+    margin-top: 2.25rem;
+    margin-bottom: 0.5rem;
+  }
+  p, li { color: var(--fg); }
+  ul { padding-left: 1.25rem; }
+  a { color: var(--accent); }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>HotkeyPad Privacy Policy</h1>
+  <p class="updated">Last updated: September 17, 2026</p>
+
+  <div class="summary">
+    <p><strong>HotkeyPad does not collect, store, or transmit any personal
+    data to any server.</strong> The app connects directly and privately to
+    a HotkeyPad host running on your own Mac, over Bluetooth or your local
+    Wi-Fi network. Nothing you do in the app is sent anywhere else.</p>
+  </div>
+
+  <h2>What HotkeyPad does</h2>
+  <p>HotkeyPad lets a phone act as a remote control for a Mac. The
+  HotkeyPad host app runs on your Mac; the HotkeyPad client app runs on
+  your phone. When you pair them, the phone talks directly to that one
+  Mac — there is no cloud service, no account, and no intermediary
+  server in between.</p>
+
+  <h2>Bluetooth</h2>
+  <p>The client app uses Bluetooth Low Energy only to discover a nearby
+  HotkeyPad host and to exchange button presses with it once paired.
+  This connection stays entirely between your phone and your Mac.</p>
+
+  <h2>Local network / Wi-Fi</h2>
+  <p>The client app uses your local Wi-Fi network only to find a
+  HotkeyPad host on the same network and to communicate with it
+  directly, the same way a printer or a smart-home device on your
+  network works. The first time you connect to a new host, a
+  one-time PIN shown on the host confirms it's really your Mac before
+  the phone is trusted — this pairing decision is stored only on the
+  host and the phone involved, never anywhere else.</p>
+
+  <h2>Camera</h2>
+  <p>The client app can use the camera to scan a QR code shown on the
+  host, as a faster alternative to typing in its address by hand. The
+  camera feed is processed on the phone only to read that QR code; it
+  is never recorded, stored, or transmitted anywhere.</p>
+
+  <h2>What HotkeyPad does not do</h2>
+  <ul>
+    <li>No user accounts or sign-in of any kind.</li>
+    <li>No analytics, tracking, or advertising SDKs.</li>
+    <li>No data is uploaded to any server operated by us or anyone
+    else — the app has no server to upload to.</li>
+    <li>No data is sold or shared with third parties.</li>
+  </ul>
+
+  <h2>Children's privacy</h2>
+  <p>HotkeyPad is not directed at children and does not knowingly
+  collect any information from anyone, regardless of age — see above.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If this policy ever changes, the new version will be posted at
+  this same address with an updated date at the top.</p>
+
+  <footer>
+    Questions about this policy? Open an issue on the
+    <a href="https://github.com/AJua/HotkeyPad">HotkeyPad GitHub
+    repository</a>.
+  </footer>
+</main>
+</body>
+</html>
