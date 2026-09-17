@@ -19,8 +19,8 @@ import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 abstract final class CustomIconStore {
   static const _channel = MethodChannel('btlink/icons');
 
-  /// The native picker is macOS-only for now, the same gap [AppLauncher]
-  /// already reports for launching apps on other platforms.
+  /// The native picker is macOS-only for now — unlike [AppLauncher], which
+  /// has a Windows implementation of its own, this has no equivalent yet.
   static bool get supported => !kIsWeb && Platform.isMacOS;
 
   static Directory? get _directory {

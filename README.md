@@ -16,15 +16,17 @@ whatever it is sent.
 
 ## What it does
 
-A Stream Deck for your Mac: the phone is the deck, the Mac runs the service,
-and the two talk over BLE or WiFi. A button can launch an app, work the media
-keys, send a keyboard combination, run a shell command, or fire a macOS
-Shortcut.
+A Stream Deck for your Mac or Windows PC: the phone is the deck, the computer
+runs the service, and the two talk over BLE or WiFi. Every platform can
+launch an app (including a Steam game, on Windows); working the media keys,
+sending a keyboard combination, running a shell command, or firing a
+Shortcut are Mac-only for now — see
+[Platform support for host actions](#platform-support-for-host-actions).
 
 - **The client opens straight onto the deck.** It scans in the background,
-  takes the first host that advertises the HotkeyPad service, and connects. With
-  one Mac in the room there is nothing to choose between, so a device picker
-  was a step to dismiss rather than a feature.
+  takes the first host that advertises the HotkeyPad service, and connects.
+  With one host in the room there is nothing to choose between, so a device
+  picker was a step to dismiss rather than a feature.
 - The scanner survives as a diagnostic under the debug console: what this
   radio can see, and which of it speaks HotkeyPad. It is for working out why the
   automatic connection did not happen, not for making it happen.
@@ -122,11 +124,21 @@ two apart unambiguously. The app name is repeated in every frame rather than
 kept as connection state, so reassembly stays correct even if two icons
 interleave.
 
-The host renders icons with `NSWorkspace.icon(forFile:)` through a method
-channel (`macos/Runner/AppIconChannel.swift`) rather than reading
+On macOS the host renders icons with `NSWorkspace.icon(forFile:)` through a
+method channel (`macos/Runner/AppIconChannel.swift`) rather than reading
 `CFBundleIconFile` from Info.plist: modern apps keep their icon inside
 `Assets.car`, where the plist route finds nothing, and AppKit also returns a
 sensible generic icon for apps that have none.
+
+On Windows there is no method channel at all — `app_launcher.dart` calls
+`PrivateExtractIcons` directly through the `win32` package's FFI bindings,
+reading a shortcut's real icon source (resolved via `IShellLink`, so a
+`.lnk`'s own icon override or its target file, never the shortcut-arrow
+badge Explorer draws) at the exact size the button needs, rather than the
+small, blurry icon `SHGetFileInfo`'s system icon list would otherwise hand
+back. A Steam game has no icon resource to extract at all — `steam://` is a
+URI, not a file — so its icon is Steam's own cached box art, cropped to a
+square.
 
 `HotkeyPad.iconSize` (128) is shared by both projects. Deck buttons fill their
 whole tappable area with the icon, so on a 3x phone screen it is scaled to
@@ -308,9 +320,41 @@ sandbox forbids launching other applications, which is the host's entire
 purpose. This rules out App Store distribution — the same reason the real
 Stream Deck ships outside it.
 
-Launching is macOS-only (`open -a`). On every other platform the host reports
-the gap in its status card and acks failures honestly rather than pretending
-the button worked.
+Launching apps is not macOS-only, though — see
+[Platform support for host actions](#platform-support-for-host-actions)
+below. Windows has no equivalent sandbox to work around: `ShellExecute`
+launching a shortcut or a `steam:` URI needs no special entitlement there.
+
+## Platform support for host actions
+
+Not every button kind works on every host platform. A button kind that is
+not supported on the running host reports the gap in its ack rather than
+pretending it worked, and the service-details card shows the same honest
+failure.
+
+| Action                          | macOS | Windows |
+| ------------------------------- | ----- | ------- |
+| Launch an app                   | yes   | yes     |
+| Launch a Steam game              | —     | yes     |
+| Volume / mute                    | yes   | no      |
+| Media transport (play/pause, …) | yes   | no      |
+| Keyboard combination             | yes   | no      |
+| Shell command                   | yes   | no      |
+| Shortcut                         | yes   | no      |
+
+`app_launcher.dart` is the only button-action file with a Windows
+implementation. `media_control.dart` and `command_runner.dart` (media keys,
+shell commands, shortcuts, key combos) are still the macOS-only code this
+project started with; see
+[What needs Accessibility, and what does not](#what-needs-accessibility-and-what-does-not)
+for why those specifically need AppleScript/System Events rather than
+something portable.
+
+Every store's own on-disk state (`layout.json`, `settings.json`, ...) is
+already cross-platform regardless of button support: `config_dir.dart`
+resolves `~/.config/HotkeyPad` on macOS/Linux and `%AppData%\HotkeyPad` on
+Windows, so the deck a user builds actually survives a restart on either
+platform.
 
 ## Why the host list stays empty until a client subscribes
 
@@ -380,6 +424,18 @@ bar's edge inference takes a different branch there (notch side rather than
 navigation bar side). Actually *sending* a keystroke or a transport media
 key also needs Accessibility granted through a macOS dialog, which cannot be
 driven from a shell.
+
+**Windows host, verified against this machine's real state rather than a
+phone:** the Start Menu scan, icon extraction and launch resolution in
+`app_launcher.dart` were run against this machine's actual installed
+applications and Steam library (31 real games), not synthetic fixtures —
+see the commit history for `app_launcher.dart` and `steam_library.dart`.
+Config persistence was verified by stripping `HOME` from the environment to
+reproduce a plain `flutter run` from PowerShell/cmd and confirming
+`layout.json` round-trips through `%AppData%\HotkeyPad`. **Not verified:** an
+actual BLE/WiFi session from a phone to a Windows host — everything above
+was checked host-side only, through `flutter test`/`flutter analyze` and
+direct inspection of what was produced, not an end-to-end connection.
 
 ## Platform support
 

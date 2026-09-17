@@ -20,8 +20,8 @@ abstract final class BackupFilePicker {
   // MethodChannel just to add two more methods to it.
   static const _channel = MethodChannel('btlink/icons');
 
-  /// The native picker is macOS-only, the same gap [CustomIconStore] and
-  /// [AppLauncher] already report elsewhere.
+  /// The native picker is macOS-only, the same gap [CustomIconStore]'s own
+  /// picker has — unlike [AppLauncher], which has a Windows implementation.
   static bool get supported => !kIsWeb && Platform.isMacOS;
 
   /// Opens a native Save panel pre-filled with [suggestedName]. Returns the
