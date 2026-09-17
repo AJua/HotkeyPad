@@ -8,6 +8,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:win32/win32.dart' as win32;
 
+import 'custom_icon_store.dart';
+import 'steam_library.dart';
+
 /// Finds and launches applications on the machine running the host.
 ///
 /// macOS and Windows are implemented. The other desktop platforms have no
@@ -115,6 +118,20 @@ abstract final class AppLauncher {
   _listWindows() {
     final seen = <String>{};
     final apps = <({String name, String category, String path})>[];
+
+    // Ahead of the Start Menu scan: a Steam game that also happens to have
+    // its own shortcut there is still better launched through Steam (which
+    // keeps it updated and honors Steam Cloud) than through whatever that
+    // shortcut points at directly, and `seen` makes sure it is not listed
+    // twice.
+    for (final game in SteamLibrary.list()) {
+      if (!seen.add(game.name)) continue;
+      apps.add((
+        name: game.name,
+        category: 'Games',
+        path: 'steam://rungameid/${game.appId}',
+      ));
+    }
 
     for (final root in _windowsSearchPaths) {
       final directory = Directory(root);
@@ -227,6 +244,7 @@ abstract final class AppLauncher {
   /// of which belongs on a launcher button. Best-effort like its macOS
   /// counterpart: any failure along the way just means no icon.
   static Future<Uint8List?> _iconWindows(String path, int size) async {
+    if (path.startsWith('steam://')) return _steamIcon(path);
     try {
       final source = _resolveIconSource(path);
       if (source == null) return null;
@@ -243,6 +261,49 @@ abstract final class AppLauncher {
       return null;
     }
   }
+
+  /// A Steam game has no icon resource of its own to extract — `steam://`
+  /// is a URI, not a file — so this reads whatever box-art image Steam has
+  /// already cached locally for its own library views instead, cropped to a
+  /// square the same way a user-picked image is (see
+  /// [CustomIconStore.cropToSquarePng]). Steam does not cache a true square
+  /// icon locally — only fetching one from its CDN would, which is a
+  /// network call this project does not make for an app icon — so the crop
+  /// loses whatever the source image's own edges show, the same tradeoff a
+  /// Steam library grid view makes with the same images.
+  ///
+  /// Steam only caches an image once its own UI has actually shown that
+  /// view for a given game, so no single filename is guaranteed to exist;
+  /// [_libraryCacheCandidates] are tried in the order most likely to still
+  /// look right once forced square.
+  static Future<Uint8List?> _steamIcon(String uri) async {
+    final appId = uri.split('/').last;
+    final cacheDir = SteamLibrary.libraryCacheDir(appId);
+    if (cacheDir == null) return null;
+    for (final name in _libraryCacheCandidates) {
+      final file = File('$cacheDir\\$name');
+      try {
+        if (!file.existsSync()) continue;
+        final cropped = await CustomIconStore.cropToSquarePng(
+          await file.readAsBytes(),
+        );
+        if (cropped != null) return cropped;
+      } on FileSystemException {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  /// Widescreen box art first — the closest thing to a poster, so square
+  /// crop loses the least — then the portrait grid image (already close to
+  /// square), and only then the logo, which is text on a transparent
+  /// background and reads worst forced into a square.
+  static const _libraryCacheCandidates = [
+    'header.jpg',
+    'library_600x900.jpg',
+    'logo.png',
+  ];
 
   static bool _comInitialized = false;
 
