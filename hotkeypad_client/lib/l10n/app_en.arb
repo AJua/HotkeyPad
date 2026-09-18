@@ -165,6 +165,12 @@
 
   "connectionMethodSettingsTitle": "Connection method",
   "@connectionMethodSettingsTitle": {"description": "Section heading above the connection-method radio buttons in the settings dialog."},
+  "landscapeWidgetsSettingsTitle": "Landscape display",
+  "@landscapeWidgetsSettingsTitle": {"description": "Section heading above the clock/date switches in the settings dialog."},
+  "showClockInLandscape": "Show a clock beside the deck",
+  "@showClockInLandscape": {"description": "Switch label: shows an analog clock beside the deck in landscape."},
+  "showDateInLandscape": "Show a calendar beside the deck",
+  "@showDateInLandscape": {"description": "Switch label: shows a month calendar beside the deck in landscape."},
 
   "settingsTitle": "Settings",
   "@settingsTitle": {"description": "Tooltip on the gear icon, and title of the dialog it opens."},

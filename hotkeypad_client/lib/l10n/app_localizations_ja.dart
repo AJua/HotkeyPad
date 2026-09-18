@@ -167,6 +167,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get connectionMethodSettingsTitle => '接続方法';
 
   @override
+  String get landscapeWidgetsSettingsTitle => '横向き表示';
+
+  @override
+  String get showClockInLandscape => 'デッキの横に時計を表示';
+
+  @override
+  String get showDateInLandscape => 'デッキの横にカレンダーを表示';
+
+  @override
   String get settingsTitle => '設定';
 
   @override

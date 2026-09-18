@@ -8,13 +8,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../l10n/app_localizations.dart';
+import 'analog_clock.dart';
 import 'background_fit.dart';
 import 'connection_method_store.dart';
 import 'debug_page.dart';
 import 'edge_bar.dart';
 import 'host_history_store.dart';
+import 'landscape_widgets_store.dart';
 import 'link_target.dart';
 import 'locale_store.dart';
+import 'month_calendar.dart';
 import 'qr_scan_page.dart';
 import 'safe_insets.dart';
 import 'scan_page.dart';
@@ -99,6 +102,10 @@ class _DeckPageState extends State<DeckPage> {
   ConnectionMethod? _method;
   bool _methodLoaded = false;
 
+  /// Optional, off by default — see [LandscapeWidgetsStore].
+  bool _showClock = false;
+  bool _showDate = false;
+
   /// WiFi's own discovery, alongside Bluetooth's — bound independently of
   /// [_central]/[_state] since WiFi needs neither an adapter nor a runtime
   /// permission, so it must not be gated behind Bluetooth's own state
@@ -114,6 +121,27 @@ class _DeckPageState extends State<DeckPage> {
   void initState() {
     super.initState();
     unawaited(_loadMethod());
+    unawaited(_loadLandscapeWidgets());
+  }
+
+  Future<void> _loadLandscapeWidgets() async {
+    final clock = await LandscapeWidgetsStore.loadShowClock();
+    final date = await LandscapeWidgetsStore.loadShowDate();
+    if (!mounted) return;
+    setState(() {
+      _showClock = clock;
+      _showDate = date;
+    });
+  }
+
+  void _setShowClock(bool value) {
+    setState(() => _showClock = value);
+    unawaited(LandscapeWidgetsStore.saveShowClock(value));
+  }
+
+  void _setShowDate(bool value) {
+    setState(() => _showDate = value);
+    unawaited(LandscapeWidgetsStore.saveShowDate(value));
   }
 
   Future<void> _loadMethod() async {
@@ -737,6 +765,31 @@ class _DeckPageState extends State<DeckPage> {
                         ],
                       ),
                     ),
+                    const Divider(height: 32),
+                    Text(
+                      l10n.landscapeWidgetsSettingsTitle,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(Icons.access_time),
+                      title: Text(l10n.showClockInLandscape),
+                      value: _showClock,
+                      onChanged: (value) {
+                        _setShowClock(value);
+                        setDialogState(() {});
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(Icons.calendar_today_outlined),
+                      title: Text(l10n.showDateInLandscape),
+                      value: _showDate,
+                      onChanged: (value) {
+                        _setShowDate(value);
+                        setDialogState(() {});
+                      },
+                    ),
                     // Developer diagnostics, like the host's own "Service
                     // details" — for working out why the deck is
                     // misbehaving, not for daily use. Debug-build only:
@@ -1079,7 +1132,7 @@ class _DeckPageState extends State<DeckPage> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: SizedBox(
                     height: outer.maxHeight,
-                    child: _deck(session, layout),
+                    child: _deckArea(session, layout, portrait),
                   ),
                 ),
               );
@@ -1098,6 +1151,32 @@ class _DeckPageState extends State<DeckPage> {
           bottom: 16,
           child: _SyncingBadge(visible: session.isSyncing),
         ),
+      ],
+    );
+  }
+
+  /// Flanks [_deck] with the optional clock/date widgets in landscape —
+  /// see [LandscapeWidgetsStore]. Both off (the default) is exactly the
+  /// plain deck, unchanged. Kept as a wrapper around [_deck] rather than
+  /// folded into it so the grid's own centering math there never has to
+  /// know about anything beside it — it just gets a narrower [Expanded]
+  /// to center within.
+  Widget _deckArea(HotkeyPadSession session, DeckLayout layout, bool portrait) {
+    final deck = _deck(session, layout);
+    if (portrait || (!_showClock && !_showDate)) return deck;
+    return Row(
+      children: [
+        if (_showClock)
+          const Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: AnalogClock(),
+          ),
+        Expanded(child: deck),
+        if (_showDate)
+          const Padding(
+            padding: EdgeInsets.only(left: 12),
+            child: MonthCalendar(),
+          ),
       ],
     );
   }

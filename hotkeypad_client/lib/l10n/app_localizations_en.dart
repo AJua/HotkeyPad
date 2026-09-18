@@ -175,6 +175,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionMethodSettingsTitle => 'Connection method';
 
   @override
+  String get landscapeWidgetsSettingsTitle => 'Landscape display';
+
+  @override
+  String get showClockInLandscape => 'Show a clock beside the deck';
+
+  @override
+  String get showDateInLandscape => 'Show a calendar beside the deck';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override
