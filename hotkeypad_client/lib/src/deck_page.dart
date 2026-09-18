@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
@@ -111,10 +110,11 @@ class _DeckPageState extends State<DeckPage> {
   final _pages = PageController();
   int _page = 0;
 
-  /// The gap between slots — also used as the gap between the deck and the
-  /// optional clock/calendar in [_deckArea], so both read as one grid
+  /// The gap between slots — shared with the host's own editor preview
+  /// via [kDeckGridSpacing], and also used as the gap between the deck and
+  /// the optional clock/calendar in [_deckArea], so both read as one grid
   /// rather than the side widgets looking bolted on at a different rhythm.
-  static const _slotSpacing = 2.0;
+  static const _slotSpacing = kDeckGridSpacing;
 
   /// Matches [_deck]'s own `margin` — kept as one shared constant since
   /// [_slotBlockHeight] has to reproduce that side of _deck's math (see
@@ -1279,10 +1279,13 @@ class _DeckPageState extends State<DeckPage> {
     );
   }
 
-  /// The grid's own vertical math, minus anything to do with column count
-  /// or width — shared by [_deck] (as its `freeHeight`) and [_deckArea]
-  /// (to size the clock/calendar) so the two can't drift apart.
-  double _slotBlockHeight(
+  /// The room left for the grid on the vertical axis once the page-dots
+  /// row and the outer margin are accounted for — everything about
+  /// [maxHeight] that has nothing to do with column count or width, but
+  /// stops short of subtracting the gap *between* rows, which
+  /// [deckGridMetrics] itself now owns (see [_slotBlockHeight] for the
+  /// fully-net version [_squareCardSize] still needs).
+  double _rawVerticalSpace(
     BuildContext context,
     DeckLayout layout,
     bool showDots,
@@ -1294,9 +1297,19 @@ class _DeckPageState extends State<DeckPage> {
       horizontal: _slotMargin,
       vertical: _slotMargin,
     );
-    return maxHeight -
-        padding.vertical -
-        dots -
+    return maxHeight - padding.vertical - dots;
+  }
+
+  /// [_rawVerticalSpace] minus the row spacing too — what [_squareCardSize]
+  /// needs, since a card's own height has no separate "spacing" of its
+  /// own to add back the way [deckGridMetrics]'s callers do.
+  double _slotBlockHeight(
+    BuildContext context,
+    DeckLayout layout,
+    bool showDots,
+    double maxHeight,
+  ) {
+    return _rawVerticalSpace(context, layout, showDots, maxHeight) -
         _slotSpacing * (layout.rows - 1);
   }
 
@@ -1375,13 +1388,11 @@ class _DeckPageState extends State<DeckPage> {
     );
   }
 
-  /// The grid's own horizontal math — the exact same formula [_deck] uses
-  /// for its `gridWidth`, so [_deckArea] can hug the clock/calendar
+  /// The grid's own width, via the exact same [deckGridMetrics] call
+  /// [_deck] itself makes, so [_deckArea] can hug the clock/calendar
   /// against it instead of against whatever wider space _deck was given
   /// (see _deck's own "leaves wide margins... deliberately not stretched"
   /// centering, which is otherwise exactly the gap this would leave).
-  /// Matches _deck's real answer whenever height is the binding
-  /// constraint there — the same case [_slotBlockHeight] already assumes.
   double _gridWidthFor(
     BuildContext context,
     DeckLayout layout,
@@ -1398,14 +1409,14 @@ class _DeckPageState extends State<DeckPage> {
       hugLeft: hugLeft,
       hugRight: hugRight,
     );
-    final freeWidth =
-        maxWidth - padding.horizontal - _slotSpacing * (layout.columns - 1);
-    final freeHeight = _slotBlockHeight(context, layout, showDots, maxHeight);
-    final cellWidth = math.min(
-      freeWidth / layout.columns,
-      freeHeight / layout.rows * cellRatio,
-    );
-    return cellWidth * layout.columns + _slotSpacing * (layout.columns - 1);
+    return deckGridMetrics(
+      maxWidth: maxWidth - padding.horizontal,
+      maxHeight: _rawVerticalSpace(context, layout, showDots, maxHeight),
+      columns: layout.columns,
+      rows: layout.rows,
+      cellRatio: cellRatio,
+      spacing: _slotSpacing,
+    ).gridWidth;
   }
 
   Widget _deck(
@@ -1428,28 +1439,19 @@ class _DeckPageState extends State<DeckPage> {
           hugRight: hugRight,
         );
 
-        final freeWidth =
-            constraints.maxWidth -
-            padding.horizontal -
-            spacing * (layout.columns - 1);
-        final freeHeight = _slotBlockHeight(
-          context,
-          layout,
-          session.showPageDots,
-          constraints.maxHeight,
+        final metrics = deckGridMetrics(
+          maxWidth: constraints.maxWidth - padding.horizontal,
+          maxHeight: _rawVerticalSpace(
+            context,
+            layout,
+            session.showPageDots,
+            constraints.maxHeight,
+          ),
+          columns: layout.columns,
+          rows: layout.rows,
+          cellRatio: cellRatio,
+          spacing: spacing,
         );
-
-        // Whichever axis runs out first decides the cell width; the other
-        // axis keeps its spare room as even margin on both sides.
-        final cellWidth = math.min(
-          freeWidth / layout.columns,
-          freeHeight / layout.rows * cellRatio,
-        );
-        final cellHeight = cellWidth / cellRatio;
-        final gridWidth =
-            cellWidth * layout.columns + spacing * (layout.columns - 1);
-        final gridHeight =
-            cellHeight * layout.rows + spacing * (layout.rows - 1);
 
         return Padding(
           // Vertical only. The horizontal inset is already subtracted from
@@ -1469,54 +1471,37 @@ class _DeckPageState extends State<DeckPage> {
                   controller: _pages,
                   itemCount: layout.pages,
                   onPageChanged: (page) => setState(() => _page = page),
-                  itemBuilder: (context, page) => Center(
-                    child: SizedBox(
-                      width: gridWidth.isFinite && gridWidth > 0
-                          ? gridWidth
-                          : null,
-                      height: gridHeight.isFinite && gridHeight > 0
-                          ? gridHeight
-                          : null,
-                      child: GridView.builder(
-                        padding: EdgeInsets.zero,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: layout.columns,
-                          mainAxisSpacing: spacing,
-                          crossAxisSpacing: spacing,
-                          childAspectRatio: cellRatio,
-                        ),
-                        itemCount: layout.pageCapacity,
-                        itemBuilder: (context, cell) {
-                          final index = layout.indexOf(page: page, cell: cell);
-                          final slot = layout.slots[index];
-                          final item = slot == null
-                              ? null
-                              : DeckItem.parse(slot.value);
-                          if (item == null) return const _EmptyCell();
-                          final iconKey = item.emoji == null
-                              ? iconKeyFor(item)
-                              : null;
-                          if (iconKey != null) {
-                            unawaited(session.ensureIcon(iconKey));
-                          }
-                          return _DeckButton(
-                            item: item,
-                            icon: iconKey == null
-                                ? null
-                                : session.iconFor(iconKey),
-                            showLabel: labels,
-                            pressing: session.isPressing(item),
-                            outcome: session.feedbackFor(item),
-                            // slot.id is the host's own index for this
-                            // button, carried unchanged however the deck is
-                            // turned to fit the screen — nothing here needs
-                            // to translate it back.
-                            onPressed: () => _press(session, slot!.id, item),
-                          );
-                        },
-                      ),
-                    ),
+                  itemBuilder: (context, page) => DeckGridView(
+                    layout: layout,
+                    page: page,
+                    metrics: metrics,
+                    cellRatio: cellRatio,
+                    spacing: spacing,
+                    cellBuilder: (context, index) {
+                      final slot = layout.slots[index];
+                      final item = slot == null
+                          ? null
+                          : DeckItem.parse(slot.value);
+                      if (item == null) return const _EmptyCell();
+                      final iconKey = item.emoji == null
+                          ? iconKeyFor(item)
+                          : null;
+                      if (iconKey != null) {
+                        unawaited(session.ensureIcon(iconKey));
+                      }
+                      return _DeckButton(
+                        item: item,
+                        icon: iconKey == null ? null : session.iconFor(iconKey),
+                        showLabel: labels,
+                        pressing: session.isPressing(item),
+                        outcome: session.feedbackFor(item),
+                        // slot.id is the host's own index for this button,
+                        // carried unchanged however the deck is turned to
+                        // fit the screen — nothing here needs to translate
+                        // it back.
+                        onPressed: () => _press(session, slot!.id, item),
+                      );
+                    },
                   ),
                 ),
               ),

@@ -1063,4 +1063,72 @@ void main() {
       expect(LinkTransport.values.map((t) => t.label), ['bluetooth', 'wifi']);
     });
   });
+
+  group('deckGridMetrics', () {
+    test('height-bound: fills every column, spare room sits top/bottom', () {
+      // Plenty of width for 3 columns, not much height for 2 rows.
+      final metrics = deckGridMetrics(
+        maxWidth: 1000,
+        maxHeight: 220,
+        columns: 3,
+        rows: 2,
+        cellRatio: 0.86,
+        spacing: 2,
+      );
+      // cellHeight = freeHeight / rows = (220 - 2) / 2 = 109
+      expect(metrics.cellHeight, 109);
+      expect(metrics.cellWidth, closeTo(109 * 0.86, 0.001));
+      expect(metrics.gridHeight, 220);
+      // gridWidth must not exceed what was actually available.
+      expect(metrics.gridWidth, lessThanOrEqualTo(1000));
+    });
+
+    test('width-bound: fills every row, spare room sits left/right', () {
+      // Not much width for 3 columns, plenty of height for 2 rows.
+      final metrics = deckGridMetrics(
+        maxWidth: 200,
+        maxHeight: 2000,
+        columns: 3,
+        rows: 2,
+        cellRatio: 0.86,
+        spacing: 2,
+      );
+      // cellWidth = freeWidth / columns = (200 - 4) / 3 = 65.33...
+      expect(metrics.cellWidth, closeTo(196 / 3, 0.001));
+      expect(metrics.gridWidth, closeTo(200, 0.001));
+      expect(metrics.gridHeight, lessThanOrEqualTo(2000));
+    });
+
+    test('a square cellRatio of 1 makes width and height match', () {
+      final metrics = deckGridMetrics(
+        maxWidth: 300,
+        maxHeight: 300,
+        columns: 3,
+        rows: 3,
+        cellRatio: 1,
+        spacing: 2,
+      );
+      expect(metrics.cellWidth, metrics.cellHeight);
+    });
+
+    test('defaults to kDeckGridSpacing when spacing is not given', () {
+      final withDefault = deckGridMetrics(
+        maxWidth: 300,
+        maxHeight: 300,
+        columns: 3,
+        rows: 2,
+        cellRatio: 0.86,
+      );
+      final withExplicit = deckGridMetrics(
+        maxWidth: 300,
+        maxHeight: 300,
+        columns: 3,
+        rows: 2,
+        cellRatio: 0.86,
+        spacing: kDeckGridSpacing,
+      );
+      expect(withDefault.gridWidth, withExplicit.gridWidth);
+      expect(withDefault.gridHeight, withExplicit.gridHeight);
+    });
+  });
 }

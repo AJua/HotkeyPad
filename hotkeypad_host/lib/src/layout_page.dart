@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -940,50 +939,41 @@ class LayoutGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const spacing = 6.0;
-        // Same proportions the phone draws, so this previews rather than
-        // approximates.
+        // Same proportions — and now the same formula, the same spacing,
+        // and the same grid shell — the phone draws, so this previews
+        // rather than approximates. Shared with the client via
+        // hotkeypad_protocol instead of each computing its own slightly
+        // different answer to the same question.
         const cellRatio = 0.86;
-        final cellWidth = math.min(
-          (constraints.maxWidth - spacing * (layout.columns - 1)) /
-              layout.columns,
-          (constraints.maxHeight - spacing * (layout.rows - 1)) /
-              layout.rows *
-              cellRatio,
+        const spacing = kDeckGridSpacing;
+        final metrics = deckGridMetrics(
+          maxWidth: constraints.maxWidth,
+          maxHeight: constraints.maxHeight,
+          columns: layout.columns,
+          rows: layout.rows,
+          cellRatio: cellRatio,
         );
-        final cellHeight = cellWidth / cellRatio;
-        return Center(
-          child: SizedBox(
-            width: cellWidth * layout.columns + spacing * (layout.columns - 1),
-            height: cellHeight * layout.rows + spacing * (layout.rows - 1),
-            child: GridView.builder(
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: layout.columns,
-                mainAxisSpacing: spacing,
-                crossAxisSpacing: spacing,
-                childAspectRatio: cellRatio,
-              ),
-              itemCount: layout.pageCapacity,
-              itemBuilder: (context, cellIndex) {
-                final index = layout.indexOf(page: page, cell: cellIndex);
-                final stored = layout.slots[index]?.value;
-                final item = stored == null ? null : DeckItem.parse(stored);
-                final iconKey = item == null || item.emoji != null
-                    ? null
-                    : iconKeyFor(item);
-                return _Cell(
-                  index: index,
-                  item: item,
-                  icon: iconKey == null ? null : iconFor(iconKey),
-                  onTap: () => onPick(index),
-                  onClear: stored == null ? null : () => onClear(index),
-                  onMoved: (from) => onMove(from, index),
-                );
-              },
-            ),
-          ),
+        return DeckGridView(
+          layout: layout,
+          page: page,
+          metrics: metrics,
+          cellRatio: cellRatio,
+          spacing: spacing,
+          cellBuilder: (context, index) {
+            final stored = layout.slots[index]?.value;
+            final item = stored == null ? null : DeckItem.parse(stored);
+            final iconKey = item == null || item.emoji != null
+                ? null
+                : iconKeyFor(item);
+            return _Cell(
+              index: index,
+              item: item,
+              icon: iconKey == null ? null : iconFor(iconKey),
+              onTap: () => onPick(index),
+              onClear: stored == null ? null : () => onClear(index),
+              onMoved: (from) => onMove(from, index),
+            );
+          },
         );
       },
     );

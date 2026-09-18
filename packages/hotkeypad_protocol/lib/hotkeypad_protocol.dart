@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
+import 'package:flutter/widgets.dart';
 
 /// The contract shared by the host service and the client app.
 ///
@@ -853,6 +855,122 @@ class DeckLayout {
           else
             null,
       ],
+    );
+  }
+}
+
+/// The natural size of a [columns] x [rows] grid of cells [spacing] apart,
+/// each [cellRatio] wide-to-tall, that fits within [maxWidth] x
+/// [maxHeight] — shared by the host's editor preview and the client's own
+/// deck so a button looks the same size relative to its neighbours on
+/// both, rather than each computing its own slightly different answer to
+/// the same question. See also [DeckGridView], which renders a grid at
+/// this size.
+class DeckGridMetrics {
+  const DeckGridMetrics({
+    required this.cellWidth,
+    required this.cellHeight,
+    required this.gridWidth,
+    required this.gridHeight,
+  });
+
+  final double cellWidth;
+  final double cellHeight;
+  final double gridWidth;
+  final double gridHeight;
+}
+
+/// The gap between cells, shared by both apps' decks — see
+/// [DeckGridMetrics]'s own doc comment for why matching this exactly is
+/// the point.
+const kDeckGridSpacing = 2.0;
+
+DeckGridMetrics deckGridMetrics({
+  required double maxWidth,
+  required double maxHeight,
+  required int columns,
+  required int rows,
+  required double cellRatio,
+  double spacing = kDeckGridSpacing,
+}) {
+  final freeWidth = maxWidth - spacing * (columns - 1);
+  final freeHeight = maxHeight - spacing * (rows - 1);
+  // Whichever axis runs out first decides the cell width; the other axis
+  // keeps its spare room as even margin on both sides.
+  final cellWidth = math.min(
+    freeWidth / columns,
+    freeHeight / rows * cellRatio,
+  );
+  final cellHeight = cellWidth / cellRatio;
+  return DeckGridMetrics(
+    cellWidth: cellWidth,
+    cellHeight: cellHeight,
+    gridWidth: cellWidth * columns + spacing * (columns - 1),
+    gridHeight: cellHeight * rows + spacing * (rows - 1),
+  );
+}
+
+/// The rendered shell of one page of [layout]: a fixed-size, non-scrolling
+/// grid sized by [metrics] and centered in the space around it — identical
+/// between the host's editable grid and the client's pressable one, since
+/// what actually differs between them (drag-to-reorder vs tap-to-press) is
+/// entirely inside [cellBuilder], never in the grid's own geometry.
+///
+/// [metrics] is a parameter rather than computed here so a caller that also
+/// has to reserve space for something beside the grid (the client's
+/// clock/calendar widgets, say) can solve for that layout first and hand
+/// back the metrics it settled on, instead of this widget silently
+/// recomputing a second, inconsistent answer from raw constraints.
+class DeckGridView extends StatelessWidget {
+  const DeckGridView({
+    super.key,
+    required this.layout,
+    required this.page,
+    required this.metrics,
+    required this.cellRatio,
+    required this.cellBuilder,
+    this.spacing = kDeckGridSpacing,
+  });
+
+  final DeckLayout layout;
+
+  /// Which page of [layout] to show — cell `n` on this page is
+  /// `layout.indexOf(page: page, cell: n)` into [DeckLayout.slots], the
+  /// index [cellBuilder] is actually called with.
+  final int page;
+
+  final DeckGridMetrics metrics;
+  final double cellRatio;
+  final double spacing;
+
+  /// Builds the widget for the slot at [DeckLayout.slots] index `index`.
+  final Widget Function(BuildContext context, int index) cellBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = metrics.gridWidth;
+    final height = metrics.gridHeight;
+    return Center(
+      child: SizedBox(
+        // A transient zero/negative constraint (mid-resize, say) is left
+        // to the grid's own intrinsic size rather than forced to a size
+        // that would just throw.
+        width: width.isFinite && width > 0 ? width : null,
+        height: height.isFinite && height > 0 ? height : null,
+        child: GridView.builder(
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: layout.columns,
+            mainAxisSpacing: spacing,
+            crossAxisSpacing: spacing,
+            childAspectRatio: cellRatio,
+          ),
+          itemCount: layout.pageCapacity,
+          itemBuilder: (context, cellIndex) =>
+              cellBuilder(context, layout.indexOf(page: page, cell: cellIndex)),
+        ),
+      ),
     );
   }
 }
