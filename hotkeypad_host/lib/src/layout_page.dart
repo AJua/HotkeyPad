@@ -835,18 +835,37 @@ class LayoutPageState extends State<LayoutPage> {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: LayoutGrid(
-              layout: _displayLayout,
-              page: _page,
-              iconFor: (key) {
-                unawaited(_ensureIcon(key));
-                return _icons[key];
-              },
-              onPick: _pick,
-              onClear: (index) =>
-                  _apply(_toCanonical(_displayLayout.withSlot(index, null))),
-              onMove: (from, to) =>
-                  _apply(_toCanonical(_displayLayout.moved(from, to))),
+            // A phone's own screen ratio, not just a generic frame — this
+            // is meant to preview roughly how much of the deck a real
+            // phone actually shows, not merely to decorate it.
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: 9 / 19.5,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline,
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(36),
+                  ),
+                  child: LayoutGrid(
+                    layout: _displayLayout,
+                    page: _page,
+                    iconFor: (key) {
+                      unawaited(_ensureIcon(key));
+                      return _icons[key];
+                    },
+                    onPick: _pick,
+                    onClear: (index) => _apply(
+                      _toCanonical(_displayLayout.withSlot(index, null)),
+                    ),
+                    onMove: (from, to) =>
+                        _apply(_toCanonical(_displayLayout.moved(from, to))),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
