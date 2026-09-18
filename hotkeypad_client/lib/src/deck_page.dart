@@ -1182,7 +1182,12 @@ class _DeckPageState extends State<DeckPage> {
   /// [_deck]'s own width constraint depends on it — a cycle a plain
   /// LayoutBuilder can't resolve in one pass.
   Widget _deckArea(HotkeyPadSession session, DeckLayout layout, bool portrait) {
-    final deck = _deck(session, layout);
+    final deck = _deck(
+      session,
+      layout,
+      hugLeft: !portrait && _showClock,
+      hugRight: !portrait && _showDate,
+    );
     if (portrait || (!_showClock && !_showDate)) return deck;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1192,14 +1197,42 @@ class _DeckPageState extends State<DeckPage> {
           session.showPageDots,
           constraints.maxHeight,
         );
+        final reserved =
+            (_showClock ? size + _slotSpacing : 0.0) +
+            (_showDate ? size + _slotSpacing : 0.0);
+        // What's left once the cards are reserved is exactly what _deck
+        // would see through an Expanded — computed here first, rather
+        // than actually handing _deck that Expanded, so the cards can sit
+        // right at the grid's own edge instead of the far edge of
+        // whatever leftover space _deck's own centering leaves beside it.
+        final gridWidth = _gridWidthFor(
+          context,
+          layout,
+          session.showLabels,
+          session.showPageDots,
+          constraints.maxWidth - reserved,
+          constraints.maxHeight,
+          hugLeft: _showClock,
+          hugRight: _showDate,
+        );
+        // _deck still subtracts a margin from whatever width it's given —
+        // just not on the hugged side(s), where it's now zero — added
+        // back here so the SizedBox below hands it exactly enough to
+        // arrive back at gridWidth once it does.
+        final deckPadding = _slotHorizontalPadding(
+          context,
+          hugLeft: _showClock,
+          hugRight: _showDate,
+        );
         return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (_showClock)
               Padding(
                 padding: const EdgeInsets.only(right: _slotSpacing),
                 child: AnalogClock(size: size),
               ),
-            Expanded(child: deck),
+            SizedBox(width: gridWidth + deckPadding.horizontal, child: deck),
             if (_showDate)
               Padding(
                 padding: const EdgeInsets.only(left: _slotSpacing),
@@ -1232,20 +1265,82 @@ class _DeckPageState extends State<DeckPage> {
         _slotSpacing * (layout.rows - 1);
   }
 
-  Widget _deck(HotkeyPadSession session, DeckLayout layout) {
+  /// [_deck]'s own horizontal margin — [_slotMargin] plus whatever real
+  /// device inset (notch, gesture nav) sits on that side, except on a
+  /// hugged side, where the constant margin is dropped (a real inset, if
+  /// there is one, still applies — that one exists for a hardware reason
+  /// unrelated to the clock/calendar being there or not). Shared by
+  /// [_deck] and [_gridWidthFor] so a hugged side's math can't drift
+  /// between the two.
+  EdgeInsets _slotHorizontalPadding(
+    BuildContext context, {
+    required bool hugLeft,
+    required bool hugRight,
+  }) {
+    final base = safeScrollPadding(
+      context,
+      horizontal: _slotMargin,
+      vertical: _slotMargin,
+    );
+    return EdgeInsets.fromLTRB(
+      hugLeft ? base.left - _slotMargin : base.left,
+      base.top,
+      hugRight ? base.right - _slotMargin : base.right,
+      base.bottom,
+    );
+  }
+
+  /// The grid's own horizontal math — the exact same formula [_deck] uses
+  /// for its `gridWidth`, so [_deckArea] can hug the clock/calendar
+  /// against it instead of against whatever wider space _deck was given
+  /// (see _deck's own "leaves wide margins... deliberately not stretched"
+  /// centering, which is otherwise exactly the gap this would leave).
+  /// Matches _deck's real answer whenever height is the binding
+  /// constraint there — the same case [_slotBlockHeight] already assumes.
+  double _gridWidthFor(
+    BuildContext context,
+    DeckLayout layout,
+    bool showLabels,
+    bool showDots,
+    double maxWidth,
+    double maxHeight, {
+    required bool hugLeft,
+    required bool hugRight,
+  }) {
+    final cellRatio = showLabels ? 0.86 : 1.0;
+    final padding = _slotHorizontalPadding(
+      context,
+      hugLeft: hugLeft,
+      hugRight: hugRight,
+    );
+    final freeWidth =
+        maxWidth - padding.horizontal - _slotSpacing * (layout.columns - 1);
+    final freeHeight = _slotBlockHeight(context, layout, showDots, maxHeight);
+    final cellWidth = math.min(
+      freeWidth / layout.columns,
+      freeHeight / layout.rows * cellRatio,
+    );
+    return cellWidth * layout.columns + _slotSpacing * (layout.columns - 1);
+  }
+
+  Widget _deck(
+    HotkeyPadSession session,
+    DeckLayout layout, {
+    bool hugLeft = false,
+    bool hugRight = false,
+  }) {
     return LayoutBuilder(
       builder: (context, constraints) {
         const spacing = _slotSpacing;
-        const margin = _slotMargin;
         // Taller than wide when there are labels, since the text needs a
         // band of its own. Without labels there is nothing to leave room
         // for, so cells go square and the icon fills them.
         final labels = session.showLabels;
         final cellRatio = labels ? 0.86 : 1.0;
-        final padding = safeScrollPadding(
+        final padding = _slotHorizontalPadding(
           context,
-          horizontal: margin,
-          vertical: margin,
+          hugLeft: hugLeft,
+          hugRight: hugRight,
         );
 
         final freeWidth =
