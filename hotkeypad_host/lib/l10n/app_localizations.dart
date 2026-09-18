@@ -257,6 +257,12 @@ abstract class AppLocalizations {
   /// **'Click a cell to choose what it does. Drag a button to move it, including onto another page.'**
   String get deckLayoutHint;
 
+  /// Tooltip on the rotate icon that flips the deck preview between portrait and landscape when no device is locked in.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview portrait/landscape'**
+  String get previewOrientationTooltip;
+
   /// Tooltip on the settings gear icon, and the Settings dialog's title.
   ///
   /// In en, this message translates to:

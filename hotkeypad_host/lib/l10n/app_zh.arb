@@ -27,6 +27,7 @@
   "done": "完成",
   "deckLayoutTitle": "面板配置",
   "deckLayoutHint": "點擊按鈕格以選擇它的功能。拖曳按鈕可以移動它,也可以拖到其他頁面。",
+  "previewOrientationTooltip": "預覽直向／橫向",
   "settingsTitle": "設定",
   "appearanceSectionHeader": "外觀",
   "themeSystem": "自動",

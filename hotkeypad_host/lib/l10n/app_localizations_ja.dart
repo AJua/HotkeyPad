@@ -97,6 +97,9 @@ class AppLocalizationsJa extends AppLocalizations {
       'セルをクリックして機能を選択します。ボタンをドラッグすると移動できます(別のページへの移動も可能です)。';
 
   @override
+  String get previewOrientationTooltip => '縦向き/横向きのプレビューを切り替え';
+
+  @override
   String get settingsTitle => '設定';
 
   @override

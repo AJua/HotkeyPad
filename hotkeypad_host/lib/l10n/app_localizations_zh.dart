@@ -95,6 +95,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deckLayoutHint => '點擊按鈕格以選擇它的功能。拖曳按鈕可以移動它,也可以拖到其他頁面。';
 
   @override
+  String get previewOrientationTooltip => '預覽直向／橫向';
+
+  @override
   String get settingsTitle => '設定';
 
   @override
@@ -274,6 +277,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get deckLayoutHint => '點擊按鈕格以選擇它的功能。拖曳按鈕可以移動它,也可以拖到其他頁面。';
+
+  @override
+  String get previewOrientationTooltip => '預覽直向／橫向';
 
   @override
   String get settingsTitle => '設定';

@@ -90,6 +90,8 @@
 
   "deckLayoutHint": "Click a cell to choose what it does. Drag a button to move it, including onto another page.",
   "@deckLayoutHint": {"description": "Deck layout screen's instructional subtitle."},
+  "previewOrientationTooltip": "Preview portrait/landscape",
+  "@previewOrientationTooltip": {"description": "Tooltip on the rotate icon that flips the deck preview between portrait and landscape when no device is locked in."},
 
   "settingsTitle": "Settings",
   "@settingsTitle": {"description": "Tooltip on the settings gear icon, and the Settings dialog's title."},

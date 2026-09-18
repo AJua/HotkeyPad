@@ -97,6 +97,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Click a cell to choose what it does. Drag a button to move it, including onto another page.';
 
   @override
+  String get previewOrientationTooltip => 'Preview portrait/landscape';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override

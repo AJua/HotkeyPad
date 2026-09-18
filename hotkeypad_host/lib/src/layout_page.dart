@@ -397,9 +397,32 @@ class LayoutPageState extends State<LayoutPage> {
   /// actually displaying. Storage and broadcast are untouched: an edit
   /// made through this view is turned back via [_toCanonical] before
   /// [_apply] ever sees it.
+  /// A manual portrait/landscape preview, used only when no real device is
+  /// locked ([widget.lockedClientPortrait] is null) to say which shape to
+  /// show — see [_toggleOrientationPreview]. Null means "whatever [_layout]
+  /// is already saved as", same as before this existed.
+  bool? _previewPortrait;
+
   DeckLayout get _displayLayout {
-    final portrait = widget.lockedClientPortrait;
+    final portrait = widget.lockedClientPortrait ?? _previewPortrait;
     return portrait == null ? _layout : _layout.orientedFor(portrait: portrait);
+  }
+
+  /// Whether [_displayLayout] is currently showing its portrait (taller
+  /// than wide) shape — used to pick the preview frame's own aspect ratio
+  /// and to flip [_previewPortrait] relative to whatever is on screen right
+  /// now, rather than some fixed starting orientation.
+  bool get _displayIsPortrait {
+    final layout = _displayLayout;
+    if (layout.columns == layout.rows) return true;
+    return layout.rows > layout.columns;
+  }
+
+  /// Flips the preview between portrait and landscape — only reachable
+  /// when nothing real is locked in, since a locked device's own
+  /// orientation should always win over a guess made here.
+  void _toggleOrientationPreview() {
+    setState(() => _previewPortrait = !_displayIsPortrait);
   }
 
   /// Whether producing [_displayLayout] actually turned [_layout] — the
@@ -799,9 +822,24 @@ class LayoutPageState extends State<LayoutPage> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            l10n.deckLayoutHint,
-            style: Theme.of(context).textTheme.bodySmall,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.deckLayoutHint,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              // Hidden once a real device is locked in: its own actual
+              // orientation always wins over a guess made here — see
+              // _toggleOrientationPreview.
+              if (widget.lockedClientPortrait == null)
+                IconButton(
+                  tooltip: l10n.previewOrientationTooltip,
+                  onPressed: _toggleOrientationPreview,
+                  icon: const Icon(Icons.screen_rotation_outlined),
+                ),
+            ],
           ),
         ),
         if (_layout.pages > 1)
@@ -840,7 +878,7 @@ class LayoutPageState extends State<LayoutPage> {
             // phone actually shows, not merely to decorate it.
             child: Center(
               child: AspectRatio(
-                aspectRatio: 9 / 19.5,
+                aspectRatio: _displayIsPortrait ? 9 / 19.5 : 19.5 / 9,
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(

@@ -27,6 +27,7 @@
   "done": "完了",
   "deckLayoutTitle": "デッキレイアウト",
   "deckLayoutHint": "セルをクリックして機能を選択します。ボタンをドラッグすると移動できます(別のページへの移動も可能です)。",
+  "previewOrientationTooltip": "縦向き/横向きのプレビューを切り替え",
   "settingsTitle": "設定",
   "appearanceSectionHeader": "外観",
   "themeSystem": "自動",
