@@ -40,9 +40,7 @@ class _AnalogClockState extends State<AnalogClock> {
 
   void _scheduleNextTick() {
     final now = DateTime.now();
-    final untilNextSecond = Duration(
-      milliseconds: 1000 - now.millisecond,
-    );
+    final untilNextSecond = Duration(milliseconds: 1000 - now.millisecond);
     _ticker = Timer(untilNextSecond, () {
       if (!mounted) return;
       setState(() => _now = DateTime.now());
@@ -58,21 +56,34 @@ class _AnalogClockState extends State<AnalogClock> {
 
   @override
   Widget build(BuildContext context) {
-    const cardPadding = 18.0;
-    final faceWidth = math.max(widget.width - cardPadding * 2, 0.0);
-    final faceHeight = math.max(widget.height - cardPadding * 2, 0.0);
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xF01C1C1E),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: SizedBox(
-        width: faceWidth,
-        height: faceHeight,
-        child: CustomPaint(painter: _ClockPainter(_now)),
+    const margin = 12.0;
+    final cardWidth = math.max(widget.width - margin * 2, 0.0);
+    final cardHeight = math.max(widget.height - margin * 2, 0.0);
+    // The margin is a Padding around the card rather than Container's own
+    // `margin` property: Container merges an explicit width/height into a
+    // *tight* constraint that would then override — not compose with — a
+    // margin's own deflate, so the card wouldn't actually shrink. Sizing
+    // the card itself to widget.width/height minus the margin, and only
+    // then wrapping it in that much Padding, keeps this explicit rather
+    // than depending on whatever constraint happens to reach here.
+    return Padding(
+      padding: const EdgeInsets.all(margin),
+      child: Container(
+        width: cardWidth,
+        height: cardHeight,
+        decoration: BoxDecoration(
+          color: const Color(0xF01C1C1E),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        // A childless CustomPaint sizes itself to this explicitly — without
+        // it, Container's own `alignment` (needed when it had a smaller
+        // SizedBox child) would hand it *loose* constraints, and with no
+        // child of its own to measure, it would collapse to zero size and
+        // paint nothing at all, leaving only the card's plain background.
+        child: CustomPaint(
+          size: Size(cardWidth, cardHeight),
+          painter: _ClockPainter(_now),
+        ),
       ),
     );
   }
@@ -121,8 +132,7 @@ class _ClockPainter extends CustomPainter {
       );
     }
 
-    final hourAngle =
-        (time.hour % 12 + time.minute / 60) * math.pi / 6;
+    final hourAngle = (time.hour % 12 + time.minute / 60) * math.pi / 6;
     final minuteAngle = (time.minute + time.second / 60) * math.pi / 30;
     final secondAngle = time.second * math.pi / 30;
 

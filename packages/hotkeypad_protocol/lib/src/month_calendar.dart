@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -66,86 +67,93 @@ class _MonthCalendarState extends State<MonthCalendar> {
       (i) => materialL10n.narrowWeekdays[(weekStart + i) % 7],
     );
 
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-      decoration: BoxDecoration(
-        color: const Color(0xF01C1C1E),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        // A card this size is usually taller than the header + weekday
-        // row + day grid need, so the extra room is centered rather than
-        // left pinned to the top.
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            DateFormat.yMMMM(locale).format(today),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
+    const margin = 12.0;
+    final cardWidth = math.max(widget.width - margin * 2, 0.0);
+    final cardHeight = math.max(widget.height - margin * 2, 0.0);
+    // The margin is a Padding around the card rather than Container's own
+    // `margin` property — see AnalogClock's own doc comment for why.
+    return Padding(
+      padding: const EdgeInsets.all(margin),
+      child: Container(
+        width: cardWidth,
+        height: cardHeight,
+        decoration: BoxDecoration(
+          color: const Color(0xF01C1C1E),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          // A card this size is usually taller than the header + weekday
+          // row + day grid need, so the extra room is centered rather than
+          // left pinned to the top.
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              DateFormat.yMMMM(locale).format(today),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              for (final label in weekdayLabels)
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                for (final label in weekdayLabels)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
+              ],
             ),
-            itemCount: leadingBlanks + daysInMonth,
-            itemBuilder: (context, index) {
-              if (index < leadingBlanks) return const SizedBox.shrink();
-              final day = index - leadingBlanks + 1;
-              final isToday = day == today.day;
-              return Center(
-                child: Container(
-                  width: 22,
-                  height: 22,
-                  alignment: Alignment.center,
-                  decoration: isToday
-                      ? BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                        )
-                      : null,
-                  child: Text(
-                    '$day',
-                    style: TextStyle(
-                      color: isToday
-                          ? Theme.of(context).colorScheme.onPrimary
-                          : Colors.white.withValues(alpha: 0.85),
-                      fontSize: 12,
-                      fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+            const SizedBox(height: 4),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+              ),
+              itemCount: leadingBlanks + daysInMonth,
+              itemBuilder: (context, index) {
+                if (index < leadingBlanks) return const SizedBox.shrink();
+                final day = index - leadingBlanks + 1;
+                final isToday = day == today.day;
+                return Center(
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: isToday
+                        ? BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                          )
+                        : null,
+                    child: Text(
+                      '$day',
+                      style: TextStyle(
+                        color: isToday
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Colors.white.withValues(alpha: 0.85),
+                        fontSize: 12,
+                        fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-          ),
-        ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
