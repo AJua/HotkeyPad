@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 /// A month calendar grid, styled after iOS StandBy's calendar widget —
-/// today circled in the app's own accent color. Always dark, for the same
-/// reason as [AnalogClock]: it needs to read the same regardless of the
-/// deck's own background.
+/// today circled in the app's own accent color, the card itself a dark or
+/// light card following [Theme.of]'s own brightness — see [AnalogClock]'s
+/// own doc comment for why.
 ///
 /// Shared between the host's grid editor and the client's own deck — see
 /// [AnalogClock]'s own doc comment for why.
@@ -67,6 +67,15 @@ class _MonthCalendarState extends State<MonthCalendar> {
       (i) => materialL10n.narrowWeekdays[(weekStart + i) % 7],
     );
 
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = dark ? Colors.white : Colors.black87;
+    final secondaryTextColor = dark
+        ? Colors.white.withValues(alpha: 0.5)
+        : Colors.black.withValues(alpha: 0.5);
+    final dayTextColor = dark
+        ? Colors.white.withValues(alpha: 0.85)
+        : Colors.black.withValues(alpha: 0.85);
+
     const margin = 12.0;
     final cardWidth = math.max(widget.width - margin * 2, 0.0);
     final cardHeight = math.max(widget.height - margin * 2, 0.0);
@@ -74,13 +83,12 @@ class _MonthCalendarState extends State<MonthCalendar> {
     // `margin` property — see AnalogClock's own doc comment for why.
     return Padding(
       padding: const EdgeInsets.all(margin),
-      child: Container(
+      // No card behind the grid: it reads directly against the deck's own
+      // background, the same as every other button — dark/light still
+      // decides the text's own colors above, just not a backing fill.
+      child: SizedBox(
         width: cardWidth,
         height: cardHeight,
-        decoration: BoxDecoration(
-          color: const Color(0xF01C1C1E),
-          borderRadius: BorderRadius.circular(24),
-        ),
         child: Column(
           // A card this size is usually taller than the header + weekday
           // row + day grid need, so the extra room is centered rather than
@@ -90,8 +98,8 @@ class _MonthCalendarState extends State<MonthCalendar> {
           children: [
             Text(
               DateFormat.yMMMM(locale).format(today),
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: textColor,
                 fontWeight: FontWeight.w700,
                 fontSize: 15,
               ),
@@ -105,7 +113,7 @@ class _MonthCalendarState extends State<MonthCalendar> {
                       child: Text(
                         label,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: secondaryTextColor,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -143,7 +151,7 @@ class _MonthCalendarState extends State<MonthCalendar> {
                       style: TextStyle(
                         color: isToday
                             ? Theme.of(context).colorScheme.onPrimary
-                            : Colors.white.withValues(alpha: 0.85),
+                            : dayTextColor,
                         fontSize: 12,
                         fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
                       ),

@@ -4,9 +4,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 /// A ticking analog clock face, styled after iOS StandBy's clock widget —
-/// always dark, regardless of the deck's own theme or background, so it
-/// reads the same whether the deck behind it is light, dark, or has a
-/// photo background.
+/// a dark card in dark mode, a light one in light mode, following
+/// [Theme.of]'s own brightness rather than the deck's background image
+/// (which can be light or dark regardless of the theme) — same reasoning
+/// as [MonthCalendar]'s own card.
 ///
 /// Shared between the host's grid editor and the client's own deck — see
 /// [DeckGridView] — so a [WidgetItem] looks the same regardless of which
@@ -56,6 +57,7 @@ class _AnalogClockState extends State<AnalogClock> {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     const margin = 12.0;
     final cardWidth = math.max(widget.width - margin * 2, 0.0);
     final cardHeight = math.max(widget.height - margin * 2, 0.0);
@@ -68,21 +70,18 @@ class _AnalogClockState extends State<AnalogClock> {
     // than depending on whatever constraint happens to reach here.
     return Padding(
       padding: const EdgeInsets.all(margin),
-      child: Container(
+      // No card behind the face: it reads directly against the deck's own
+      // background, the same as every other button — dark/light still
+      // decides the face's own colors below, just not a backing fill.
+      child: SizedBox(
         width: cardWidth,
         height: cardHeight,
-        decoration: BoxDecoration(
-          color: const Color(0xF01C1C1E),
-          borderRadius: BorderRadius.circular(24),
-        ),
         // A childless CustomPaint sizes itself to this explicitly — without
-        // it, Container's own `alignment` (needed when it had a smaller
-        // SizedBox child) would hand it *loose* constraints, and with no
-        // child of its own to measure, it would collapse to zero size and
-        // paint nothing at all, leaving only the card's plain background.
+        // it, an ambient loose constraint would leave it nothing to measure
+        // against and it would collapse to zero size, painting nothing.
         child: CustomPaint(
           size: Size(cardWidth, cardHeight),
-          painter: _ClockPainter(_now),
+          painter: _ClockPainter(_now, dark: dark),
         ),
       ),
     );
@@ -90,18 +89,20 @@ class _AnalogClockState extends State<AnalogClock> {
 }
 
 class _ClockPainter extends CustomPainter {
-  _ClockPainter(this.time);
+  _ClockPainter(this.time, {required this.dark});
 
   final DateTime time;
+  final bool dark;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.shortestSide / 2;
 
-    final tickPaint = Paint()..color = Colors.white.withValues(alpha: 0.9);
+    final faceColor = dark ? Colors.white : Colors.black87;
+    final tickPaint = Paint()..color = faceColor.withValues(alpha: 0.9);
     final numberStyle = TextStyle(
-      color: Colors.white,
+      color: faceColor,
       fontSize: radius * 0.18,
       fontWeight: FontWeight.w600,
     );
@@ -141,7 +142,7 @@ class _ClockPainter extends CustomPainter {
       center,
       hourAngle,
       radius * 0.5,
-      Colors.white,
+      faceColor,
       radius * 0.045,
     );
     _drawHand(
@@ -149,7 +150,7 @@ class _ClockPainter extends CustomPainter {
       center,
       minuteAngle,
       radius * 0.72,
-      Colors.white,
+      faceColor,
       radius * 0.032,
     );
     _drawHand(
@@ -161,7 +162,7 @@ class _ClockPainter extends CustomPainter {
       radius * 0.014,
     );
 
-    canvas.drawCircle(center, radius * 0.045, Paint()..color = Colors.white);
+    canvas.drawCircle(center, radius * 0.045, Paint()..color = faceColor);
     canvas.drawCircle(
       center,
       radius * 0.02,
@@ -190,5 +191,5 @@ class _ClockPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ClockPainter oldDelegate) =>
-      oldDelegate.time.second != time.second;
+      oldDelegate.time.second != time.second || oldDelegate.dark != dark;
 }
