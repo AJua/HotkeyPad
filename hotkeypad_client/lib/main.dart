@@ -7,6 +7,12 @@ import 'src/deck_page.dart';
 import 'src/locale_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
+/// iPhone 17 Pro's "Cosmic Orange" — matched here (not [Colors.orange],
+/// which is a duller, more generic hue) so the app's own accent reads as
+/// that specific color, not just "some orange". Shared with the host,
+/// which seeds its own theme from the same value.
+const _kSeedColor = Color(0xFFF77E2D);
+
 void main() {
   runApp(const HotkeyPadClientApp());
 }
@@ -60,11 +66,11 @@ class _HotkeyPadClientAppState extends State<HotkeyPadClientApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
-        colorSchemeSeed: Colors.teal,
+        colorSchemeSeed: _kSeedColor,
         brightness: Brightness.light,
       ),
       darkTheme: ThemeData(
-        colorSchemeSeed: Colors.teal,
+        colorSchemeSeed: _kSeedColor,
         brightness: Brightness.dark,
       ),
       home: DeckPage(
