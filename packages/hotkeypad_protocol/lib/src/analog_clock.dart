@@ -77,9 +77,9 @@ class _AnalogClockState extends State<AnalogClock> {
     // than depending on whatever constraint happens to reach here.
     return Padding(
       padding: const EdgeInsets.all(margin),
-      // No card behind the face: it reads directly against the deck's own
-      // background, the same as every other button — dark/light still
-      // decides the face's own colors below, just not a backing fill.
+      // The dial itself paints a circular backing in the app's own
+      // surface color (see _ClockPainter's own doc comment) — there is no
+      // separate square card behind it beyond that.
       child: SizedBox(
         width: outerWidth,
         height: outerHeight,
@@ -100,6 +100,7 @@ class _AnalogClockState extends State<AnalogClock> {
                 _now,
                 dark: dark,
                 accent: Theme.of(context).colorScheme.primary,
+                surface: Theme.of(context).colorScheme.surface,
               ),
             ),
           ),
@@ -115,16 +116,30 @@ class _AnalogClockState extends State<AnalogClock> {
 /// orientation doesn't require reading every number, and the accent comes
 /// from the app's own theme rather than a fixed brand color.
 class _ClockPainter extends CustomPainter {
-  _ClockPainter(this.time, {required this.dark, required this.accent});
+  _ClockPainter(
+    this.time, {
+    required this.dark,
+    required this.accent,
+    required this.surface,
+  });
 
   final DateTime time;
   final bool dark;
   final Color accent;
 
+  /// The app's own background color — [Theme.of]'s `colorScheme.surface`,
+  /// which is also what an unadorned Scaffold paints behind everything
+  /// else — so the dial reads as a distinct circular face floating on top
+  /// of whatever the deck itself is showing (a photo background included),
+  /// rather than each element sitting directly on it with nothing behind.
+  final Color surface;
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.shortestSide / 2;
+
+    canvas.drawCircle(center, radius, Paint()..color = surface);
 
     final faceColor = dark ? Colors.white : Colors.black87;
     final tickPaint = Paint()..color = faceColor.withValues(alpha: 0.9);
@@ -279,5 +294,6 @@ class _ClockPainter extends CustomPainter {
   bool shouldRepaint(covariant _ClockPainter oldDelegate) =>
       oldDelegate.time.second != time.second ||
       oldDelegate.dark != dark ||
-      oldDelegate.accent != accent;
+      oldDelegate.accent != accent ||
+      oldDelegate.surface != surface;
 }
