@@ -8,14 +8,11 @@ import 'package:intl/intl.dart';
 /// reason as [AnalogClock]: it needs to read the same regardless of the
 /// deck's own background.
 class MonthCalendar extends StatefulWidget {
-  const MonthCalendar({super.key, this.width = 220, this.height});
+  const MonthCalendar({super.key, this.size = 220});
 
-  final double width;
-
-  /// The card's total height, so it can be made flush with the deck's own
-  /// slots — see [_DeckPageState._gridHeight] and [AnalogClock.height].
-  /// Null keeps the card just tall enough for its own content.
-  final double? height;
+  /// The card's side — square, both width and height — see
+  /// [_DeckPageState._slotBlockHeight] and [AnalogClock.size].
+  final double size;
 
   @override
   State<MonthCalendar> createState() => _MonthCalendarState();
@@ -68,20 +65,17 @@ class _MonthCalendarState extends State<MonthCalendar> {
     );
 
     return Container(
-      width: widget.width,
-      height: widget.height,
+      width: widget.size,
+      height: widget.size,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
         color: const Color(0xF01C1C1E),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
-        // Bounded (a definite widget.height) can center the grid in the
-        // extra room a shorter month leaves; unbounded (no height given
-        // at all) has no extra room to distribute, so must shrink to fit
-        // instead of asking for infinite height.
-        mainAxisSize:
-            widget.height == null ? MainAxisSize.min : MainAxisSize.max,
+        // A square this size is usually taller than the header + weekday
+        // row + day grid need, so the extra room is centered rather than
+        // left pinned to the top.
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -8,17 +8,12 @@ import 'package:flutter/material.dart';
 /// reads the same whether the deck behind it is light, dark, or has a
 /// photo background.
 class AnalogClock extends StatefulWidget {
-  const AnalogClock({super.key, this.size = 168, this.height});
+  const AnalogClock({super.key, this.size = 204});
 
-  /// The clock face's own diameter — independent of [height], which only
-  /// stretches the card around it.
+  /// The card's side — square, both width and height — see
+  /// [_DeckPageState._slotBlockHeight]. The face itself is drawn at
+  /// [size] minus this card's own padding.
   final double size;
-
-  /// The card's total height, so it can be made flush with the deck's own
-  /// slots — see [_DeckPageState._gridHeight]. Null keeps the card's
-  /// height to just the face plus its padding, same as before this
-  /// existed.
-  final double? height;
 
   @override
   State<AnalogClock> createState() => _AnalogClockState();
@@ -57,17 +52,19 @@ class _AnalogClockState extends State<AnalogClock> {
 
   @override
   Widget build(BuildContext context) {
+    const cardPadding = 18.0;
+    final faceSize = math.max(widget.size - cardPadding * 2, 0.0);
     return Container(
-      width: widget.size + 36,
-      height: widget.height ?? widget.size + 36,
+      width: widget.size,
+      height: widget.size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: const Color(0xF01C1C1E),
         borderRadius: BorderRadius.circular(24),
       ),
       child: SizedBox(
-        width: widget.size,
-        height: widget.size,
+        width: faceSize,
+        height: faceSize,
         child: CustomPaint(painter: _ClockPainter(_now)),
       ),
     );

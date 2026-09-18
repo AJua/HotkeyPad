@@ -84,14 +84,10 @@ class _DeckPageState extends State<DeckPage> {
   /// rather than the side widgets looking bolted on at a different rhythm.
   static const _slotSpacing = 2.0;
 
-  /// [_deck]'s own computed grid height, reported here (after its build,
-  /// not during — see the postFrameCallback where this is set) so the
-  /// clock/calendar in [_deckArea] can be sized to match it exactly. A
-  /// plain field can't do this: [_deck] and the side widgets are siblings
-  /// in the same [Row], neither able to read the other's size during the
-  /// same layout pass, so this is a value the grid publishes and the side
-  /// widgets each independently listen for.
-  final _gridHeight = ValueNotifier<double?>(null);
+  /// Matches [_deck]'s own `margin` — kept as one shared constant since
+  /// [_slotBlockHeight] has to reproduce that side of _deck's math (see
+  /// its own doc comment for why it can't just ask _deck for the answer).
+  static const _slotMargin = 12.0;
 
   /// The last [HotkeyPadSession.failureSeq] a SnackBar was already shown
   /// for — see its own use in [build] for why a sequence number rather
@@ -256,7 +252,6 @@ class _DeckPageState extends State<DeckPage> {
     _stopWifiDiscovery();
     _pages.dispose();
     _session?.dispose();
-    _gridHeight.dispose();
     super.dispose();
   }
 
@@ -1176,40 +1171,72 @@ class _DeckPageState extends State<DeckPage> {
   /// folded into it so the grid's own centering math there never has to
   /// know about anything beside it — it just gets a narrower [Expanded]
   /// to center within.
+  ///
+  /// The clock/calendar are square, sized to [_slotBlockHeight] — matching
+  /// [_deck]'s own `gridHeight` exactly whenever height is the binding
+  /// constraint there (the common landscape case: wide screen, few rows),
+  /// which is also the one case that matters for a *square* card, since a
+  /// width-bound grid would need a narrower square anyway to still fit
+  /// beside it. Computed here rather than read back from [_deck] because
+  /// its width would otherwise depend on [_deck]'s output the same frame
+  /// [_deck]'s own width constraint depends on it — a cycle a plain
+  /// LayoutBuilder can't resolve in one pass.
   Widget _deckArea(HotkeyPadSession session, DeckLayout layout, bool portrait) {
     final deck = _deck(session, layout);
     if (portrait || (!_showClock && !_showDate)) return deck;
-    // Stretched to whatever _deck last reported (null on the very first
-    // frame, before it has measured anything — the cards just fall back
-    // to their own default height for that one frame).
-    return Row(
-      children: [
-        if (_showClock)
-          Padding(
-            padding: const EdgeInsets.only(right: _slotSpacing),
-            child: ValueListenableBuilder<double?>(
-              valueListenable: _gridHeight,
-              builder: (context, height, _) => AnalogClock(height: height),
-            ),
-          ),
-        Expanded(child: deck),
-        if (_showDate)
-          Padding(
-            padding: const EdgeInsets.only(left: _slotSpacing),
-            child: ValueListenableBuilder<double?>(
-              valueListenable: _gridHeight,
-              builder: (context, height, _) => MonthCalendar(height: height),
-            ),
-          ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = _slotBlockHeight(
+          context,
+          layout,
+          session.showPageDots,
+          constraints.maxHeight,
+        );
+        return Row(
+          children: [
+            if (_showClock)
+              Padding(
+                padding: const EdgeInsets.only(right: _slotSpacing),
+                child: AnalogClock(size: size),
+              ),
+            Expanded(child: deck),
+            if (_showDate)
+              Padding(
+                padding: const EdgeInsets.only(left: _slotSpacing),
+                child: MonthCalendar(size: size),
+              ),
+          ],
+        );
+      },
     );
+  }
+
+  /// The grid's own vertical math, minus anything to do with column count
+  /// or width — shared by [_deck] (as its `freeHeight`) and [_deckArea]
+  /// (to size the clock/calendar) so the two can't drift apart.
+  double _slotBlockHeight(
+    BuildContext context,
+    DeckLayout layout,
+    bool showDots,
+    double maxHeight,
+  ) {
+    final dots = layout.pages > 1 && showDots ? 28.0 : 0.0;
+    final padding = safeScrollPadding(
+      context,
+      horizontal: _slotMargin,
+      vertical: _slotMargin,
+    );
+    return maxHeight -
+        padding.vertical -
+        dots -
+        _slotSpacing * (layout.rows - 1);
   }
 
   Widget _deck(HotkeyPadSession session, DeckLayout layout) {
     return LayoutBuilder(
       builder: (context, constraints) {
         const spacing = _slotSpacing;
-        const margin = 12.0;
+        const margin = _slotMargin;
         // Taller than wide when there are labels, since the text needs a
         // band of its own. Without labels there is nothing to leave room
         // for, so cells go square and the icon fills them.
@@ -1220,17 +1247,17 @@ class _DeckPageState extends State<DeckPage> {
           horizontal: margin,
           vertical: margin,
         );
-        final dots = layout.pages > 1 && session.showPageDots ? 28.0 : 0.0;
 
         final freeWidth =
             constraints.maxWidth -
             padding.horizontal -
             spacing * (layout.columns - 1);
-        final freeHeight =
-            constraints.maxHeight -
-            padding.vertical -
-            dots -
-            spacing * (layout.rows - 1);
+        final freeHeight = _slotBlockHeight(
+          context,
+          layout,
+          session.showPageDots,
+          constraints.maxHeight,
+        );
 
         // Whichever axis runs out first decides the cell width; the other
         // axis keeps its spare room as even margin on both sides.
@@ -1243,17 +1270,6 @@ class _DeckPageState extends State<DeckPage> {
             cellWidth * layout.columns + spacing * (layout.columns - 1);
         final gridHeight =
             cellHeight * layout.rows + spacing * (layout.rows - 1);
-
-        // Deferred: this runs during _deck's own build, and the side
-        // widgets listening for it are built independently — updating a
-        // ValueNotifier they're already subscribed to in the middle of
-        // this build would ask them to rebuild before this frame is even
-        // done with its own.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _gridHeight.value != gridHeight) {
-            _gridHeight.value = gridHeight;
-          }
-        });
 
         return Padding(
           // Vertical only. The horizontal inset is already subtracted from
