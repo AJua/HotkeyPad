@@ -79,6 +79,20 @@ class _DeckPageState extends State<DeckPage> {
   final _pages = PageController();
   int _page = 0;
 
+  /// The gap between slots — also used as the gap between the deck and the
+  /// optional clock/calendar in [_deckArea], so both read as one grid
+  /// rather than the side widgets looking bolted on at a different rhythm.
+  static const _slotSpacing = 2.0;
+
+  /// [_deck]'s own computed grid height, reported here (after its build,
+  /// not during — see the postFrameCallback where this is set) so the
+  /// clock/calendar in [_deckArea] can be sized to match it exactly. A
+  /// plain field can't do this: [_deck] and the side widgets are siblings
+  /// in the same [Row], neither able to read the other's size during the
+  /// same layout pass, so this is a value the grid publishes and the side
+  /// widgets each independently listen for.
+  final _gridHeight = ValueNotifier<double?>(null);
+
   /// The last [HotkeyPadSession.failureSeq] a SnackBar was already shown
   /// for — see its own use in [build] for why a sequence number rather
   /// than just checking [HotkeyPadSession.lastAck] for null.
@@ -242,6 +256,7 @@ class _DeckPageState extends State<DeckPage> {
     _stopWifiDiscovery();
     _pages.dispose();
     _session?.dispose();
+    _gridHeight.dispose();
     super.dispose();
   }
 
@@ -1164,18 +1179,27 @@ class _DeckPageState extends State<DeckPage> {
   Widget _deckArea(HotkeyPadSession session, DeckLayout layout, bool portrait) {
     final deck = _deck(session, layout);
     if (portrait || (!_showClock && !_showDate)) return deck;
+    // Stretched to whatever _deck last reported (null on the very first
+    // frame, before it has measured anything — the cards just fall back
+    // to their own default height for that one frame).
     return Row(
       children: [
         if (_showClock)
-          const Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: AnalogClock(),
+          Padding(
+            padding: const EdgeInsets.only(right: _slotSpacing),
+            child: ValueListenableBuilder<double?>(
+              valueListenable: _gridHeight,
+              builder: (context, height, _) => AnalogClock(height: height),
+            ),
           ),
         Expanded(child: deck),
         if (_showDate)
-          const Padding(
-            padding: EdgeInsets.only(left: 12),
-            child: MonthCalendar(),
+          Padding(
+            padding: const EdgeInsets.only(left: _slotSpacing),
+            child: ValueListenableBuilder<double?>(
+              valueListenable: _gridHeight,
+              builder: (context, height, _) => MonthCalendar(height: height),
+            ),
           ),
       ],
     );
@@ -1184,7 +1208,7 @@ class _DeckPageState extends State<DeckPage> {
   Widget _deck(HotkeyPadSession session, DeckLayout layout) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const spacing = 2.0;
+        const spacing = _slotSpacing;
         const margin = 12.0;
         // Taller than wide when there are labels, since the text needs a
         // band of its own. Without labels there is nothing to leave room
@@ -1219,6 +1243,17 @@ class _DeckPageState extends State<DeckPage> {
             cellWidth * layout.columns + spacing * (layout.columns - 1);
         final gridHeight =
             cellHeight * layout.rows + spacing * (layout.rows - 1);
+
+        // Deferred: this runs during _deck's own build, and the side
+        // widgets listening for it are built independently — updating a
+        // ValueNotifier they're already subscribed to in the middle of
+        // this build would ask them to rebuild before this frame is even
+        // done with its own.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _gridHeight.value != gridHeight) {
+            _gridHeight.value = gridHeight;
+          }
+        });
 
         return Padding(
           // Vertical only. The horizontal inset is already subtracted from
