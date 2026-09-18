@@ -16,8 +16,8 @@ whatever it is sent.
 
 ## What it does
 
-A Stream Deck for your Mac or Windows PC: the phone is the deck, the computer
-runs the service, and the two talk over BLE or WiFi. Every platform can
+A customizable button deck for your Mac or Windows PC: the phone is the deck,
+the computer runs the service, and the two talk over BLE or WiFi. Every platform can
 launch an app (including a Steam game, on Windows); working the media keys,
 sending a keyboard combination, running a shell command, or firing a
 Shortcut are Mac-only for now — see
@@ -316,8 +316,8 @@ the one gap left if this toolchain ever regresses again.
 
 `com.apple.security.app-sandbox` is **false** in both entitlements files. The
 sandbox forbids launching other applications, which is the host's entire
-purpose. This rules out App Store distribution — the same reason the real
-Stream Deck ships outside it.
+purpose. This rules out App Store distribution — the same reason any
+hardware macro-pad's desktop software ships outside it.
 
 Launching apps is not macOS-only, though — see
 [Platform support for host actions](#platform-support-for-host-actions)
