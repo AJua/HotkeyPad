@@ -142,7 +142,7 @@ class _ClockPainter extends CustomPainter {
       Paint()
         ..color = accent.withValues(alpha: 0.55)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = radius * 0.02
+        ..strokeWidth = radius * 0.026
         ..strokeCap = StrokeCap.round,
     );
 
@@ -154,17 +154,17 @@ class _ClockPainter extends CustomPainter {
       final isCardinal = i % 15 == 0;
       final outer = radius * 0.94;
       final inner = isCardinal
-          ? radius * 0.78
+          ? radius * 0.79
           : isHour
-          ? radius * 0.84
-          : radius * 0.91;
+          ? radius * 0.82
+          : radius * 0.90;
       final p1 = center + Offset(math.sin(angle), -math.cos(angle)) * outer;
       final p2 = center + Offset(math.sin(angle), -math.cos(angle)) * inner;
       tickPaint.strokeWidth = isCardinal
-          ? 3.2
+          ? 4.0
           : isHour
-          ? 2.4
-          : 1.2;
+          ? 3.0
+          : 1.6;
       canvas.drawLine(p1, p2, tickPaint);
     }
 
@@ -202,8 +202,8 @@ class _ClockPainter extends CustomPainter {
       center,
       hourAngle,
       length: radius * 0.5,
-      baseWidth: radius * 0.09,
-      tipWidth: radius * 0.02,
+      baseWidth: radius * 0.115,
+      tipWidth: radius * 0.03,
       color: faceColor,
     );
     _drawTaperedHand(
@@ -211,8 +211,8 @@ class _ClockPainter extends CustomPainter {
       center,
       minuteAngle,
       length: radius * 0.74,
-      baseWidth: radius * 0.065,
-      tipWidth: radius * 0.014,
+      baseWidth: radius * 0.085,
+      tipWidth: radius * 0.02,
       color: faceColor,
     );
     _drawHairlineHand(
@@ -221,7 +221,7 @@ class _ClockPainter extends CustomPainter {
       secondAngle,
       length: radius * 0.78,
       color: accent,
-      width: radius * 0.014,
+      width: radius * 0.018,
     );
 
     canvas.drawCircle(center, radius * 0.05, Paint()..color = faceColor);
