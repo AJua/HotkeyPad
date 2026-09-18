@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="images/app-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: light dark;
@@ -62,11 +62,11 @@
     margin: 0;
     background: var(--bg);
     color: var(--fg);
-    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Manrope', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3 { font-family: 'Sora', sans-serif; text-wrap: balance; margin: 0; }
+  h1, h2, h3 { font-family: 'Sora', 'Noto Sans TC', sans-serif; text-wrap: balance; margin: 0; }
   p { margin: 0; }
   a { color: inherit; }
   .label {
@@ -77,6 +77,7 @@
     text-transform: uppercase;
     color: var(--accent);
   }
+  html[lang="zh-Hant"] .label { letter-spacing: .04em; text-transform: none; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
 
   /* ---------- nav ---------- */
@@ -90,20 +91,26 @@
   nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 4rem; }
   .brand { display: flex; align-items: center; gap: .6rem; font-family: 'Sora'; font-weight: 700; font-size: 1.05rem; }
   .brand img { width: 28px; height: 28px; border-radius: 8px; display: block; }
-  .navlinks { display: flex; gap: 1.75rem; align-items: center; }
+  .navlinks { display: flex; gap: 1.5rem; align-items: center; }
   .navlinks a { font-size: .92rem; font-weight: 600; color: var(--muted); text-decoration: none; }
   .navlinks a:hover { color: var(--fg); }
   .navlinks .cta {
     background: var(--accent); color: #fff; padding: .5rem 1rem; border-radius: 999px;
     font-size: .85rem;
   }
-  @media (max-width: 640px) { .navlinks a:not(.cta) { display: none; } }
+  #langToggle {
+    font-family: 'IBM Plex Mono', monospace; font-size: .78rem; font-weight: 600;
+    color: var(--fg); background: var(--surface-2); border: 1px solid var(--border);
+    padding: .4rem .7rem; border-radius: 999px; cursor: pointer; line-height: 1;
+  }
+  #langToggle:hover { border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 640px) { .navlinks a:not(.cta):not(#langToggle) { display: none; } }
 
   /* ---------- hero ---------- */
   .hero { padding: 4.5rem 0 3rem; }
   .hero .wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 3rem; align-items: center; }
   @media (max-width: 860px) { .hero .wrap { grid-template-columns: 1fr; } }
-  .hero h1 { font-size: clamp(2.1rem, 4.2vw, 3.1rem); font-weight: 800; line-height: 1.08; letter-spacing: -.01em; }
+  .hero h1 { font-size: clamp(2.1rem, 4.2vw, 3.1rem); font-weight: 800; line-height: 1.12; letter-spacing: -.01em; }
   .hero h1 .accent { color: var(--accent); }
   .hero p.lede { margin-top: 1.15rem; font-size: 1.12rem; color: var(--muted); max-width: 46ch; }
   .hero-ctas { margin-top: 1.75rem; display: flex; gap: .85rem; flex-wrap: wrap; }
@@ -132,6 +139,7 @@
     background: var(--gold-soft); color: var(--gold);
     font-family: 'IBM Plex Mono'; font-size: .72rem; font-weight: 600;
     padding: .35rem .6rem; border-radius: 8px; box-shadow: var(--shadow);
+    white-space: nowrap;
   }
 
   /* ---------- transport pill row ---------- */
@@ -142,7 +150,8 @@
     padding: .38rem .75rem; border-radius: 999px;
     font-family: 'IBM Plex Mono'; font-size: .72rem; font-weight: 600; color: var(--muted);
   }
-  .pill svg { width: 14px; height: 14px; }
+  .pill svg { width: 14px; height: 14px; flex: none; }
+  html[lang="zh-Hant"] .pill { font-family: 'Manrope', 'Noto Sans TC'; }
 
   /* ---------- section shell ---------- */
   section { padding: 4.5rem 0; }
@@ -191,7 +200,7 @@
     padding: 1.75rem; box-shadow: var(--shadow);
   }
   .platform-card .kicker { display: flex; align-items: center; gap: .6rem; margin-bottom: 1.1rem; }
-  .platform-card .kicker svg { width: 22px; height: 22px; color: var(--accent); }
+  .platform-card .kicker svg { width: 22px; height: 22px; color: var(--accent); flex: none; }
   .platform-card h3 { font-size: 1.15rem; }
   .platform-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
   .platform-card li { display: flex; gap: .6rem; font-size: .93rem; align-items: flex-start; }
@@ -201,6 +210,7 @@
     font-size: .72rem; font-weight: 600; color: var(--gold); background: var(--gold-soft);
     padding: .3rem .6rem; border-radius: 8px;
   }
+  html[lang="zh-Hant"] .soon-badge { font-family: 'Manrope', 'Noto Sans TC'; }
 
   /* ---------- privacy callout ---------- */
   .privacy-band {
@@ -228,10 +238,11 @@
   <div class="wrap">
     <div class="brand"><img src="images/app-icon.png" alt=""> HotkeyPad</div>
     <div class="navlinks">
-      <a href="#how">How it works</a>
-      <a href="#buttons">Buttons</a>
-      <a href="#platforms">Platforms</a>
-      <a class="cta" href="https://github.com/AJua/HotkeyPad/releases">Download</a>
+      <a href="#how" data-i18n="nav.how">How it works</a>
+      <a href="#buttons" data-i18n="nav.buttons">Buttons</a>
+      <a href="#platforms" data-i18n="nav.platforms">Platforms</a>
+      <a class="cta" href="https://github.com/AJua/HotkeyPad/releases" data-i18n="nav.download">Download</a>
+      <button id="langToggle" type="button">中文</button>
     </div>
   </div>
 </nav>
@@ -239,29 +250,29 @@
 <header class="hero">
   <div class="wrap">
     <div>
-      <p class="label">Free &amp; open source</p>
-      <h1>Your phone is already<br>the best <span class="accent">Stream Deck</span><br>you own.</h1>
-      <p class="lede">HotkeyPad turns an iPhone or Android phone into a customizable
+      <p class="label" data-i18n="hero.eyebrow">Free &amp; open source</p>
+      <h1 data-i18n-html="hero.title">Your phone is already<br>the best <span class="accent">Stream Deck</span><br>you own.</h1>
+      <p class="lede" data-i18n="hero.lede">HotkeyPad turns an iPhone or Android phone into a customizable
       button deck for your Mac or Windows PC — launch apps, run Shortcuts, control
       media, or fire off a key combination, all from a grid of buttons you lay out
       yourself.</p>
 
       <div class="transports">
-        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg> Bluetooth</span>
-        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M12 20h.01"/></svg> Wi‑Fi</span>
-        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4z"/></svg> No account, no cloud</span>
+        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg> <span data-i18n="hero.pill.bluetooth">Bluetooth</span></span>
+        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M12 20h.01"/></svg> <span data-i18n="hero.pill.wifi">Wi‑Fi</span></span>
+        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4z"/></svg> <span data-i18n="hero.pill.privacy">No account, no cloud</span></span>
       </div>
 
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="https://github.com/AJua/HotkeyPad/releases">Download the host app</a>
-        <a class="btn btn-ghost" href="#how">See how it works</a>
+        <a class="btn btn-primary" href="https://github.com/AJua/HotkeyPad/releases" data-i18n="hero.cta.primary">Download the host app</a>
+        <a class="btn btn-ghost" href="#how" data-i18n="hero.cta.secondary">See how it works</a>
       </div>
-      <p class="hero-note">Host app for Mac and Windows. Phone app for iOS and Android is coming soon.</p>
+      <p class="hero-note" data-i18n="hero.note">Host app for Mac and Windows. Phone app for iOS and Android is coming soon.</p>
     </div>
 
     <div class="hero-visual">
-      <span class="hero-badge">live on the device</span>
-      <div class="phone-frame"><img src="images/screenshot-deck.png" alt="HotkeyPad deck screen on a phone, showing a grid of app icons connected to a Mac"></div>
+      <span class="hero-badge" data-i18n="hero.badge">live on the device</span>
+      <div class="phone-frame"><img src="images/screenshot-deck.png" data-i18n-alt="hero.img.alt" alt="HotkeyPad deck screen on a phone, showing a grid of app icons connected to a Mac"></div>
     </div>
   </div>
 </header>
@@ -269,33 +280,33 @@
 <section id="how">
   <div class="wrap">
     <div class="section-head">
-      <p class="label">Setup</p>
-      <h2>Two apps, one connection, no fuss.</h2>
-      <p>There's no cloud account to create and no server in between — your phone
+      <p class="label" data-i18n="how.eyebrow">Setup</p>
+      <h2 data-i18n="how.title">Two apps, one connection, no fuss.</h2>
+      <p data-i18n="how.lede">There's no cloud account to create and no server in between — your phone
       talks straight to your computer.</p>
     </div>
     <div class="steps">
       <div class="step">
         <span class="num">1</span>
-        <h3>Install the host</h3>
-        <p>A small app runs on your Mac or PC and quietly waits for your phone
+        <h3 data-i18n="how.step1.title">Install the host</h3>
+        <p data-i18n="how.step1.body">A small app runs on your Mac or PC and quietly waits for your phone
         to say hello.</p>
       </div>
       <div class="step">
         <span class="num">2</span>
-        <h3>Install HotkeyPad</h3>
-        <p>Open the app on your phone — it looks for a host over Bluetooth or
+        <h3 data-i18n="how.step2.title">Install HotkeyPad</h3>
+        <p data-i18n="how.step2.body">Open the app on your phone — it looks for a host over Bluetooth or
         your Wi‑Fi network automatically.</p>
       </div>
       <div class="step">
         <span class="num">3</span>
-        <h3>Build your deck</h3>
-        <p>Drag apps, media controls, and shortcuts onto a grid. Swipe between
+        <h3 data-i18n="how.step3.title">Build your deck</h3>
+        <p data-i18n="how.step3.body">Drag apps, media controls, and shortcuts onto a grid. Swipe between
         pages, rename buttons, pick your own icons.</p>
       </div>
     </div>
     <div class="how-visual">
-      <div class="tablet-frame"><img src="images/screenshot-choose.png" alt="HotkeyPad's first-launch screen, asking whether to connect over Bluetooth or Wi-Fi"></div>
+      <div class="tablet-frame"><img src="images/screenshot-choose.png" data-i18n-alt="how.img.alt" alt="HotkeyPad's first-launch screen, asking whether to connect over Bluetooth or Wi-Fi"></div>
     </div>
   </div>
 </section>
@@ -303,36 +314,36 @@
 <section id="buttons" style="background:var(--surface-2);">
   <div class="wrap">
     <div class="section-head">
-      <p class="label">On the deck</p>
-      <h2>Every button does one real thing.</h2>
-      <p>No macros to script, no plugin marketplace to dig through — five kinds
+      <p class="label" data-i18n="buttons.eyebrow">On the deck</p>
+      <h2 data-i18n="buttons.title">Every button does one real thing.</h2>
+      <p data-i18n="buttons.lede">No macros to script, no plugin marketplace to dig through — five kinds
       of button cover almost everything you'd reach for a shortcut key for.</p>
     </div>
     <div class="keycaps">
       <div class="keycap">
         <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
-        <h3>Launch an app</h3>
-        <p>Or a Steam game on Windows — pick it from what's already installed.</p>
+        <h3 data-i18n="buttons.app.title">Launch an app</h3>
+        <p data-i18n="buttons.app.body">Or a Steam game on Windows — pick it from what's already installed.</p>
       </div>
       <div class="keycap">
         <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
-        <h3>Control media</h3>
-        <p>Play, pause, skip, and volume — for whatever's currently playing.</p>
+        <h3 data-i18n="buttons.media.title">Control media</h3>
+        <p data-i18n="buttons.media.body">Play, pause, skip, and volume — for whatever's currently playing.</p>
       </div>
       <div class="keycap">
         <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6M12 19h8"/></svg></span>
-        <h3>Run a shell command</h3>
-        <p>One line, run instantly — for the script you already reach for.</p>
+        <h3 data-i18n="buttons.shell.title">Run a shell command</h3>
+        <p data-i18n="buttons.shell.body">One line, run instantly — for the script you already reach for.</p>
       </div>
       <div class="keycap">
         <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></span>
-        <h3>Run a Shortcut</h3>
-        <p>Trigger any macOS Shortcut by name, no scripting required.</p>
+        <h3 data-i18n="buttons.shortcut.title">Run a Shortcut</h3>
+        <p data-i18n="buttons.shortcut.body">Trigger any macOS Shortcut by name, no scripting required.</p>
       </div>
       <div class="keycap">
         <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/></svg></span>
-        <h3>Send a key combination</h3>
-        <p>⌘⇧4, a mute toggle, whatever chord you'd otherwise have to remember.</p>
+        <h3 data-i18n="buttons.key.title">Send a key combination</h3>
+        <p data-i18n="buttons.key.body">⌘⇧4, a mute toggle, whatever chord you'd otherwise have to remember.</p>
       </div>
     </div>
   </div>
@@ -341,30 +352,30 @@
 <section id="platforms">
   <div class="wrap">
     <div class="section-head">
-      <p class="label">Platform support</p>
-      <h2>Runs on what you already have.</h2>
+      <p class="label" data-i18n="platforms.eyebrow">Platform support</p>
+      <h2 data-i18n="platforms.title">Runs on what you already have.</h2>
     </div>
     <div class="platform-grid">
       <div class="platform-card">
         <div class="kicker">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          <h3>Computer &mdash; the host</h3>
+          <h3 data-i18n="platforms.computer.title">Computer &mdash; the host</h3>
         </div>
         <ul>
-          <li><span class="check">✓</span> macOS &mdash; the full toolkit: apps, media, Shortcuts, shell commands, key combinations</li>
-          <li><span class="check">✓</span> Windows &mdash; launch apps and Steam games today, with media and more actions on the way</li>
+          <li><span class="check">✓</span> <span data-i18n="platforms.computer.macos">macOS &mdash; the full toolkit: apps, media, Shortcuts, shell commands, key combinations</span></li>
+          <li><span class="check">✓</span> <span data-i18n="platforms.computer.windows">Windows &mdash; launch apps and Steam games today, with media and more actions on the way</span></li>
         </ul>
       </div>
       <div class="platform-card">
         <div class="kicker">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>
-          <h3>Phone &mdash; the deck</h3>
+          <h3 data-i18n="platforms.phone.title">Phone &mdash; the deck</h3>
         </div>
         <ul>
-          <li><span class="check">✓</span> iOS</li>
-          <li><span class="check">✓</span> Android</li>
+          <li><span class="check">✓</span> <span data-i18n="platforms.phone.ios">iOS</span></li>
+          <li><span class="check">✓</span> <span data-i18n="platforms.phone.android">Android</span></li>
         </ul>
-        <span class="soon-badge">Coming soon to the App Store &amp; Google Play</span>
+        <span class="soon-badge" data-i18n="platforms.soon">Coming soon to the App Store &amp; Google Play</span>
       </div>
     </div>
   </div>
@@ -375,12 +386,12 @@
     <div class="privacy-band">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4z"/></svg>
       <div>
-        <h3>Nothing leaves your two devices.</h3>
-        <p>No sign‑in, no analytics, no server in between. Your phone and your
+        <h3 data-i18n="privacy.title">Nothing leaves your two devices.</h3>
+        <p data-i18n="privacy.body">No sign‑in, no analytics, no server in between. Your phone and your
         computer talk to each other directly, over Bluetooth or your own Wi‑Fi
         network.</p>
       </div>
-      <a class="btn btn-ghost" href="privacy-policy.html">Read the privacy policy</a>
+      <a class="btn btn-ghost" href="privacy-policy.html" data-i18n="privacy.cta">Read the privacy policy</a>
     </div>
   </div>
 </section>
@@ -389,12 +400,180 @@
   <div class="wrap">
     <div class="brand"><img src="images/app-icon.png" alt="" style="width:22px;height:22px;"> HotkeyPad</div>
     <div class="foot-links">
-      <a href="https://github.com/AJua/HotkeyPad">GitHub</a>
-      <a href="https://github.com/AJua/HotkeyPad/releases">Releases</a>
-      <a href="privacy-policy.html">Privacy</a>
+      <a href="https://github.com/AJua/HotkeyPad" data-i18n="footer.github">GitHub</a>
+      <a href="https://github.com/AJua/HotkeyPad/releases" data-i18n="footer.releases">Releases</a>
+      <a href="privacy-policy.html" data-i18n="footer.privacy">Privacy</a>
     </div>
   </div>
 </footer>
+
+<script>
+(function () {
+  var STRINGS = {
+    en: {
+      'meta.title': 'HotkeyPad',
+      'meta.description': 'Turn your phone into a customizable button deck for your Mac or Windows PC — no cloud, no account, nothing but your two devices talking directly.',
+      'nav.how': 'How it works',
+      'nav.buttons': 'Buttons',
+      'nav.platforms': 'Platforms',
+      'nav.download': 'Download',
+      'hero.eyebrow': 'Free & open source',
+      'hero.title': 'Your phone is already<br>the best <span class="accent">Stream Deck</span><br>you own.',
+      'hero.lede': "HotkeyPad turns an iPhone or Android phone into a customizable button deck for your Mac or Windows PC — launch apps, run Shortcuts, control media, or fire off a key combination, all from a grid of buttons you lay out yourself.",
+      'hero.pill.bluetooth': 'Bluetooth',
+      'hero.pill.wifi': 'Wi‑Fi',
+      'hero.pill.privacy': 'No account, no cloud',
+      'hero.cta.primary': 'Download the host app',
+      'hero.cta.secondary': 'See how it works',
+      'hero.note': 'Host app for Mac and Windows. Phone app for iOS and Android is coming soon.',
+      'hero.badge': 'live on the device',
+      'hero.img.alt': 'HotkeyPad deck screen on a phone, showing a grid of app icons connected to a Mac',
+      'how.eyebrow': 'Setup',
+      'how.title': 'Two apps, one connection, no fuss.',
+      'how.lede': "There's no cloud account to create and no server in between — your phone talks straight to your computer.",
+      'how.step1.title': 'Install the host',
+      'how.step1.body': 'A small app runs on your Mac or PC and quietly waits for your phone to say hello.',
+      'how.step2.title': 'Install HotkeyPad',
+      'how.step2.body': 'Open the app on your phone — it looks for a host over Bluetooth or your Wi‑Fi network automatically.',
+      'how.step3.title': 'Build your deck',
+      'how.step3.body': 'Drag apps, media controls, and shortcuts onto a grid. Swipe between pages, rename buttons, pick your own icons.',
+      'how.img.alt': "HotkeyPad's first-launch screen, asking whether to connect over Bluetooth or Wi-Fi",
+      'buttons.eyebrow': 'On the deck',
+      'buttons.title': 'Every button does one real thing.',
+      'buttons.lede': "No macros to script, no plugin marketplace to dig through — five kinds of button cover almost everything you'd reach for a shortcut key for.",
+      'buttons.app.title': 'Launch an app',
+      'buttons.app.body': "Or a Steam game on Windows — pick it from what's already installed.",
+      'buttons.media.title': 'Control media',
+      'buttons.media.body': "Play, pause, skip, and volume — for whatever's currently playing.",
+      'buttons.shell.title': 'Run a shell command',
+      'buttons.shell.body': 'One line, run instantly — for the script you already reach for.',
+      'buttons.shortcut.title': 'Run a Shortcut',
+      'buttons.shortcut.body': 'Trigger any macOS Shortcut by name, no scripting required.',
+      'buttons.key.title': 'Send a key combination',
+      'buttons.key.body': "⌘⇧4, a mute toggle, whatever chord you'd otherwise have to remember.",
+      'platforms.eyebrow': 'Platform support',
+      'platforms.title': 'Runs on what you already have.',
+      'platforms.computer.title': 'Computer — the host',
+      'platforms.computer.macos': 'macOS — the full toolkit: apps, media, Shortcuts, shell commands, key combinations',
+      'platforms.computer.windows': 'Windows — launch apps and Steam games today, with media and more actions on the way',
+      'platforms.phone.title': 'Phone — the deck',
+      'platforms.phone.ios': 'iOS',
+      'platforms.phone.android': 'Android',
+      'platforms.soon': 'Coming soon to the App Store & Google Play',
+      'privacy.title': 'Nothing leaves your two devices.',
+      'privacy.body': 'No sign‑in, no analytics, no server in between. Your phone and your computer talk to each other directly, over Bluetooth or your own Wi‑Fi network.',
+      'privacy.cta': 'Read the privacy policy',
+      'footer.github': 'GitHub',
+      'footer.releases': 'Releases',
+      'footer.privacy': 'Privacy'
+    },
+    zh: {
+      'meta.title': 'HotkeyPad',
+      'meta.description': '把手機變成 Mac 或 Windows 電腦的自訂按鍵面板——不需要雲端，不需要帳號，兩台裝置直接對話。',
+      'nav.how': '運作方式',
+      'nav.buttons': '按鍵功能',
+      'nav.platforms': '平台支援',
+      'nav.download': '下載',
+      'hero.eyebrow': '免費、開源',
+      'hero.title': '你的手機，就是你<br>最好用的 <span class="accent">Stream Deck</span>。',
+      'hero.lede': 'HotkeyPad 把 iPhone 或 Android 手機變成 Mac、Windows 電腦的自訂按鍵面板——開啟應用程式、執行 Shortcut、控制媒體播放，或送出一組按鍵組合，全部畫在你自己排的按鍵網格上。',
+      'hero.pill.bluetooth': '藍牙',
+      'hero.pill.wifi': 'WiFi',
+      'hero.pill.privacy': '不需要帳號，沒有雲端',
+      'hero.cta.primary': '下載電腦端 App',
+      'hero.cta.secondary': '看看怎麼運作',
+      'hero.note': '電腦端支援 Mac 與 Windows。手機端 App（iOS / Android）即將上架。',
+      'hero.badge': '實機畫面',
+      'hero.img.alt': '手機上的 HotkeyPad 按鍵面板畫面，一格格應用程式圖示連接著一台 Mac',
+      'how.eyebrow': '設定流程',
+      'how.title': '兩個 App，一條連線，沒有其他麻煩事。',
+      'how.lede': '不需要註冊雲端帳號，中間也沒有伺服器——手機直接跟你的電腦對話。',
+      'how.step1.title': '安裝電腦端',
+      'how.step1.body': '在 Mac 或 PC 上執行一個小程式，安靜地等手機打招呼。',
+      'how.step2.title': '安裝 HotkeyPad',
+      'how.step2.body': '打開手機上的 App，它會自動透過藍牙或你的 WiFi 網路尋找電腦。',
+      'how.step3.title': '排出你的按鍵面板',
+      'how.step3.body': '把應用程式、媒體控制、Shortcut 拖進網格。左右滑動切換頁面，重新命名按鍵，換上自己喜歡的圖示。',
+      'how.img.alt': 'HotkeyPad 首次啟動畫面，詢問要用藍牙還是 WiFi 連線',
+      'buttons.eyebrow': '按鍵面板上',
+      'buttons.title': '每顆按鍵都做一件實際的事。',
+      'buttons.lede': '不用寫巨集，也不用翻套件市集——五種按鍵類型幾乎涵蓋你平常會想按快速鍵做的每件事。',
+      'buttons.app.title': '開啟應用程式',
+      'buttons.app.body': '或是 Windows 上的 Steam 遊戲——從已安裝的項目裡直接選。',
+      'buttons.media.title': '控制媒體播放',
+      'buttons.media.body': '播放、暫停、上一首下一首、音量——控制目前正在播放的東西。',
+      'buttons.shell.title': '執行 Shell 指令',
+      'buttons.shell.body': '一行指令，立即執行——放進你平常就會用到的那個腳本。',
+      'buttons.shortcut.title': '執行 Shortcut',
+      'buttons.shortcut.body': '用名稱觸發任何 macOS Shortcut，不用寫腳本。',
+      'buttons.key.title': '送出按鍵組合',
+      'buttons.key.body': '⌘⇧4、靜音鍵，任何你原本得自己記住的組合鍵。',
+      'platforms.eyebrow': '平台支援',
+      'platforms.title': '用你現有的裝置就能跑。',
+      'platforms.computer.title': '電腦——負責主機端',
+      'platforms.computer.macos': 'macOS——完整功能：應用程式、媒體、Shortcut、Shell 指令、按鍵組合',
+      'platforms.computer.windows': 'Windows——目前可開啟應用程式與 Steam 遊戲，媒體與其他功能陸續加入',
+      'platforms.phone.title': '手機——你的按鍵面板',
+      'platforms.phone.ios': 'iOS',
+      'platforms.phone.android': 'Android',
+      'platforms.soon': '即將上架 App Store 與 Google Play',
+      'privacy.title': '資料不會離開你的這兩台裝置。',
+      'privacy.body': '不需要登入、沒有分析追蹤、中間沒有伺服器。你的手機跟電腦透過藍牙或你自己的 WiFi 網路直接對話。',
+      'privacy.cta': '閱讀隱私權政策',
+      'footer.github': 'GitHub',
+      'footer.releases': '版本下載',
+      'footer.privacy': '隱私權政策'
+    }
+  };
+
+  var LANG_KEY = 'hotkeypad-lang';
+
+  function detectDefaultLang() {
+    try {
+      var saved = localStorage.getItem(LANG_KEY);
+      if (saved === 'en' || saved === 'zh') return saved;
+    } catch (e) {}
+    return (navigator.language || '').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
+  }
+
+  function applyLang(lang) {
+    var dict = STRINGS[lang];
+    document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
+
+    var nodes = document.querySelectorAll('[data-i18n]');
+    for (var i = 0; i < nodes.length; i++) {
+      var key = nodes[i].getAttribute('data-i18n');
+      if (dict[key] != null) nodes[i].textContent = dict[key];
+    }
+    var htmlNodes = document.querySelectorAll('[data-i18n-html]');
+    for (var j = 0; j < htmlNodes.length; j++) {
+      var hKey = htmlNodes[j].getAttribute('data-i18n-html');
+      if (dict[hKey] != null) htmlNodes[j].innerHTML = dict[hKey];
+    }
+    var altNodes = document.querySelectorAll('[data-i18n-alt]');
+    for (var k = 0; k < altNodes.length; k++) {
+      var aKey = altNodes[k].getAttribute('data-i18n-alt');
+      if (dict[aKey] != null) altNodes[k].setAttribute('alt', dict[aKey]);
+    }
+
+    if (dict['meta.title']) document.title = dict['meta.title'];
+    var metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc && dict['meta.description']) metaDesc.setAttribute('content', dict['meta.description']);
+
+    var toggle = document.getElementById('langToggle');
+    if (toggle) toggle.textContent = lang === 'zh' ? 'EN' : '中文';
+
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+    window.__hotkeypadLang = lang;
+  }
+
+  applyLang(detectDefaultLang());
+
+  document.getElementById('langToggle').addEventListener('click', function () {
+    applyLang(window.__hotkeypadLang === 'zh' ? 'en' : 'zh');
+  });
+})();
+</script>
 
 </body>
 </html>
