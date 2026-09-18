@@ -49,6 +49,38 @@ int resolveManualPort(String input) {
 bool looksLikeIpv4(String input) =>
     RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(input);
 
+/// The square clock/calendar card's side length, solved so it is
+/// consistent with the grid it sits beside — see
+/// [_DeckPageState._squareCardSize]'s own doc comment for why a plain
+/// "make it [freeHeight]" falls apart on a wide-enough deck, and why
+/// this is solved directly rather than iterated. A pure function of the
+/// numbers _squareCardSize otherwise reads off [BuildContext] and
+/// [DeckLayout], so it is testable without either.
+double squareCardSizeFor({
+  required double freeHeight,
+  required double widthBudget,
+  required int rows,
+  required int columns,
+  required double cellRatio,
+  required int shownCount,
+  required double spacing,
+}) {
+  // Height-bound: cellWidth would be freeHeight/rows*cellRatio regardless
+  // of the card size, so the card can just be freeHeight — consistent
+  // exactly when that still leaves at least that much width per column.
+  if (widthBudget - shownCount * freeHeight >=
+      (columns * cellRatio / rows) * freeHeight) {
+    return freeHeight;
+  }
+  // Width-bound: cellWidth is (widthBudget - shownCount*size)/columns,
+  // which determines gridHeight, which the card size must equal — solved
+  // as size = a*widthBudget + spacing*(rows-1), all over
+  // (1 + a*shownCount), where a = rows/(columns*cellRatio) folds in how
+  // a column's width maps to a row's height through the aspect ratio.
+  final a = rows / (columns * cellRatio);
+  return (a * widthBudget + spacing * (rows - 1)) / (1 + a * shownCount);
+}
+
 /// The app's home. Finds a host by itself rather than making the user pick
 /// one: there is normally exactly one Mac to talk to, and choosing it from a
 /// list of every radio in the room is a chore, not a feature.
@@ -1172,13 +1204,10 @@ class _DeckPageState extends State<DeckPage> {
   /// know about anything beside it — it just gets a narrower [Expanded]
   /// to center within.
   ///
-  /// The clock/calendar are square, sized to [_slotBlockHeight] — matching
-  /// [_deck]'s own `gridHeight` exactly whenever height is the binding
-  /// constraint there (the common landscape case: wide screen, few rows),
-  /// which is also the one case that matters for a *square* card, since a
-  /// width-bound grid would need a narrower square anyway to still fit
-  /// beside it. Computed here rather than read back from [_deck] because
-  /// its width would otherwise depend on [_deck]'s output the same frame
+  /// The clock/calendar are square, sized by [_squareCardSize] to match
+  /// [_deck]'s own `gridHeight` exactly, whichever axis ends up binding
+  /// it — computed here rather than read back from [_deck] because its
+  /// width would otherwise depend on [_deck]'s output the same frame
   /// [_deck]'s own width constraint depends on it — a cycle a plain
   /// LayoutBuilder can't resolve in one pass.
   Widget _deckArea(HotkeyPadSession session, DeckLayout layout, bool portrait) {
@@ -1191,15 +1220,23 @@ class _DeckPageState extends State<DeckPage> {
     if (portrait || (!_showClock && !_showDate)) return deck;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = _slotBlockHeight(
+        final horizontalPadding = _slotHorizontalPadding(
           context,
-          layout,
-          session.showPageDots,
-          constraints.maxHeight,
+          hugLeft: _showClock,
+          hugRight: _showDate,
         );
-        final reserved =
-            (_showClock ? size + _slotSpacing : 0.0) +
-            (_showDate ? size + _slotSpacing : 0.0);
+        final shownCount = (_showClock ? 1 : 0) + (_showDate ? 1 : 0);
+        final size = _squareCardSize(
+          context: context,
+          layout: layout,
+          showLabels: session.showLabels,
+          showDots: session.showPageDots,
+          maxWidth: constraints.maxWidth,
+          maxHeight: constraints.maxHeight,
+          shownCount: shownCount,
+          horizontalPadding: horizontalPadding,
+        );
+        final reserved = shownCount * (size + _slotSpacing);
         // What's left once the cards are reserved is exactly what _deck
         // would see through an Expanded — computed here first, rather
         // than actually handing _deck that Expanded, so the cards can sit
@@ -1219,11 +1256,6 @@ class _DeckPageState extends State<DeckPage> {
         // just not on the hugged side(s), where it's now zero — added
         // back here so the SizedBox below hands it exactly enough to
         // arrive back at gridWidth once it does.
-        final deckPadding = _slotHorizontalPadding(
-          context,
-          hugLeft: _showClock,
-          hugRight: _showDate,
-        );
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1232,7 +1264,10 @@ class _DeckPageState extends State<DeckPage> {
                 padding: const EdgeInsets.only(right: _slotSpacing),
                 child: AnalogClock(size: size),
               ),
-            SizedBox(width: gridWidth + deckPadding.horizontal, child: deck),
+            SizedBox(
+              width: gridWidth + horizontalPadding.horizontal,
+              child: deck,
+            ),
             if (_showDate)
               Padding(
                 padding: const EdgeInsets.only(left: _slotSpacing),
@@ -1263,6 +1298,56 @@ class _DeckPageState extends State<DeckPage> {
         padding.vertical -
         dots -
         _slotSpacing * (layout.rows - 1);
+  }
+
+  /// The clock/calendar's square side — [_slotBlockHeight] whenever
+  /// height binds [_deck]'s own grid (the common case: a wide screen,
+  /// not many rows), but *not* simply that otherwise. A deck with enough
+  /// columns instead has *width* bind it, which brings the card's own
+  /// width back into the equation: a taller card reserves more width,
+  /// which narrows the grid, which — width-bound — makes the grid
+  /// shorter, which the card would then need to shrink to keep matching.
+  /// Confirmed on a 5-column deck: sized to plain [_slotBlockHeight]
+  /// there, the card came out visibly taller than the grid actually
+  /// rendered, exactly this case.
+  ///
+  /// Solved directly for the card size that is *already* consistent with
+  /// itself, rather than feeding a layout pass's answer back into the
+  /// next one — which a case like this can oscillate rather than settle
+  /// (a taller card narrows the grid, which wants a shorter card, which
+  /// widens the grid, which wants a taller card again). The grid's own
+  /// width/height choice is `min` of two linear functions of the card
+  /// size, so the two branches are each solved for directly and
+  /// whichever one is internally consistent (the width branch doesn't
+  /// actually need to be *narrower* than the height branch it assumed
+  /// away, or vice versa) is the real answer.
+  double _squareCardSize({
+    required BuildContext context,
+    required DeckLayout layout,
+    required bool showLabels,
+    required bool showDots,
+    required double maxWidth,
+    required double maxHeight,
+    required int shownCount,
+    required EdgeInsets horizontalPadding,
+  }) {
+    final h = _slotBlockHeight(context, layout, showDots, maxHeight);
+    // The width left for the grid once the card(s) and their own gap are
+    // reserved, as a function of the card size: w0 - shownCount * size.
+    final w0 =
+        maxWidth -
+        shownCount * _slotSpacing -
+        horizontalPadding.horizontal -
+        _slotSpacing * (layout.columns - 1);
+    return squareCardSizeFor(
+      freeHeight: h,
+      widthBudget: w0,
+      rows: layout.rows,
+      columns: layout.columns,
+      cellRatio: showLabels ? 0.86 : 1.0,
+      shownCount: shownCount,
+      spacing: _slotSpacing,
+    );
   }
 
   /// [_deck]'s own horizontal margin — [_slotMargin] plus whatever real
