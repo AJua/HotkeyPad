@@ -14,6 +14,7 @@ dependencies:
   flutter:
     sdk: flutter
   bluetooth_low_energy: ^6.2.1
+  intl: any # version pinned transitively by flutter_localizations
 
 dev_dependencies:
   flutter_test:

@@ -29,4 +29,12 @@ IconData deckFallbackIcon(DeckItem item) => switch (item) {
     DeckAction.volumeDown => Icons.volume_down,
     DeckAction.mute => Icons.volume_off,
   },
+  // Unreachable in practice — the deck's own cellBuilder renders a
+  // WidgetItem as a live AnalogClock/MonthCalendar before ever reaching
+  // this fallback — but the switch above is exhaustive over DeckItem, so
+  // this still has to exist.
+  WidgetItem(:final kind) => switch (kind) {
+    DeckWidgetKind.clock => Icons.access_time,
+    DeckWidgetKind.calendar => Icons.calendar_month,
+  },
 };

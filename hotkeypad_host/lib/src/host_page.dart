@@ -912,6 +912,10 @@ class _HostPageState extends State<HostPage> {
       run: _runItem,
       delay: (duration) => Future<void>.delayed(duration),
     ),
+    // Nothing to run: a WidgetItem is display-only, and the client never
+    // sends a press for one of its own slots — this only guards against a
+    // stale or misbehaving client naming it directly.
+    WidgetItem() => Future.value((ok: false, message: 'Not a button')),
   };
 
   /// Streams the layout: a header, one message per occupied cell, then an

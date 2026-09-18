@@ -135,6 +135,56 @@ void main() {
     expect(cell(0), findsNothing);
   });
 
+  testWidgets(
+    'a placed widget renders a live preview and hides its covered cells',
+    (tester) async {
+      final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
+        1,
+        const WidgetItem(
+          kind: DeckWidgetKind.clock,
+          rowSpan: 2,
+          columnSpan: 2,
+        ),
+      );
+
+      await pumpGrid(tester, layout);
+
+      // The anchor renders the real widget...
+      expect(cell(1), findsOneWidget);
+      expect(
+        find.descendant(of: cell(1), matching: find.byType(AnalogClock)),
+        findsOneWidget,
+      );
+      // ...and every other cell in its footprint isn't built at all, not
+      // even as an empty placeholder — there is nothing there to tap.
+      expect(cell(2), findsNothing);
+      expect(cell(6), findsNothing);
+      expect(cell(7), findsNothing);
+      // Cells outside the footprint are unaffected.
+      expect(cell(0), findsOneWidget);
+      expect(cell(3), findsOneWidget);
+    },
+  );
+
+  testWidgets('tapping anywhere on a widget tile asks to reconfigure it', (
+    tester,
+  ) async {
+    final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
+      1,
+      const WidgetItem(
+        kind: DeckWidgetKind.calendar,
+        rowSpan: 2,
+        columnSpan: 2,
+      ),
+    );
+
+    final recorded = await pumpGrid(tester, layout);
+    await tester.tap(cell(1));
+    await tester.pumpAndSettle();
+
+    expect(recorded.picks, [1]);
+  });
+
   group('itemsDroppedByResize', () {
     test('growing never drops anything', () {
       final layout = DeckLayout.empty().withSlot(14, 'app:Last');
@@ -216,6 +266,116 @@ void main() {
     });
   });
 
+  group('maxWidgetSpanAt', () {
+    test('the top-left corner can use the whole grid', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3);
+
+      final span = maxWidgetSpanAt(layout, 0);
+
+      expect(span.rows, 3);
+      expect(span.columns, 5);
+    });
+
+    test('the bottom-right corner can only be 1x1', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3);
+
+      final span = maxWidgetSpanAt(layout, 14);
+
+      expect(span.rows, 1);
+      expect(span.columns, 1);
+    });
+
+    test('a mid-grid anchor is bounded by whatever room is left', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3);
+
+      // Row 1, column 3 (index 8): 2 rows and 2 columns remain.
+      final span = maxWidgetSpanAt(layout, 8);
+
+      expect(span.rows, 2);
+      expect(span.columns, 2);
+    });
+  });
+
+  group('itemsDroppedByWidget', () {
+    const clock = WidgetItem(
+      kind: DeckWidgetKind.clock,
+      rowSpan: 2,
+      columnSpan: 2,
+    );
+
+    test('reports the buttons a footprint would clear, anchor excluded', () {
+      final layout = DeckLayout.empty(
+        columns: 5,
+        rows: 3,
+      ).withSlot(1, 'app:Anchor').withSlot(2, 'app:Neighbour');
+
+      final dropped = itemsDroppedByWidget(layout, 1, clock);
+
+      expect(dropped, [const AppItem('Neighbour')]);
+    });
+
+    test('an empty footprint drops nothing', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3);
+
+      expect(itemsDroppedByWidget(layout, 1, clock), isEmpty);
+    });
+  });
+
+  group('confirmWidgetOverwrite', () {
+    Future<bool?> confirm(
+      WidgetTester tester,
+      List<DeckItem> dropped, {
+      String? tap,
+    }) async {
+      bool? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  result = await confirmWidgetOverwrite(context, dropped);
+                },
+                child: const Text('ask'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('ask'));
+      await tester.pumpAndSettle();
+      if (tap != null) {
+        await tester.tap(find.text(tap));
+        await tester.pumpAndSettle();
+      }
+      return result;
+    }
+
+    testWidgets('names the buttons the widget would cover', (tester) async {
+      await confirm(tester, const [AppItem('Safari')]);
+
+      expect(find.text('Remove 1 button?'), findsOneWidget);
+    });
+
+    testWidgets('Cancel reports false', (tester) async {
+      final result = await confirm(tester, const [
+        AppItem('Safari'),
+      ], tap: 'Cancel');
+
+      expect(result, isFalse);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('Remove reports true', (tester) async {
+      final result = await confirm(tester, const [
+        AppItem('Safari'),
+      ], tap: 'Remove');
+
+      expect(result, isTrue);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+  });
+
   group('currentButtonSummary', () {
     test('null for an empty slot', () {
       expect(currentButtonSummary(null), isNull);
@@ -274,6 +434,15 @@ void main() {
         label: 'Browsers',
       );
       expect(currentButtonSummary(item.stored), 'Runs 2 steps');
+    });
+
+    test('names the kind and span for a widget button', () {
+      const item = WidgetItem(
+        kind: DeckWidgetKind.calendar,
+        rowSpan: 2,
+        columnSpan: 3,
+      );
+      expect(currentButtonSummary(item.stored), 'Calendar widget (2x3)');
     });
   });
 
@@ -567,6 +736,9 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(find.text('Button combo...'), findsNothing);
+          // Same reason: a combo step picks an action to run, and a
+          // Clock/Calendar widget isn't one.
+          expect(find.text('Clock...'), findsNothing);
           expect(find.text('Shell command...'), findsOneWidget);
         },
       );

@@ -395,24 +395,6 @@ abstract class AppLocalizations {
   /// **'Connection method'**
   String get connectionMethodSettingsTitle;
 
-  /// Section heading above the clock/date switches in the settings dialog.
-  ///
-  /// In en, this message translates to:
-  /// **'Landscape display'**
-  String get landscapeWidgetsSettingsTitle;
-
-  /// Switch label: shows an analog clock beside the deck in landscape.
-  ///
-  /// In en, this message translates to:
-  /// **'Show a clock beside the deck'**
-  String get showClockInLandscape;
-
-  /// Switch label: shows a month calendar beside the deck in landscape.
-  ///
-  /// In en, this message translates to:
-  /// **'Show a calendar beside the deck'**
-  String get showDateInLandscape;
-
   /// Tooltip on the gear icon, and title of the dialog it opens.
   ///
   /// In en, this message translates to:

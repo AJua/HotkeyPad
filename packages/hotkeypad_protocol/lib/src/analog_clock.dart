@@ -7,13 +7,19 @@ import 'package:flutter/material.dart';
 /// always dark, regardless of the deck's own theme or background, so it
 /// reads the same whether the deck behind it is light, dark, or has a
 /// photo background.
+///
+/// Shared between the host's grid editor and the client's own deck — see
+/// [DeckGridView] — so a [WidgetItem] looks the same regardless of which
+/// one is rendering it; only [width]/[height] differ, driven by whatever
+/// row/column span its slot was actually given.
 class AnalogClock extends StatefulWidget {
-  const AnalogClock({super.key, this.size = 204});
+  const AnalogClock({super.key, required this.width, required this.height});
 
-  /// The card's side — square, both width and height — see
-  /// [_DeckPageState._slotBlockHeight]. The face itself is drawn at
-  /// [size] minus this card's own padding.
-  final double size;
+  /// The card's own size — not necessarily square, unlike a single cell:
+  /// a span wider than tall (or the reverse) still centers a circular face
+  /// within it, via [_ClockPainter]'s own use of the shorter side.
+  final double width;
+  final double height;
 
   @override
   State<AnalogClock> createState() => _AnalogClockState();
@@ -53,18 +59,19 @@ class _AnalogClockState extends State<AnalogClock> {
   @override
   Widget build(BuildContext context) {
     const cardPadding = 18.0;
-    final faceSize = math.max(widget.size - cardPadding * 2, 0.0);
+    final faceWidth = math.max(widget.width - cardPadding * 2, 0.0);
+    final faceHeight = math.max(widget.height - cardPadding * 2, 0.0);
     return Container(
-      width: widget.size,
-      height: widget.size,
+      width: widget.width,
+      height: widget.height,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: const Color(0xF01C1C1E),
         borderRadius: BorderRadius.circular(24),
       ),
       child: SizedBox(
-        width: faceSize,
-        height: faceSize,
+        width: faceWidth,
+        height: faceHeight,
         child: CustomPaint(painter: _ClockPainter(_now)),
       ),
     );

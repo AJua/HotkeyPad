@@ -5,6 +5,9 @@ import 'dart:typed_data';
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/widgets.dart';
 
+export 'src/analog_clock.dart';
+export 'src/month_calendar.dart';
+
 /// The contract shared by the host service and the client app.
 ///
 /// Both projects depend on this package by path (`packages/hotkeypad_protocol`)
@@ -312,6 +315,14 @@ sealed class DeckItem {
           emoji: emoji,
           customIconId: customIconId,
         ),
+        'widget' => switch (DeckWidgetKind.fromWire(json['k'] as String?)) {
+          final kind? => WidgetItem(
+            kind: kind,
+            rowSpan: (json['rs'] as num?)?.toInt() ?? 1,
+            columnSpan: (json['cs'] as num?)?.toInt() ?? 1,
+          ),
+          null => null,
+        },
         _ => null,
       };
     } catch (_) {
@@ -639,6 +650,64 @@ final class ComboItem extends DeckItem {
   });
 }
 
+/// A live widget a [WidgetItem] can render, rather than something a press
+/// runs.
+enum DeckWidgetKind {
+  clock('clock', 'Clock'),
+  calendar('calendar', 'Calendar');
+
+  const DeckWidgetKind(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static DeckWidgetKind? fromWire(String? wire) {
+    for (final kind in values) {
+      if (kind.wire == wire) return kind;
+    }
+    return null;
+  }
+}
+
+/// A live widget (a clock or a calendar) placed like any other button, but
+/// anchored at its own top-left slot and spanning [rowSpan] x [columnSpan]
+/// cells from there — see [DeckLayout.footprintFor] and [DeckGridView],
+/// which is what actually renders a span rather than a single cell.
+///
+/// Every other cell inside that span is kept empty in [DeckLayout.slots]:
+/// there is no separate wire representation for "covered by a widget
+/// elsewhere", it is derived fresh from wherever a [WidgetItem] currently
+/// sits — see [DeckLayout.widgetCoveredIndexes].
+final class WidgetItem extends DeckItem {
+  const WidgetItem({
+    required this.kind,
+    required this.rowSpan,
+    required this.columnSpan,
+  });
+
+  final DeckWidgetKind kind;
+  final int rowSpan;
+  final int columnSpan;
+
+  @override
+  String get label => kind.label;
+
+  /// A widget renders itself; there is no glyph to override.
+  @override
+  String? get emoji => null;
+
+  @override
+  String? get customIconId => null;
+
+  @override
+  String get stored => jsonEncode({
+    't': 'widget',
+    'k': kind.wire,
+    'rs': rowSpan,
+    'cs': columnSpan,
+  });
+}
+
 /// One occupied cell of a [DeckLayout]: a button's content, tagged with the
 /// id it is pressed by.
 ///
@@ -666,6 +735,25 @@ final class DeckSlot {
 
   @override
   String toString() => 'DeckSlot(id: $id, value: $value)';
+}
+
+/// A [WidgetItem]'s footprint once actually anchored somewhere — see
+/// [DeckLayout.footprintFor]/[DeckLayout.footprintAt].
+class DeckWidgetFootprint {
+  const DeckWidgetFootprint({
+    required this.rows,
+    required this.columns,
+    required this.indexes,
+  });
+
+  /// The span actually used, after clamping to the page's own bounds —
+  /// may be smaller than what was asked for; never larger.
+  final int rows;
+  final int columns;
+
+  /// Every [DeckLayout.slots] index the footprint covers, the anchor first,
+  /// then the rest in reading order.
+  final List<int> indexes;
 }
 
 /// The grid the client draws and the host edits.
@@ -774,8 +862,9 @@ class DeckLayout {
       final offset = page * pageCapacity;
       for (var row = 0; row < rows; row++) {
         for (var column = 0; column < columns; column++) {
-          swapped[offset + column * rows + row] =
-              slots[offset + row * columns + column];
+          swapped[offset + column * rows + row] = _transposedSlot(
+            slots[offset + row * columns + column],
+          );
         }
       }
     }
@@ -784,6 +873,25 @@ class DeckLayout {
       rows: columns,
       pages: pages,
       slots: swapped,
+    );
+  }
+
+  /// [transposed]'s per-cell copy, widget-aware: a [WidgetItem]'s own
+  /// rowSpan/columnSpan describe its shape in the *un*-turned grid, so a
+  /// turn that swaps every cell's position has to swap those two numbers
+  /// right along with it — otherwise the footprint this widget claims
+  /// would silently stop matching the shape it was actually placed in.
+  static DeckSlot? _transposedSlot(DeckSlot? slot) {
+    if (slot == null) return null;
+    final item = DeckItem.parse(slot.value);
+    if (item is! WidgetItem) return slot;
+    return DeckSlot(
+      id: slot.id,
+      value: WidgetItem(
+        kind: item.kind,
+        rowSpan: item.columnSpan,
+        columnSpan: item.rowSpan,
+      ).stored,
     );
   }
 
@@ -799,6 +907,103 @@ class DeckLayout {
   DeckLayout withSlot(int index, String? value) {
     final copy = List<DeckSlot?>.of(slots);
     copy[index] = value == null ? null : DeckSlot(id: index, value: value);
+    return DeckLayout(columns: columns, rows: rows, pages: pages, slots: copy);
+  }
+
+  /// The cells a [WidgetItem] anchored at [index] with [rowSpan] x
+  /// [columnSpan] would occupy on that same page — [index] itself first,
+  /// then every other covered cell in reading order. Clamped to whatever
+  /// room is actually left on the page from that position, rather than
+  /// running past its right or bottom edge: a widget can be placed (or can
+  /// simply be left in place through a later shrink) where its full span
+  /// would not fit, in which case it just claims less than
+  /// `rowSpan x columnSpan`.
+  DeckWidgetFootprint footprintFor(
+    int index, {
+    required int rowSpan,
+    required int columnSpan,
+  }) {
+    final page = index ~/ pageCapacity;
+    final cell = index % pageCapacity;
+    final anchorRow = cell ~/ columns;
+    final anchorColumn = cell % columns;
+    final clampedRows = math.min(rowSpan, rows - anchorRow);
+    final clampedColumns = math.min(columnSpan, columns - anchorColumn);
+    return DeckWidgetFootprint(
+      rows: clampedRows,
+      columns: clampedColumns,
+      indexes: [
+        for (var dr = 0; dr < clampedRows; dr++)
+          for (var dc = 0; dc < clampedColumns; dc++)
+            page * pageCapacity +
+                (anchorRow + dr) * columns +
+                (anchorColumn + dc),
+      ],
+    );
+  }
+
+  /// [index]'s own footprint as it is actually stored right now: 1x1 for an
+  /// ordinary button or an empty cell, or a [WidgetItem]'s own span.
+  DeckWidgetFootprint footprintAt(int index) {
+    final slot = slots[index];
+    final item = slot == null ? null : DeckItem.parse(slot.value);
+    if (item is! WidgetItem) {
+      return DeckWidgetFootprint(rows: 1, columns: 1, indexes: [index]);
+    }
+    return footprintFor(index, rowSpan: item.rowSpan, columnSpan: item.columnSpan);
+  }
+
+  /// Every cell forced empty because some other cell on its page anchors a
+  /// [WidgetItem] whose footprint reaches it — occupied on screen, but not
+  /// by a value of its own, so a plain pick or drag must treat it as
+  /// unavailable rather than as an ordinary empty slot.
+  Set<int> get widgetCoveredIndexes {
+    final covered = <int>{};
+    for (var index = 0; index < slots.length; index++) {
+      if (slots[index] == null) continue;
+      covered.addAll(footprintAt(index).indexes.where((i) => i != index));
+    }
+    return covered;
+  }
+
+  /// Whether placing a widget with [rowSpan] x [columnSpan] anchored at
+  /// [index] would reach into a cell some other widget already covers.
+  ///
+  /// Nulling such a cell (which is what [withWidget] does to the rest of
+  /// its own footprint) would silently shrink that other widget's shape
+  /// rather than actually freeing anything, so a placement reaching into
+  /// one is refused outright — this is checked before the footprint is
+  /// ever cleared, not cleaned up after. [index]'s own current footprint
+  /// (if it already anchors a widget) does not count as "another widget":
+  /// resizing a widget in place is not blocked by itself.
+  bool widgetPlacementBlocked(
+    int index, {
+    required int rowSpan,
+    required int columnSpan,
+  }) {
+    final ownFootprint = footprintAt(index).indexes.toSet();
+    final blockedByOthers = widgetCoveredIndexes.difference(ownFootprint);
+    final candidate = footprintFor(index, rowSpan: rowSpan, columnSpan: columnSpan);
+    return candidate.indexes.any(
+      (i) => i != index && blockedByOthers.contains(i),
+    );
+  }
+
+  /// Places [item] anchored at [index], clearing whatever the rest of its
+  /// footprint already held. Confirming that loss away first, when there
+  /// is one, is the caller's job — see the host's own `confirmResizeDrop`
+  /// for the equivalent already used before a grid shrink.
+  DeckLayout withWidget(int index, WidgetItem item) {
+    final footprint = footprintFor(
+      index,
+      rowSpan: item.rowSpan,
+      columnSpan: item.columnSpan,
+    );
+    final copy = List<DeckSlot?>.of(slots);
+    for (final covered in footprint.indexes) {
+      if (covered != index) copy[covered] = null;
+    }
+    copy[index] = DeckSlot(id: index, value: item.stored);
     return DeckLayout(columns: columns, rows: rows, pages: pages, slots: copy);
   }
 
@@ -917,10 +1122,18 @@ DeckGridMetrics deckGridMetrics({
 /// entirely inside [cellBuilder], never in the grid's own geometry.
 ///
 /// [metrics] is a parameter rather than computed here so a caller that also
-/// has to reserve space for something beside the grid (the client's
-/// clock/calendar widgets, say) can solve for that layout first and hand
-/// back the metrics it settled on, instead of this widget silently
-/// recomputing a second, inconsistent answer from raw constraints.
+/// has to reserve space for something beside the grid can solve for that
+/// layout first and hand back the metrics it settled on, instead of this
+/// widget silently recomputing a second, inconsistent answer from raw
+/// constraints.
+///
+/// Built on a [Stack] of explicitly [Positioned] cells rather than a
+/// [GridView]: a [WidgetItem] spans more than one cell, which a
+/// [SliverGridDelegateWithFixedCrossAxisCount] has no way to express — every
+/// cell's own on-screen rectangle is placed by hand instead, from
+/// [DeckGridMetrics]'s per-cell size and [DeckLayout.footprintAt]'s span,
+/// which collapses to exactly what the old [GridView] drew whenever nothing
+/// spans more than 1x1.
 class DeckGridView extends StatelessWidget {
   const DeckGridView({
     super.key,
@@ -950,6 +1163,10 @@ class DeckGridView extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = metrics.gridWidth;
     final height = metrics.gridHeight;
+    // Cells [DeckLayout.widgetCoveredIndexes] covers are never built at
+    // all: the widget anchored elsewhere already draws over that area, via
+    // its own wider/taller Positioned below.
+    final covered = layout.widgetCoveredIndexes;
     return Center(
       child: SizedBox(
         // A transient zero/negative constraint (mid-resize, say) is left
@@ -957,20 +1174,35 @@ class DeckGridView extends StatelessWidget {
         // that would just throw.
         width: width.isFinite && width > 0 ? width : null,
         height: height.isFinite && height > 0 ? height : null,
-        child: GridView.builder(
-          padding: EdgeInsets.zero,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: layout.columns,
-            mainAxisSpacing: spacing,
-            crossAxisSpacing: spacing,
-            childAspectRatio: cellRatio,
-          ),
-          itemCount: layout.pageCapacity,
-          itemBuilder: (context, cellIndex) =>
-              cellBuilder(context, layout.indexOf(page: page, cell: cellIndex)),
+        child: Stack(
+          children: [
+            for (
+              var cellIndex = 0;
+              cellIndex < layout.pageCapacity;
+              cellIndex++
+            )
+              if (!covered.contains(layout.indexOf(page: page, cell: cellIndex)))
+                _positionedCell(context, cellIndex),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _positionedCell(BuildContext context, int cellIndex) {
+    final index = layout.indexOf(page: page, cell: cellIndex);
+    final row = cellIndex ~/ layout.columns;
+    final column = cellIndex % layout.columns;
+    final footprint = layout.footprintAt(index);
+    return Positioned(
+      left: column * (metrics.cellWidth + spacing),
+      top: row * (metrics.cellHeight + spacing),
+      width:
+          footprint.columns * metrics.cellWidth +
+          (footprint.columns - 1) * spacing,
+      height:
+          footprint.rows * metrics.cellHeight + (footprint.rows - 1) * spacing,
+      child: cellBuilder(context, index),
     );
   }
 }

@@ -166,15 +166,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get connectionMethodSettingsTitle => '連線方式';
 
   @override
-  String get landscapeWidgetsSettingsTitle => '橫向顯示';
-
-  @override
-  String get showClockInLandscape => '在按鍵面板旁顯示時鐘';
-
-  @override
-  String get showDateInLandscape => '在按鍵面板旁顯示日曆';
-
-  @override
   String get settingsTitle => '設定';
 
   @override
@@ -442,15 +433,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get connectionMethodSettingsTitle => '連線方式';
-
-  @override
-  String get landscapeWidgetsSettingsTitle => '橫向顯示';
-
-  @override
-  String get showClockInLandscape => '在按鍵面板旁顯示時鐘';
-
-  @override
-  String get showDateInLandscape => '在按鍵面板旁顯示日曆';
 
   @override
   String get settingsTitle => '設定';

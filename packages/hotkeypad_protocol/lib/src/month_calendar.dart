@@ -7,12 +7,14 @@ import 'package:intl/intl.dart';
 /// today circled in the app's own accent color. Always dark, for the same
 /// reason as [AnalogClock]: it needs to read the same regardless of the
 /// deck's own background.
+///
+/// Shared between the host's grid editor and the client's own deck — see
+/// [AnalogClock]'s own doc comment for why.
 class MonthCalendar extends StatefulWidget {
-  const MonthCalendar({super.key, this.size = 220});
+  const MonthCalendar({super.key, required this.width, required this.height});
 
-  /// The card's side — square, both width and height — see
-  /// [_DeckPageState._slotBlockHeight] and [AnalogClock.size].
-  final double size;
+  final double width;
+  final double height;
 
   @override
   State<MonthCalendar> createState() => _MonthCalendarState();
@@ -65,15 +67,15 @@ class _MonthCalendarState extends State<MonthCalendar> {
     );
 
     return Container(
-      width: widget.size,
-      height: widget.size,
+      width: widget.width,
+      height: widget.height,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
         color: const Color(0xF01C1C1E),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
-        // A square this size is usually taller than the header + weekday
+        // A card this size is usually taller than the header + weekday
         // row + day grid need, so the extra room is centered rather than
         // left pinned to the top.
         mainAxisAlignment: MainAxisAlignment.center,

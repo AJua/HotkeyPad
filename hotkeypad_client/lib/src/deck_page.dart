@@ -7,16 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../l10n/app_localizations.dart';
-import 'analog_clock.dart';
 import 'background_fit.dart';
 import 'connection_method_store.dart';
 import 'debug_page.dart';
 import 'edge_bar.dart';
 import 'host_history_store.dart';
-import 'landscape_widgets_store.dart';
 import 'link_target.dart';
 import 'locale_store.dart';
-import 'month_calendar.dart';
 import 'qr_scan_page.dart';
 import 'safe_insets.dart';
 import 'scan_page.dart';
@@ -48,38 +45,6 @@ int resolveManualPort(String input) {
 bool looksLikeIpv4(String input) =>
     RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(input);
 
-/// The square clock/calendar card's side length, solved so it is
-/// consistent with the grid it sits beside — see
-/// [_DeckPageState._squareCardSize]'s own doc comment for why a plain
-/// "make it [freeHeight]" falls apart on a wide-enough deck, and why
-/// this is solved directly rather than iterated. A pure function of the
-/// numbers _squareCardSize otherwise reads off [BuildContext] and
-/// [DeckLayout], so it is testable without either.
-double squareCardSizeFor({
-  required double freeHeight,
-  required double widthBudget,
-  required int rows,
-  required int columns,
-  required double cellRatio,
-  required int shownCount,
-  required double spacing,
-}) {
-  // Height-bound: cellWidth would be freeHeight/rows*cellRatio regardless
-  // of the card size, so the card can just be freeHeight — consistent
-  // exactly when that still leaves at least that much width per column.
-  if (widthBudget - shownCount * freeHeight >=
-      (columns * cellRatio / rows) * freeHeight) {
-    return freeHeight;
-  }
-  // Width-bound: cellWidth is (widthBudget - shownCount*size)/columns,
-  // which determines gridHeight, which the card size must equal — solved
-  // as size = a*widthBudget + spacing*(rows-1), all over
-  // (1 + a*shownCount), where a = rows/(columns*cellRatio) folds in how
-  // a column's width maps to a row's height through the aspect ratio.
-  final a = rows / (columns * cellRatio);
-  return (a * widthBudget + spacing * (rows - 1)) / (1 + a * shownCount);
-}
-
 /// The app's home. Finds a host by itself rather than making the user pick
 /// one: there is normally exactly one Mac to talk to, and choosing it from a
 /// list of every radio in the room is a chore, not a feature.
@@ -110,15 +75,12 @@ class _DeckPageState extends State<DeckPage> {
   final _pages = PageController();
   int _page = 0;
 
-  /// The gap between slots — shared with the host's own editor preview
-  /// via [kDeckGridSpacing], and also used as the gap between the deck and
-  /// the optional clock/calendar in [_deckArea], so both read as one grid
-  /// rather than the side widgets looking bolted on at a different rhythm.
+  /// The gap between slots — shared with the host's own editor preview via
+  /// [kDeckGridSpacing], so a button looks the same size relative to its
+  /// neighbours on both.
   static const _slotSpacing = kDeckGridSpacing;
 
-  /// Matches [_deck]'s own `margin` — kept as one shared constant since
-  /// [_slotBlockHeight] has to reproduce that side of _deck's math (see
-  /// its own doc comment for why it can't just ask _deck for the answer).
+  /// The deck's own outer margin — see [_deck].
   static const _slotMargin = 12.0;
 
   /// The last [HotkeyPadSession.failureSeq] a SnackBar was already shown
@@ -144,10 +106,6 @@ class _DeckPageState extends State<DeckPage> {
   ConnectionMethod? _method;
   bool _methodLoaded = false;
 
-  /// Optional, off by default — see [LandscapeWidgetsStore].
-  bool _showClock = false;
-  bool _showDate = false;
-
   /// WiFi's own discovery, alongside Bluetooth's — bound independently of
   /// [_central]/[_state] since WiFi needs neither an adapter nor a runtime
   /// permission, so it must not be gated behind Bluetooth's own state
@@ -163,27 +121,6 @@ class _DeckPageState extends State<DeckPage> {
   void initState() {
     super.initState();
     unawaited(_loadMethod());
-    unawaited(_loadLandscapeWidgets());
-  }
-
-  Future<void> _loadLandscapeWidgets() async {
-    final clock = await LandscapeWidgetsStore.loadShowClock();
-    final date = await LandscapeWidgetsStore.loadShowDate();
-    if (!mounted) return;
-    setState(() {
-      _showClock = clock;
-      _showDate = date;
-    });
-  }
-
-  void _setShowClock(bool value) {
-    setState(() => _showClock = value);
-    unawaited(LandscapeWidgetsStore.saveShowClock(value));
-  }
-
-  void _setShowDate(bool value) {
-    setState(() => _showDate = value);
-    unawaited(LandscapeWidgetsStore.saveShowDate(value));
   }
 
   Future<void> _loadMethod() async {
@@ -807,31 +744,6 @@ class _DeckPageState extends State<DeckPage> {
                         ],
                       ),
                     ),
-                    const Divider(height: 32),
-                    Text(
-                      l10n.landscapeWidgetsSettingsTitle,
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      secondary: const Icon(Icons.access_time),
-                      title: Text(l10n.showClockInLandscape),
-                      value: _showClock,
-                      onChanged: (value) {
-                        _setShowClock(value);
-                        setDialogState(() {});
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      secondary: const Icon(Icons.calendar_today_outlined),
-                      title: Text(l10n.showDateInLandscape),
-                      value: _showDate,
-                      onChanged: (value) {
-                        _setShowDate(value);
-                        setDialogState(() {});
-                      },
-                    ),
                     // Developer diagnostics, like the host's own "Service
                     // details" — for working out why the deck is
                     // misbehaving, not for daily use. Debug-build only:
@@ -1174,7 +1086,7 @@ class _DeckPageState extends State<DeckPage> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: SizedBox(
                     height: outer.maxHeight,
-                    child: _deckArea(session, layout, portrait),
+                    child: _deck(session, layout),
                   ),
                 ),
               );
@@ -1197,234 +1109,7 @@ class _DeckPageState extends State<DeckPage> {
     );
   }
 
-  /// Flanks [_deck] with the optional clock/date widgets in landscape —
-  /// see [LandscapeWidgetsStore]. Both off (the default) is exactly the
-  /// plain deck, unchanged. Kept as a wrapper around [_deck] rather than
-  /// folded into it so the grid's own centering math there never has to
-  /// know about anything beside it — it just gets a narrower [Expanded]
-  /// to center within.
-  ///
-  /// The clock/calendar are square, sized by [_squareCardSize] to match
-  /// [_deck]'s own `gridHeight` exactly, whichever axis ends up binding
-  /// it — computed here rather than read back from [_deck] because its
-  /// width would otherwise depend on [_deck]'s output the same frame
-  /// [_deck]'s own width constraint depends on it — a cycle a plain
-  /// LayoutBuilder can't resolve in one pass.
-  Widget _deckArea(HotkeyPadSession session, DeckLayout layout, bool portrait) {
-    final deck = _deck(
-      session,
-      layout,
-      hugLeft: !portrait && _showClock,
-      hugRight: !portrait && _showDate,
-    );
-    if (portrait || (!_showClock && !_showDate)) return deck;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final horizontalPadding = _slotHorizontalPadding(
-          context,
-          hugLeft: _showClock,
-          hugRight: _showDate,
-        );
-        final shownCount = (_showClock ? 1 : 0) + (_showDate ? 1 : 0);
-        final size = _squareCardSize(
-          context: context,
-          layout: layout,
-          showLabels: session.showLabels,
-          showDots: session.showPageDots,
-          maxWidth: constraints.maxWidth,
-          maxHeight: constraints.maxHeight,
-          shownCount: shownCount,
-          horizontalPadding: horizontalPadding,
-        );
-        final reserved = shownCount * (size + _slotSpacing);
-        // What's left once the cards are reserved is exactly what _deck
-        // would see through an Expanded — computed here first, rather
-        // than actually handing _deck that Expanded, so the cards can sit
-        // right at the grid's own edge instead of the far edge of
-        // whatever leftover space _deck's own centering leaves beside it.
-        final gridWidth = _gridWidthFor(
-          context,
-          layout,
-          session.showLabels,
-          session.showPageDots,
-          constraints.maxWidth - reserved,
-          constraints.maxHeight,
-          hugLeft: _showClock,
-          hugRight: _showDate,
-        );
-        // _deck still subtracts a margin from whatever width it's given —
-        // just not on the hugged side(s), where it's now zero — added
-        // back here so the SizedBox below hands it exactly enough to
-        // arrive back at gridWidth once it does.
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_showClock)
-              Padding(
-                padding: const EdgeInsets.only(right: _slotSpacing),
-                child: AnalogClock(size: size),
-              ),
-            SizedBox(
-              width: gridWidth + horizontalPadding.horizontal,
-              child: deck,
-            ),
-            if (_showDate)
-              Padding(
-                padding: const EdgeInsets.only(left: _slotSpacing),
-                child: MonthCalendar(size: size),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  /// The room left for the grid on the vertical axis once the page-dots
-  /// row and the outer margin are accounted for — everything about
-  /// [maxHeight] that has nothing to do with column count or width, but
-  /// stops short of subtracting the gap *between* rows, which
-  /// [deckGridMetrics] itself now owns (see [_slotBlockHeight] for the
-  /// fully-net version [_squareCardSize] still needs).
-  double _rawVerticalSpace(
-    BuildContext context,
-    DeckLayout layout,
-    bool showDots,
-    double maxHeight,
-  ) {
-    final dots = layout.pages > 1 && showDots ? 28.0 : 0.0;
-    final padding = safeScrollPadding(
-      context,
-      horizontal: _slotMargin,
-      vertical: _slotMargin,
-    );
-    return maxHeight - padding.vertical - dots;
-  }
-
-  /// [_rawVerticalSpace] minus the row spacing too — what [_squareCardSize]
-  /// needs, since a card's own height has no separate "spacing" of its
-  /// own to add back the way [deckGridMetrics]'s callers do.
-  double _slotBlockHeight(
-    BuildContext context,
-    DeckLayout layout,
-    bool showDots,
-    double maxHeight,
-  ) {
-    return _rawVerticalSpace(context, layout, showDots, maxHeight) -
-        _slotSpacing * (layout.rows - 1);
-  }
-
-  /// The clock/calendar's square side — [_slotBlockHeight] whenever
-  /// height binds [_deck]'s own grid (the common case: a wide screen,
-  /// not many rows), but *not* simply that otherwise. A deck with enough
-  /// columns instead has *width* bind it, which brings the card's own
-  /// width back into the equation: a taller card reserves more width,
-  /// which narrows the grid, which — width-bound — makes the grid
-  /// shorter, which the card would then need to shrink to keep matching.
-  /// Confirmed on a 5-column deck: sized to plain [_slotBlockHeight]
-  /// there, the card came out visibly taller than the grid actually
-  /// rendered, exactly this case.
-  ///
-  /// Solved directly for the card size that is *already* consistent with
-  /// itself, rather than feeding a layout pass's answer back into the
-  /// next one — which a case like this can oscillate rather than settle
-  /// (a taller card narrows the grid, which wants a shorter card, which
-  /// widens the grid, which wants a taller card again). The grid's own
-  /// width/height choice is `min` of two linear functions of the card
-  /// size, so the two branches are each solved for directly and
-  /// whichever one is internally consistent (the width branch doesn't
-  /// actually need to be *narrower* than the height branch it assumed
-  /// away, or vice versa) is the real answer.
-  double _squareCardSize({
-    required BuildContext context,
-    required DeckLayout layout,
-    required bool showLabels,
-    required bool showDots,
-    required double maxWidth,
-    required double maxHeight,
-    required int shownCount,
-    required EdgeInsets horizontalPadding,
-  }) {
-    final h = _slotBlockHeight(context, layout, showDots, maxHeight);
-    // The width left for the grid once the card(s) and their own gap are
-    // reserved, as a function of the card size: w0 - shownCount * size.
-    final w0 =
-        maxWidth -
-        shownCount * _slotSpacing -
-        horizontalPadding.horizontal -
-        _slotSpacing * (layout.columns - 1);
-    return squareCardSizeFor(
-      freeHeight: h,
-      widthBudget: w0,
-      rows: layout.rows,
-      columns: layout.columns,
-      cellRatio: showLabels ? 0.86 : 1.0,
-      shownCount: shownCount,
-      spacing: _slotSpacing,
-    );
-  }
-
-  /// [_deck]'s own horizontal margin — [_slotMargin] plus whatever real
-  /// device inset (notch, gesture nav) sits on that side, except on a
-  /// hugged side, where the constant margin is dropped (a real inset, if
-  /// there is one, still applies — that one exists for a hardware reason
-  /// unrelated to the clock/calendar being there or not). Shared by
-  /// [_deck] and [_gridWidthFor] so a hugged side's math can't drift
-  /// between the two.
-  EdgeInsets _slotHorizontalPadding(
-    BuildContext context, {
-    required bool hugLeft,
-    required bool hugRight,
-  }) {
-    final base = safeScrollPadding(
-      context,
-      horizontal: _slotMargin,
-      vertical: _slotMargin,
-    );
-    return EdgeInsets.fromLTRB(
-      hugLeft ? base.left - _slotMargin : base.left,
-      base.top,
-      hugRight ? base.right - _slotMargin : base.right,
-      base.bottom,
-    );
-  }
-
-  /// The grid's own width, via the exact same [deckGridMetrics] call
-  /// [_deck] itself makes, so [_deckArea] can hug the clock/calendar
-  /// against it instead of against whatever wider space _deck was given
-  /// (see _deck's own "leaves wide margins... deliberately not stretched"
-  /// centering, which is otherwise exactly the gap this would leave).
-  double _gridWidthFor(
-    BuildContext context,
-    DeckLayout layout,
-    bool showLabels,
-    bool showDots,
-    double maxWidth,
-    double maxHeight, {
-    required bool hugLeft,
-    required bool hugRight,
-  }) {
-    final cellRatio = showLabels ? 0.86 : 1.0;
-    final padding = _slotHorizontalPadding(
-      context,
-      hugLeft: hugLeft,
-      hugRight: hugRight,
-    );
-    return deckGridMetrics(
-      maxWidth: maxWidth - padding.horizontal,
-      maxHeight: _rawVerticalSpace(context, layout, showDots, maxHeight),
-      columns: layout.columns,
-      rows: layout.rows,
-      cellRatio: cellRatio,
-      spacing: _slotSpacing,
-    ).gridWidth;
-  }
-
-  Widget _deck(
-    HotkeyPadSession session,
-    DeckLayout layout, {
-    bool hugLeft = false,
-    bool hugRight = false,
-  }) {
+  Widget _deck(HotkeyPadSession session, DeckLayout layout) {
     return LayoutBuilder(
       builder: (context, constraints) {
         const spacing = _slotSpacing;
@@ -1433,20 +1118,16 @@ class _DeckPageState extends State<DeckPage> {
         // for, so cells go square and the icon fills them.
         final labels = session.showLabels;
         final cellRatio = labels ? 0.86 : 1.0;
-        final padding = _slotHorizontalPadding(
+        final padding = safeScrollPadding(
           context,
-          hugLeft: hugLeft,
-          hugRight: hugRight,
+          horizontal: _slotMargin,
+          vertical: _slotMargin,
         );
+        final dots = layout.pages > 1 && session.showPageDots ? 28.0 : 0.0;
 
         final metrics = deckGridMetrics(
           maxWidth: constraints.maxWidth - padding.horizontal,
-          maxHeight: _rawVerticalSpace(
-            context,
-            layout,
-            session.showPageDots,
-            constraints.maxHeight,
-          ),
+          maxHeight: constraints.maxHeight - padding.vertical - dots,
           columns: layout.columns,
           rows: layout.rows,
           cellRatio: cellRatio,
@@ -1483,6 +1164,12 @@ class _DeckPageState extends State<DeckPage> {
                           ? null
                           : DeckItem.parse(slot.value);
                       if (item == null) return const _EmptyCell();
+                      // Renders itself, live — not pressable, unlike every
+                      // other item below: there is nothing to send the
+                      // host for a Clock or Calendar.
+                      if (item case final WidgetItem widgetItem) {
+                        return _DeckWidgetTile(item: widgetItem);
+                      }
                       final iconKey = item.emoji == null
                           ? iconKeyFor(item)
                           : null;
@@ -1741,6 +1428,31 @@ class _EmptyCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const SizedBox.expand();
+}
+
+/// A placed Clock or Calendar widget, filling whatever space its own
+/// row/column span was given — see [WidgetItem] and [DeckGridView], which
+/// is what actually sizes that space.
+class _DeckWidgetTile extends StatelessWidget {
+  const _DeckWidgetTile({required this.item});
+
+  final WidgetItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => switch (item.kind) {
+        DeckWidgetKind.clock => AnalogClock(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+        ),
+        DeckWidgetKind.calendar => MonthCalendar(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+        ),
+      },
+    );
+  }
 }
 
 class _DeckButton extends StatelessWidget {

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -1130,5 +1131,254 @@ void main() {
       expect(withDefault.gridWidth, withExplicit.gridWidth);
       expect(withDefault.gridHeight, withExplicit.gridHeight);
     });
+  });
+
+  group('WidgetItem', () {
+    test('round-trips through stored/parse', () {
+      const item = WidgetItem(
+        kind: DeckWidgetKind.calendar,
+        rowSpan: 2,
+        columnSpan: 3,
+      );
+
+      final parsed = DeckItem.parse(item.stored);
+
+      expect(parsed, isA<WidgetItem>());
+      final widget = parsed as WidgetItem;
+      expect(widget.kind, DeckWidgetKind.calendar);
+      expect(widget.rowSpan, 2);
+      expect(widget.columnSpan, 3);
+      expect(widget.label, 'Calendar');
+    });
+
+    test('an unrecognized widget kind fails to parse', () {
+      expect(
+        DeckItem.parse('{"t":"widget","k":"nonsense","rs":1,"cs":1}'),
+        isNull,
+      );
+    });
+  });
+
+  group('DeckLayout widget footprints', () {
+    test('footprintFor covers the full rectangle from the anchor', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3);
+
+      // Anchored at (row 0, col 1) = index 1, spanning 2 rows x 2 columns.
+      final footprint = layout.footprintFor(1, rowSpan: 2, columnSpan: 2);
+
+      expect(footprint.rows, 2);
+      expect(footprint.columns, 2);
+      expect(footprint.indexes, [1, 2, 6, 7]);
+    });
+
+    test('footprintFor clamps to the page when it would run off the edge', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3);
+
+      // Anchored at the bottom-right corner, asking for more than fits.
+      final footprint = layout.footprintFor(14, rowSpan: 3, columnSpan: 3);
+
+      expect(footprint.rows, 1);
+      expect(footprint.columns, 1);
+      expect(footprint.indexes, [14]);
+    });
+
+    test('footprintAt is 1x1 for an ordinary item', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3).withSlot(1, 'app:A');
+
+      expect(layout.footprintAt(1).indexes, [1]);
+    });
+
+    test('footprintAt reads a WidgetItem\'s own span', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
+        1,
+        const WidgetItem(
+          kind: DeckWidgetKind.clock,
+          rowSpan: 2,
+          columnSpan: 2,
+        ),
+      );
+
+      final footprint = layout.footprintAt(1);
+      expect(footprint.rows, 2);
+      expect(footprint.columns, 2);
+      expect(footprint.indexes, [1, 2, 6, 7]);
+    });
+
+    test('withWidget clears the rest of the footprint, anchor excluded', () {
+      final layout = DeckLayout.empty(
+        columns: 5,
+        rows: 3,
+      ).withSlot(2, 'app:Bystander');
+
+      final placed = layout.withWidget(
+        1,
+        const WidgetItem(
+          kind: DeckWidgetKind.clock,
+          rowSpan: 2,
+          columnSpan: 2,
+        ),
+      );
+
+      expect(DeckItem.parse(placed.slots[1]!.value), isA<WidgetItem>());
+      expect(placed.slots[2], isNull);
+      expect(placed.slots[6], isNull);
+      expect(placed.slots[7], isNull);
+    });
+
+    test('widgetCoveredIndexes reports every non-anchor cell', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
+        1,
+        const WidgetItem(
+          kind: DeckWidgetKind.clock,
+          rowSpan: 2,
+          columnSpan: 2,
+        ),
+      );
+
+      expect(layout.widgetCoveredIndexes, {2, 6, 7});
+      // The anchor itself is occupied, not "covered".
+      expect(layout.widgetCoveredIndexes.contains(1), isFalse);
+    });
+
+    test('widgetPlacementBlocked refuses to reach into another widget', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
+        1,
+        const WidgetItem(
+          kind: DeckWidgetKind.clock,
+          rowSpan: 2,
+          columnSpan: 2,
+        ),
+      );
+
+      // Anchored at column 0, this widget's own footprint (0, 1, 2) would
+      // reach into index 2 — already covered (not anchored) by the clock
+      // at 1.
+      expect(
+        layout.widgetPlacementBlocked(0, rowSpan: 1, columnSpan: 3),
+        isTrue,
+      );
+    });
+
+    test('widgetPlacementBlocked allows resizing a widget in place', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
+        1,
+        const WidgetItem(
+          kind: DeckWidgetKind.clock,
+          rowSpan: 2,
+          columnSpan: 2,
+        ),
+      );
+
+      // Growing the same anchor's own widget isn't blocked by itself.
+      expect(
+        layout.widgetPlacementBlocked(1, rowSpan: 2, columnSpan: 3),
+        isFalse,
+      );
+    });
+
+    test('widgetPlacementBlocked allows an ordinary, non-overlapping spot', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
+        1,
+        const WidgetItem(
+          kind: DeckWidgetKind.clock,
+          rowSpan: 2,
+          columnSpan: 2,
+        ),
+      );
+
+      expect(
+        layout.widgetPlacementBlocked(3, rowSpan: 2, columnSpan: 2),
+        isFalse,
+      );
+    });
+
+    test('transposed swaps a widget\'s own rowSpan/columnSpan', () {
+      final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
+        1,
+        const WidgetItem(
+          kind: DeckWidgetKind.calendar,
+          rowSpan: 2,
+          columnSpan: 3,
+        ),
+      );
+
+      final turned = layout.transposed();
+      final item = DeckItem.parse(turned.slots[turned.slots.indexWhere(
+        (slot) => slot != null,
+      )]!.value);
+
+      expect(item, isA<WidgetItem>());
+      expect((item as WidgetItem).rowSpan, 3);
+      expect(item.columnSpan, 2);
+    });
+  });
+
+  group('DeckGridView', () {
+    Future<void> pump(
+      WidgetTester tester,
+      DeckLayout layout, {
+      required Set<int> built,
+    }) async {
+      final metrics = deckGridMetrics(
+        maxWidth: 300,
+        maxHeight: 180,
+        columns: layout.columns,
+        rows: layout.rows,
+        cellRatio: 1,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DeckGridView(
+              layout: layout,
+              page: 0,
+              metrics: metrics,
+              cellRatio: 1,
+              cellBuilder: (context, index) {
+                built.add(index);
+                return Text('cell $index');
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('every cell is built exactly once when nothing spans', (
+      tester,
+    ) async {
+      final built = <int>{};
+      await pump(tester, DeckLayout.empty(columns: 3, rows: 2), built: built);
+
+      expect(built, {0, 1, 2, 3, 4, 5});
+    });
+
+    testWidgets(
+      "a widget's own footprint is skipped, its anchor sized to cover it",
+      (tester) async {
+        final layout = DeckLayout.empty(columns: 3, rows: 2).withWidget(
+          0,
+          const WidgetItem(
+            kind: DeckWidgetKind.clock,
+            rowSpan: 2,
+            columnSpan: 2,
+          ),
+        );
+        final built = <int>{};
+
+        await pump(tester, layout, built: built);
+
+        // 1, 3, 4 sit inside the clock's own 2x2 footprint anchored at 0.
+        expect(built, {0, 2, 5});
+
+        final anchorBox = tester.getSize(find.text('cell 0'));
+        final plainBox = tester.getSize(find.text('cell 2'));
+        // The anchor spans 2 columns and 2 rows, so it comes out roughly
+        // twice the width and twice the height of an ordinary 1x1 cell
+        // (short of the one gap a single cell doesn't need to cross).
+        expect(anchorBox.width, greaterThan(plainBox.width * 1.5));
+        expect(anchorBox.height, greaterThan(plainBox.height * 1.5));
+      },
+    );
   });
 }

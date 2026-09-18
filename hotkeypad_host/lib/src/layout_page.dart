@@ -136,7 +136,88 @@ String? currentButtonSummary(String? stored) {
     KeyComboItem(:final combination) => 'Sends $combination',
     ShortcutItem(:final name) => 'Runs the "$name" Shortcut',
     ComboItem(:final steps) => 'Runs ${steps.length} steps',
+    WidgetItem(:final kind, :final rowSpan, :final columnSpan) =>
+      '${kind.label} widget (${rowSpan}x$columnSpan)',
   };
+}
+
+/// The largest row/column span a widget anchored at [index] could have
+/// without running off [layout]'s own edge from that position — what
+/// [_WidgetDialog]'s steppers are bounded to, so every span the dialog can
+/// actually produce is guaranteed to fit without [DeckLayout.footprintFor]'s
+/// own clamping ever having to kick in for a freshly-chosen size.
+///
+/// A pure function of [layout] and [index], for the same isolated-testing
+/// reason as [itemsDroppedByResize].
+({int rows, int columns}) maxWidgetSpanAt(DeckLayout layout, int index) {
+  final cell = index % layout.pageCapacity;
+  final anchorRow = cell ~/ layout.columns;
+  final anchorColumn = cell % layout.columns;
+  return (rows: layout.rows - anchorRow, columns: layout.columns - anchorColumn);
+}
+
+/// The buttons placing [item] anchored at [index] in [layout] would clear —
+/// every other cell in its own footprint, [index] itself excluded since
+/// overwriting whatever was already at the tapped cell is what picking
+/// anything for it always does, widget or not; only the cells the user did
+/// *not* tap are collateral. Mirrors [DeckLayout.withWidget]'s own clearing
+/// so a dry run reports exactly what that would actually drop.
+List<DeckItem> itemsDroppedByWidget(
+  DeckLayout layout,
+  int index,
+  WidgetItem item,
+) {
+  final footprint = layout.footprintFor(
+    index,
+    rowSpan: item.rowSpan,
+    columnSpan: item.columnSpan,
+  );
+  final dropped = <DeckItem>[];
+  for (final covered in footprint.indexes) {
+    if (covered == index) continue;
+    final slot = layout.slots[covered];
+    if (slot == null) continue;
+    final parsed = DeckItem.parse(slot.value);
+    if (parsed != null) dropped.add(parsed);
+  }
+  return dropped;
+}
+
+/// Asks before placing a widget clears buttons already inside its
+/// footprint. Returns whether to proceed. Standalone, not a method on the
+/// editor, for the same pumped-and-tapped-in-isolation reason as
+/// [confirmResizeDrop].
+Future<bool> confirmWidgetOverwrite(
+  BuildContext context,
+  List<DeckItem> dropped,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(
+        dropped.length == 1
+            ? 'Remove 1 button?'
+            : 'Remove ${dropped.length} buttons?',
+      ),
+      content: Text(
+        'This widget covers where '
+        '${dropped.map((item) => item.label).join(', ')} '
+        'already ${dropped.length == 1 ? 'is' : 'are'}. This cannot be '
+        'undone.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
 }
 
 /// Undoes the transpose (if any) that produced a display-oriented view of
@@ -797,15 +878,36 @@ class LayoutPageState extends State<LayoutPage> {
   /// [index] is into [_displayLayout] — wherever the tapped cell actually
   /// sits on screen — not [_layout] directly; see [_toCanonical].
   Future<void> _pick(int index) async {
+    final maxSpan = maxWidgetSpanAt(_displayLayout, index);
     final chosen = await showDialog<DeckItemChoice>(
       context: context,
       builder: (context) => _PickerDialog(
         apps: _apps,
         shortcuts: _shortcuts,
         current: _displayLayout.slots[index]?.value,
+        maxRowSpan: maxSpan.rows,
+        maxColumnSpan: maxSpan.columns,
       ),
     );
-    if (chosen == null) return;
+    if (chosen == null || !mounted) return;
+    final item = DeckItem.parse(chosen.stored);
+    if (item is WidgetItem) {
+      if (_displayLayout.widgetPlacementBlocked(
+        index,
+        rowSpan: item.rowSpan,
+        columnSpan: item.columnSpan,
+      )) {
+        _showMessage('That overlaps another widget already on the grid.');
+        return;
+      }
+      final dropped = itemsDroppedByWidget(_displayLayout, index, item);
+      if (dropped.isNotEmpty &&
+          (!await confirmWidgetOverwrite(context, dropped) || !mounted)) {
+        return;
+      }
+      await _apply(_toCanonical(_displayLayout.withWidget(index, item)));
+      return;
+    }
     await _apply(_toCanonical(_displayLayout.withSlot(index, chosen.stored)));
   }
 
@@ -1051,6 +1153,22 @@ class _Cell extends StatelessWidget {
           children: [
             if (!filled)
               Center(child: Icon(Icons.add, color: theme.colorScheme.outline))
+            else if (item case final WidgetItem widgetItem)
+              // Renders itself — a real, ticking preview at this cell's own
+              // (possibly multi-cell) size, rather than an icon and a
+              // label like every other item below.
+              LayoutBuilder(
+                builder: (context, constraints) => switch (widgetItem.kind) {
+                  DeckWidgetKind.clock => AnalogClock(
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                  ),
+                  DeckWidgetKind.calendar => MonthCalendar(
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                  ),
+                },
+              )
             else
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -1198,6 +1316,8 @@ class _PickerDialog extends StatefulWidget {
     required this.apps,
     required this.shortcuts,
     required this.current,
+    this.maxRowSpan,
+    this.maxColumnSpan,
     this.allowCombo = true,
   });
 
@@ -1209,6 +1329,14 @@ class _PickerDialog extends StatefulWidget {
   /// combo — hides "Button combo...", since a combo cannot contain another
   /// combo (see [ComboStep.fromJson]).
   final bool allowCombo;
+
+  /// The largest row/column span a widget placed here could have — see
+  /// [maxWidgetSpanAt]. Null hides the "Widgets" section entirely, for the
+  /// same reason [allowCombo] hides "Button combo...": a combo step picks
+  /// an action to *run*, and a Clock/Calendar widget isn't one — there is
+  /// no grid cell of its own here for it to span in the first place.
+  final int? maxRowSpan;
+  final int? maxColumnSpan;
 
   @override
   State<_PickerDialog> createState() => _PickerDialogState();
@@ -1245,6 +1373,12 @@ class _PickerDialogState extends State<_PickerDialog> {
   /// but re-parsing a short string is cheaper than a field to keep in sync.
   DeckItem? get _existing =>
       widget.current == null ? null : DeckItem.parse(widget.current!);
+
+  /// Which widget kind, if any, already sits here — used only to highlight
+  /// the matching "Widgets" entry below, the same way every other section
+  /// marks its own current choice as `selected`.
+  DeckWidgetKind? get _existingWidgetKind =>
+      switch (_existing) { final WidgetItem item => item.kind, _ => null };
 
   String? get _currentSummary => currentButtonSummary(widget.current);
 
@@ -1289,6 +1423,23 @@ class _PickerDialogState extends State<_PickerDialog> {
         existing: existing is ComboItem ? existing : null,
         emoji: _emoji,
         customIconId: _customIconId,
+      ),
+    );
+    if (item == null || !mounted) return;
+    _choose(item);
+  }
+
+  Future<void> _composeWidget(DeckWidgetKind kind) async {
+    final existing = _existing;
+    final item = await showDialog<WidgetItem>(
+      context: context,
+      builder: (context) => _WidgetDialog(
+        kind: kind,
+        existing: existing is WidgetItem && existing.kind == kind
+            ? existing
+            : null,
+        maxRowSpan: widget.maxRowSpan!,
+        maxColumnSpan: widget.maxColumnSpan!,
       ),
     );
     if (item == null || !mounted) return;
@@ -1378,6 +1529,25 @@ class _PickerDialogState extends State<_PickerDialog> {
                         subtitle: const Text('Runs other buttons in sequence'),
                         onTap: _composeCombo,
                       ),
+                    if (widget.maxRowSpan != null &&
+                        widget.maxColumnSpan != null) ...[
+                      const _SectionLabel('Widgets'),
+                      ListTile(
+                        leading: const Icon(Icons.access_time),
+                        title: const Text('Clock...'),
+                        subtitle: const Text('Live analog clock'),
+                        selected: _existingWidgetKind == DeckWidgetKind.clock,
+                        onTap: () => _composeWidget(DeckWidgetKind.clock),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.calendar_month),
+                        title: const Text('Calendar...'),
+                        subtitle: const Text('Current month'),
+                        selected:
+                            _existingWidgetKind == DeckWidgetKind.calendar,
+                        onTap: () => _composeWidget(DeckWidgetKind.calendar),
+                      ),
+                    ],
                     const _SectionLabel('Media controls'),
                     for (final action in DeckAction.values)
                       ListTile(
@@ -1894,6 +2064,82 @@ class _ShellDialogState extends State<_ShellDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(onPressed: _save, child: const Text('Add')),
+      ],
+    );
+  }
+}
+
+/// Composes a Clock or Calendar widget: how many rows and columns of the
+/// grid it should occupy, anchored at whichever cell was tapped to open
+/// this — see [DeckLayout.footprintFor]. [maxRowSpan]/[maxColumnSpan] are
+/// already bounded to what actually fits there (from
+/// [LayoutPageState._pick] via [maxWidgetSpanAt]), so every combination the
+/// steppers below can reach is guaranteed to fit without ever needing
+/// [DeckLayout.footprintFor]'s own clamping.
+class _WidgetDialog extends StatefulWidget {
+  const _WidgetDialog({
+    required this.kind,
+    required this.existing,
+    required this.maxRowSpan,
+    required this.maxColumnSpan,
+  });
+
+  final DeckWidgetKind kind;
+
+  /// Prefills the steppers when reconfiguring a widget already here, rather
+  /// than always starting from a fixed default size.
+  final WidgetItem? existing;
+
+  final int maxRowSpan;
+  final int maxColumnSpan;
+
+  @override
+  State<_WidgetDialog> createState() => _WidgetDialogState();
+}
+
+class _WidgetDialogState extends State<_WidgetDialog> {
+  late int _rows = (widget.existing?.rowSpan ?? 2).clamp(1, widget.maxRowSpan);
+  late int _columns = (widget.existing?.columnSpan ?? 2).clamp(
+    1,
+    widget.maxColumnSpan,
+  );
+
+  void _save() {
+    Navigator.of(
+      context,
+    ).pop(WidgetItem(kind: widget.kind, rowSpan: _rows, columnSpan: _columns));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.kind.label),
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _NumberStepper(
+              label: 'Rows',
+              value: _rows,
+              max: widget.maxRowSpan,
+              onChanged: (value) => setState(() => _rows = value),
+            ),
+            _NumberStepper(
+              label: 'Columns',
+              value: _columns,
+              max: widget.maxColumnSpan,
+              onChanged: (value) => setState(() => _columns = value),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }
