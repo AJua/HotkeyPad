@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:win32_registry/win32_registry.dart';
+
+import 'steam_registry_native.dart'
+    if (dart.library.js_interop) 'steam_registry_stub.dart';
 
 /// Installed Steam games, found the same way the Steam client itself does —
 /// its own on-disk manifests — rather than a network call.
@@ -18,22 +20,7 @@ abstract final class SteamLibrary {
 
   static String? get _installPath {
     if (!Platform.isWindows) return null;
-    try {
-      final key = Registry.openPath(
-        RegistryHive.currentUser,
-        path: r'Software\Valve\Steam',
-      );
-      try {
-        final path = key.getValueAsString('SteamPath');
-        if (path == null || path.isEmpty) return null;
-        return path.replaceAll('/', r'\');
-      } finally {
-        key.close();
-      }
-    } catch (_) {
-      // Not installed, or the key has moved — either way, no games.
-      return null;
-    }
+    return steamInstallPathFromRegistry();
   }
 
   /// Every library folder Steam knows about — the default install plus any

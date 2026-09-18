@@ -478,7 +478,20 @@ class _HostPageState extends State<HostPage> {
         await _handleCommand(_bleSource(event.central), event.request.value);
       }, 'write requests');
     } catch (error) {
-      _initError = error;
+      // On web there is no `bluetooth_low_energy` platform implementation
+      // at all — PeripheralManager() itself throws — but nothing else on
+      // this page actually needs one: WiFi is a real, independent
+      // transport, and every BLE-touching call below already checks
+      // `_peripheral` for null first (see _startService's own comment).
+      // Gating the whole page behind UnsupportedPage here would hide the
+      // deck editor and settings from a browser entirely for no reason;
+      // reserve that page for a real, unexpected failure on a platform
+      // that is supposed to have Bluetooth.
+      if (kIsWeb) {
+        _peripheral = null;
+      } else {
+        _initError = error;
+      }
     }
   }
 
