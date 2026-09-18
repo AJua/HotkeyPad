@@ -1105,7 +1105,7 @@ class _DeckPageState extends State<DeckPage> {
   Widget _deck(HotkeyPadSession session, DeckLayout layout) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const spacing = 6.0;
+        const spacing = 2.0;
         const margin = 12.0;
         // Taller than wide when there are labels, since the text needs a
         // band of its own. Without labels there is nothing to leave room
