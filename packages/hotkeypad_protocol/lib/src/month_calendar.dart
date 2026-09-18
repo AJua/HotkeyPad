@@ -77,9 +77,14 @@ class _MonthCalendarState extends State<MonthCalendar> {
         : Colors.black.withValues(alpha: 0.85);
 
     const margin = 12.0;
-    final cardWidth = math.max(widget.width - margin * 2, 0.0);
-    final cardHeight = math.max(widget.height - margin * 2, 0.0);
-    // The margin is a Padding around the card rather than Container's own
+    final outerWidth = math.max(widget.width - margin * 2, 0.0);
+    final outerHeight = math.max(widget.height - margin * 2, 0.0);
+    // See AnalogClock's own doc comment on _blockScale for why this exists
+    // and why it doesn't change how much of the grid this widget reserves.
+    const blockScale = 0.9;
+    final cardWidth = outerWidth * blockScale;
+    final cardHeight = outerHeight * blockScale;
+    // The margin is a Padding around the block rather than Container's own
     // `margin` property — see AnalogClock's own doc comment for why.
     return Padding(
       padding: const EdgeInsets.all(margin),
@@ -87,80 +92,88 @@ class _MonthCalendarState extends State<MonthCalendar> {
       // background, the same as every other button — dark/light still
       // decides the text's own colors above, just not a backing fill.
       child: SizedBox(
-        width: cardWidth,
-        height: cardHeight,
-        child: Column(
-          // A card this size is usually taller than the header + weekday
-          // row + day grid need, so the extra room is centered rather than
-          // left pinned to the top.
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              DateFormat.yMMMM(locale).format(today),
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
+        width: outerWidth,
+        height: outerHeight,
+        child: Center(
+          child: SizedBox(
+            width: cardWidth,
+            height: cardHeight,
+            child: Column(
+              // A card this size is usually taller than the header + weekday
+              // row + day grid need, so the extra room is centered rather than
+              // left pinned to the top.
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final label in weekdayLabels)
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          color: secondaryTextColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                Text(
+                  DateFormat.yMMMM(locale).format(today),
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    for (final label in weekdayLabels)
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              color: secondaryTextColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 7,
                   ),
+                  itemCount: leadingBlanks + daysInMonth,
+                  itemBuilder: (context, index) {
+                    if (index < leadingBlanks) return const SizedBox.shrink();
+                    final day = index - leadingBlanks + 1;
+                    final isToday = day == today.day;
+                    return Center(
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: isToday
+                            ? BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary,
+                                shape: BoxShape.circle,
+                              )
+                            : null,
+                        child: Text(
+                          '$day',
+                          style: TextStyle(
+                            color: isToday
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : dayTextColor,
+                            fontSize: 12,
+                            fontWeight: isToday
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
-            const SizedBox(height: 4),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7,
-              ),
-              itemCount: leadingBlanks + daysInMonth,
-              itemBuilder: (context, index) {
-                if (index < leadingBlanks) return const SizedBox.shrink();
-                final day = index - leadingBlanks + 1;
-                final isToday = day == today.day;
-                return Center(
-                  child: Container(
-                    width: 22,
-                    height: 22,
-                    alignment: Alignment.center,
-                    decoration: isToday
-                        ? BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            shape: BoxShape.circle,
-                          )
-                        : null,
-                    child: Text(
-                      '$day',
-                      style: TextStyle(
-                        color: isToday
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : dayTextColor,
-                        fontSize: 12,
-                        fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -55,17 +55,24 @@ class _AnalogClockState extends State<AnalogClock> {
     super.dispose();
   }
 
+  /// The rendered block's own size relative to what [margin] leaves —
+  /// shrinks the visible face without reserving any more of the grid than
+  /// before, the leftover simply becoming extra breathing room around it.
+  static const _blockScale = 0.9;
+
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     const margin = 12.0;
-    final cardWidth = math.max(widget.width - margin * 2, 0.0);
-    final cardHeight = math.max(widget.height - margin * 2, 0.0);
-    // The margin is a Padding around the card rather than Container's own
+    final outerWidth = math.max(widget.width - margin * 2, 0.0);
+    final outerHeight = math.max(widget.height - margin * 2, 0.0);
+    final faceWidth = outerWidth * _blockScale;
+    final faceHeight = outerHeight * _blockScale;
+    // The margin is a Padding around the block rather than Container's own
     // `margin` property: Container merges an explicit width/height into a
     // *tight* constraint that would then override — not compose with — a
-    // margin's own deflate, so the card wouldn't actually shrink. Sizing
-    // the card itself to widget.width/height minus the margin, and only
+    // margin's own deflate, so the block wouldn't actually shrink. Sizing
+    // the block itself to widget.width/height minus the margin, and only
     // then wrapping it in that much Padding, keeps this explicit rather
     // than depending on whatever constraint happens to reach here.
     return Padding(
@@ -74,14 +81,24 @@ class _AnalogClockState extends State<AnalogClock> {
       // background, the same as every other button — dark/light still
       // decides the face's own colors below, just not a backing fill.
       child: SizedBox(
-        width: cardWidth,
-        height: cardHeight,
-        // A childless CustomPaint sizes itself to this explicitly — without
-        // it, an ambient loose constraint would leave it nothing to measure
-        // against and it would collapse to zero size, painting nothing.
-        child: CustomPaint(
-          size: Size(cardWidth, cardHeight),
-          painter: _ClockPainter(_now, dark: dark),
+        width: outerWidth,
+        height: outerHeight,
+        // Center, not the outer SizedBox, is what actually shrinks the
+        // face by _blockScale — the outer SizedBox still claims the full
+        // outerWidth x outerHeight so nothing else in the grid reflows.
+        child: Center(
+          child: SizedBox(
+            width: faceWidth,
+            height: faceHeight,
+            // A childless CustomPaint sizes itself to this explicitly —
+            // without it, Center's own loose constraint would leave it
+            // nothing to measure against and it would collapse to zero
+            // size, painting nothing.
+            child: CustomPaint(
+              size: Size(faceWidth, faceHeight),
+              painter: _ClockPainter(_now, dark: dark),
+            ),
+          ),
         ),
       ),
     );

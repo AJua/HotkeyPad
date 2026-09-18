@@ -60,11 +60,11 @@ class _HotkeyPadClientAppState extends State<HotkeyPadClientApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
+        colorSchemeSeed: Colors.teal,
         brightness: Brightness.light,
       ),
       darkTheme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
+        colorSchemeSeed: Colors.teal,
         brightness: Brightness.dark,
       ),
       home: DeckPage(
