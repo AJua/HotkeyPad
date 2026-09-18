@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Which edge the app bar sits on.
 enum BarSide { top, left, right }
@@ -33,6 +34,29 @@ BarSide barSideFor(BuildContext context) {
   return topIsOnLeft ? BarSide.left : BarSide.right;
 }
 
+/// Set once per actual change rather than on every build (every screen using
+/// [EdgeBarScaffold] rebuilds far more often than the device is rotated —
+/// an icon sync alone is enough) — this is the app's only landscape side,
+/// so a module-level "last value" is enough to guard it without a State.
+BarSide? _lastSystemUiSide;
+
+/// Hides the top status bar in landscape, where it sits in the same strip
+/// as the side app bar and adds nothing a portrait status bar does — the
+/// bottom navigation bar (Android's, or nothing on iOS) is left alone.
+void _applySystemUiFor(BarSide side) {
+  if (_lastSystemUiSide == side) return;
+  _lastSystemUiSide = side;
+  final portrait = side == BarSide.top;
+  if (portrait) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  } else {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.bottom],
+    );
+  }
+}
+
 /// An app bar that can live on any of three edges, so it stays on the same
 /// physical edge of the phone as it is rotated.
 class EdgeBarScaffold extends StatelessWidget {
@@ -63,6 +87,8 @@ class EdgeBarScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    _applySystemUiFor(side);
+
     // The bar consumed the inset on its edge, so the content must not
     // count it again — otherwise the deck gains a second gutter there.
     final content = Expanded(
