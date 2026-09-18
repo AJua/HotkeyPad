@@ -96,7 +96,11 @@ class _AnalogClockState extends State<AnalogClock> {
             // size, painting nothing.
             child: CustomPaint(
               size: Size(faceWidth, faceHeight),
-              painter: _ClockPainter(_now, dark: dark),
+              painter: _ClockPainter(
+                _now,
+                dark: dark,
+                accent: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         ),
@@ -105,11 +109,17 @@ class _AnalogClockState extends State<AnalogClock> {
   }
 }
 
+/// Deliberately not a copy of iOS StandBy's own clock face: needle-shaped
+/// (tapered, not blunt-rectangular) hands read their exact angle more
+/// precisely at a glance, the 12/3/6/9 cardinal points are emphasized so
+/// orientation doesn't require reading every number, and the accent comes
+/// from the app's own theme rather than a fixed brand color.
 class _ClockPainter extends CustomPainter {
-  _ClockPainter(this.time, {required this.dark});
+  _ClockPainter(this.time, {required this.dark, required this.accent});
 
   final DateTime time;
   final bool dark;
+  final Color accent;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -118,30 +128,61 @@ class _ClockPainter extends CustomPainter {
 
     final faceColor = dark ? Colors.white : Colors.black87;
     final tickPaint = Paint()..color = faceColor.withValues(alpha: 0.9);
-    final numberStyle = TextStyle(
-      color: faceColor,
-      fontSize: radius * 0.18,
-      fontWeight: FontWeight.w600,
+
+    // A thin ring tracking progress through the current hour — a glance
+    // reads "how far into the hour" without doing the minute-hand math,
+    // and it's the one element with no equivalent on the face this is
+    // otherwise styled after.
+    final progress = (time.minute + time.second / 60) / 60;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius * 0.985),
+      -math.pi / 2,
+      progress * 2 * math.pi,
+      false,
+      Paint()
+        ..color = accent.withValues(alpha: 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = radius * 0.02
+        ..strokeCap = StrokeCap.round,
     );
 
     for (var i = 0; i < 60; i++) {
       final angle = i * math.pi / 30;
       final isHour = i % 5 == 0;
-      final outer = radius * 0.96;
-      final inner = isHour ? radius * 0.84 : radius * 0.91;
+      // The 12/3/6/9 points get their own longer, bolder mark so the four
+      // main compass directions stand out before reading any number.
+      final isCardinal = i % 15 == 0;
+      final outer = radius * 0.94;
+      final inner = isCardinal
+          ? radius * 0.78
+          : isHour
+          ? radius * 0.84
+          : radius * 0.91;
       final p1 = center + Offset(math.sin(angle), -math.cos(angle)) * outer;
       final p2 = center + Offset(math.sin(angle), -math.cos(angle)) * inner;
-      tickPaint.strokeWidth = isHour ? 2.4 : 1.2;
+      tickPaint.strokeWidth = isCardinal
+          ? 3.2
+          : isHour
+          ? 2.4
+          : 1.2;
       canvas.drawLine(p1, p2, tickPaint);
     }
 
     for (var hour = 1; hour <= 12; hour++) {
       final angle = hour * math.pi / 6;
-      final labelRadius = radius * 0.72;
+      final isCardinal = hour % 3 == 0;
+      final labelRadius = radius * 0.68;
       final offset =
           center + Offset(math.sin(angle), -math.cos(angle)) * labelRadius;
       final painter = TextPainter(
-        text: TextSpan(text: '$hour', style: numberStyle),
+        text: TextSpan(
+          text: '$hour',
+          style: TextStyle(
+            color: faceColor,
+            fontSize: isCardinal ? radius * 0.21 : radius * 0.17,
+            fontWeight: isCardinal ? FontWeight.w800 : FontWeight.w600,
+          ),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
       painter.paint(
@@ -154,47 +195,75 @@ class _ClockPainter extends CustomPainter {
     final minuteAngle = (time.minute + time.second / 60) * math.pi / 30;
     final secondAngle = time.second * math.pi / 30;
 
-    _drawHand(
+    // Tapered needles rather than uniform-width bars: the point at the tip
+    // is what makes reading the exact angle unambiguous.
+    _drawTaperedHand(
       canvas,
       center,
       hourAngle,
-      radius * 0.5,
-      faceColor,
-      radius * 0.045,
+      length: radius * 0.5,
+      baseWidth: radius * 0.09,
+      tipWidth: radius * 0.02,
+      color: faceColor,
     );
-    _drawHand(
+    _drawTaperedHand(
       canvas,
       center,
       minuteAngle,
-      radius * 0.72,
-      faceColor,
-      radius * 0.032,
+      length: radius * 0.74,
+      baseWidth: radius * 0.065,
+      tipWidth: radius * 0.014,
+      color: faceColor,
     );
-    _drawHand(
+    _drawHairlineHand(
       canvas,
       center,
       secondAngle,
-      radius * 0.78,
-      const Color(0xFFFF9F0A),
-      radius * 0.014,
+      length: radius * 0.78,
+      color: accent,
+      width: radius * 0.014,
     );
 
-    canvas.drawCircle(center, radius * 0.045, Paint()..color = faceColor);
-    canvas.drawCircle(
-      center,
-      radius * 0.02,
-      Paint()..color = const Color(0xFFFF9F0A),
-    );
+    canvas.drawCircle(center, radius * 0.05, Paint()..color = faceColor);
+    canvas.drawCircle(center, radius * 0.022, Paint()..color = accent);
   }
 
-  void _drawHand(
+  /// A hand shaped like a needle — wide at the pivot, narrowing to a point
+  /// at the tip — rather than iOS StandBy's own uniform-width bar.
+  void _drawTaperedHand(
     Canvas canvas,
     Offset center,
-    double angle,
-    double length,
-    Color color,
-    double width,
-  ) {
+    double angle, {
+    required double length,
+    required double baseWidth,
+    required double tipWidth,
+    required Color color,
+  }) {
+    final dir = Offset(math.sin(angle), -math.cos(angle));
+    final perp = Offset(-dir.dy, dir.dx);
+    final tip = center + dir * length;
+    final baseHalf = baseWidth / 2;
+    final tipHalf = tipWidth / 2;
+    final path = Path()
+      ..moveTo(center.dx + perp.dx * baseHalf, center.dy + perp.dy * baseHalf)
+      ..lineTo(tip.dx + perp.dx * tipHalf, tip.dy + perp.dy * tipHalf)
+      ..lineTo(tip.dx - perp.dx * tipHalf, tip.dy - perp.dy * tipHalf)
+      ..lineTo(center.dx - perp.dx * baseHalf, center.dy - perp.dy * baseHalf)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  /// The second hand: thin enough that a needle shape would add nothing,
+  /// so it stays a plain hairline — same treatment as before, just in the
+  /// theme's own accent rather than a fixed color.
+  void _drawHairlineHand(
+    Canvas canvas,
+    Offset center,
+    double angle, {
+    required double length,
+    required Color color,
+    required double width,
+  }) {
     final end = center + Offset(math.sin(angle), -math.cos(angle)) * length;
     canvas.drawLine(
       center,
@@ -208,5 +277,7 @@ class _ClockPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ClockPainter oldDelegate) =>
-      oldDelegate.time.second != time.second || oldDelegate.dark != dark;
+      oldDelegate.time.second != time.second ||
+      oldDelegate.dark != dark ||
+      oldDelegate.accent != accent;
 }
