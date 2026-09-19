@@ -47,14 +47,16 @@ abstract final class HotkeyPad {
   /// stored icons rather than leaving stale ones at the old resolution.
   static const iconSize = 128;
 
-  /// Cosmic Orange — both apps' `ThemeData.colorSchemeSeed`, and the one
-  /// color a host-rendered glyph icon (see `GlyphIconStore`) needs baked
-  /// in for its border: the host has no notion of which client theme
-  /// (light or dark) will display a given PNG, but this raw seed is the
-  /// same regardless, unlike the derived `colorScheme.primary` either
-  /// theme would produce. Single source of truth so both apps' `main.dart`
-  /// and the glyph renderer can never drift apart on the same brand color.
-  static const themeSeedColor = Color(0xFFF77E2D);
+  /// The ice-blue from the app icon's own bolt (`#38BDF8`) — both apps'
+  /// `ThemeData.colorSchemeSeed`, so the generated app bar/surface colors
+  /// actually match the icon sitting next to them, and the one color an
+  /// emoji's host-rendered PNG (see `GlyphIconStore`) needs baked in for
+  /// its border: the host has no notion of which client theme (light or
+  /// dark) will display a given PNG, but this raw seed is the same
+  /// regardless, unlike the derived `colorScheme.primary` either theme
+  /// would produce. Single source of truth so both apps' `main.dart` and
+  /// the glyph renderer can never drift apart on the same brand color.
+  static const themeSeedColor = Color(0xFF38BDF8);
 }
 
 /// One message on the link.
