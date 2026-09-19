@@ -15,10 +15,8 @@ import 'layout_store.dart';
 import 'settings_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
-/// Where the Settings dialog's "Report an issue" entry sends the user —
-/// straight to composing a new issue rather than just the repository root,
-/// since that's the actual next step anyone tapping it wants.
-const _githubIssuesUrl = 'https://github.com/AJua/HotkeyPad/issues/new';
+/// Where the Settings dialog's "Report an issue" entry sends the user.
+const _githubIssuesUrl = 'https://github.com/AJua/HotkeyPad/issues';
 
 /// The buttons a resize to this shape would leave outside the grid.
 ///
