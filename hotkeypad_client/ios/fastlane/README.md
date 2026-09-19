@@ -56,14 +56,13 @@ Store Connect web UI.
 - `fastlane/Appfile` — Apple ID / Team ID placeholders (step 2 above).
 - `fastlane/api_key.json` — not checked in at all; create it yourself
   (step 3).
-- `fastlane/metadata/*/privacy_url.txt` — Apple requires a real, hosted
-  privacy policy URL before a version can be submitted. HotkeyPad talks
-  directly device-to-device and collects nothing, so a one-page static
-  policy saying exactly that is enough — GitHub Pages is a free way to
-  host one.
-- `fastlane/metadata/*/support_url.txt` / `marketing_url.txt` — currently
-  point at the GitHub repo as a placeholder; swap in a real support
-  contact if you have one.
+- `fastlane/metadata/*/privacy_url.txt` — done: points at
+  https://ajua.github.io/HotkeyPad/privacy-policy.html, the hosted
+  policy already published from `docs/privacy-policy.html`.
+- `fastlane/metadata/*/support_url.txt` / `marketing_url.txt` — done:
+  support points at the GitHub Issues tracker, marketing at the
+  GitHub Pages site (https://ajua.github.io/HotkeyPad/). Swap in a
+  dedicated support contact later if one exists.
 - App Store Connect's **Age Rating questionnaire** — has to be answered
   once in the web UI (App Information → Age Rating) before any version
   can be submitted; fastlane has no action for first-time completion of

@@ -1,1 +1,1 @@
-TODO: a real, hosted privacy policy URL — required by Apple before submission. See fastlane/README.md.
+https://ajua.github.io/HotkeyPad/privacy-policy.html

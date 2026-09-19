@@ -1,1 +1,1 @@
-TODO: https://github.com/AJua/HotkeyPad
+https://github.com/AJua/HotkeyPad/issues
