@@ -8,10 +8,6 @@ import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'src/locale_store.dart';
 import 'src/settings_store.dart';
 
-/// iPhone 17 Pro's "Cosmic Orange" — see the client's own main.dart for why
-/// this exact value rather than [Colors.orange].
-const _kSeedColor = Color(0xFFF77E2D);
-
 void main() {
   runApp(const HotkeyPadHostApp());
 }
@@ -65,11 +61,11 @@ class _HotkeyPadHostAppState extends State<HotkeyPadHostApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
-        colorSchemeSeed: _kSeedColor,
+        colorSchemeSeed: HotkeyPad.themeSeedColor,
         brightness: Brightness.light,
       ),
       darkTheme: ThemeData(
-        colorSchemeSeed: _kSeedColor,
+        colorSchemeSeed: HotkeyPad.themeSeedColor,
         brightness: Brightness.dark,
       ),
       home: HostPage(

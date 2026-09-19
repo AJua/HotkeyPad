@@ -60,13 +60,30 @@ abstract final class GlyphIconStore {
     );
   }
 
-  /// A fixed dark colour rather than something theme-aware: a deck
-  /// button's tint background is picked client-side, per label, so
-  /// there is no host-side notion of "the current theme" to render
-  /// against — see the client's own `_DeckButton`, which now treats
-  /// every icon as a plain PNG and no longer special-cases one for
-  /// theming.
-  static const _glyphColor = Color(0xFF1A1A1A);
+  /// The app's own brand color rather than something theme-aware: a deck
+  /// button's tint background is picked client-side, per label, so there
+  /// is no host-side notion of "the current theme" to render against —
+  /// see the client's own `_DeckButton`, which now treats every icon as
+  /// a plain PNG and no longer special-cases one for theming. A fixed
+  /// dark grey used to fill this glyph, but a glyph icon has no tinted
+  /// background behind it any more (unlike the old client-drawn one),
+  /// so in dark mode that read as almost invisible against the deck's
+  /// own dark background — [HotkeyPad.themeSeedColor] is saturated
+  /// enough to stay visible against either theme's background.
+  static const _glyphColor = HotkeyPad.themeSeedColor;
+
+  /// Border width and corner rounding as a fraction of [_renderGlyph]'s
+  /// own `size`, matching [CustomIconStore]'s `cornerRadius` convention
+  /// (`size * 0.18`) so a glyph icon reads as the same rounded-square
+  /// shape as every other icon on a deck — this is the one shape with no
+  /// bitmap of its own to imply that shape, so it is drawn explicitly.
+  static const _borderWidthFraction = 0.0297; // 66% of the original 0.045
+  static const _cornerRadiusFraction = 0.18;
+
+  /// A fixed pixel margin, not a fraction of `size` like the two above:
+  /// baked into the PNG itself so the border never sits flush against
+  /// the edge of whatever box eventually displays it.
+  static const _marginPx = 3.0;
 
   static Future<Uint8List> _renderGlyph({
     required String text,
@@ -91,6 +108,20 @@ abstract final class GlyphIconStore {
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
+
+    final borderWidth = size * _borderWidthFraction;
+    final inset = _marginPx + borderWidth / 2;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(inset, inset, size - inset * 2, size - inset * 2),
+        Radius.circular(size * _cornerRadiusFraction),
+      ),
+      Paint()
+        ..color = _glyphColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = borderWidth,
+    );
+
     painter.paint(
       canvas,
       Offset((size - painter.width) / 2, (size - painter.height) / 2),

@@ -46,6 +46,15 @@ abstract final class HotkeyPad {
   /// The client's cache keys include this number, so changing it invalidates
   /// stored icons rather than leaving stale ones at the old resolution.
   static const iconSize = 128;
+
+  /// Cosmic Orange — both apps' `ThemeData.colorSchemeSeed`, and the one
+  /// color a host-rendered glyph icon (see `GlyphIconStore`) needs baked
+  /// in for its border: the host has no notion of which client theme
+  /// (light or dark) will display a given PNG, but this raw seed is the
+  /// same regardless, unlike the derived `colorScheme.primary` either
+  /// theme would produce. Single source of truth so both apps' `main.dart`
+  /// and the glyph renderer can never drift apart on the same brand color.
+  static const themeSeedColor = Color(0xFFF77E2D);
 }
 
 /// One message on the link.
@@ -956,7 +965,11 @@ class DeckLayout {
     if (item is! WidgetItem) {
       return DeckWidgetFootprint(rows: 1, columns: 1, indexes: [index]);
     }
-    return footprintFor(index, rowSpan: item.rowSpan, columnSpan: item.columnSpan);
+    return footprintFor(
+      index,
+      rowSpan: item.rowSpan,
+      columnSpan: item.columnSpan,
+    );
   }
 
   /// Every cell forced empty because some other cell on its page anchors a
@@ -989,7 +1002,11 @@ class DeckLayout {
   }) {
     final ownFootprint = footprintAt(index).indexes.toSet();
     final blockedByOthers = widgetCoveredIndexes.difference(ownFootprint);
-    final candidate = footprintFor(index, rowSpan: rowSpan, columnSpan: columnSpan);
+    final candidate = footprintFor(
+      index,
+      rowSpan: rowSpan,
+      columnSpan: columnSpan,
+    );
     return candidate.indexes.any(
       (i) => i != index && blockedByOthers.contains(i),
     );
@@ -1187,7 +1204,9 @@ class DeckGridView extends StatelessWidget {
               cellIndex < layout.pageCapacity;
               cellIndex++
             )
-              if (!covered.contains(layout.indexOf(page: page, cell: cellIndex)))
+              if (!covered.contains(
+                layout.indexOf(page: page, cell: cellIndex),
+              ))
                 _positionedCell(context, cellIndex),
           ],
         ),
