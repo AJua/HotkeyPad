@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -8,26 +9,42 @@ import 'src/deck_page.dart';
 import 'src/locale_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
+/// Native bypass for Android 15+, where `SystemChrome`'s own call below
+/// stops actually hiding anything on its own — see `MainActivity.kt`'s
+/// `hideSystemBars`/`showSystemBars` for why. A no-op on every other
+/// platform (`invokeMethod` throws `MissingPluginException` there, since
+/// nothing registers this channel), which is why every call is guarded to
+/// Android only rather than left to fail silently.
+const _systemBarsChannel = MethodChannel('hotkeypad/systembars');
+
 /// Hides the status bar and (on Android) the navigation bar, and lets the
-/// deck draw edge-to-edge underneath both — a deck button in the corner
-/// is worth more than the sliver of screen a system bar would otherwise
-/// keep for itself. `immersiveSticky` over plain `immersive`: swiping
-/// from an edge still reveals the bars temporarily (so the system
-/// gestures/notifications a user actually needs stay reachable), but the
-/// swipe itself does not also land on whatever button was underneath it.
-/// Independent of orientation — Android does not need this reapplied
-/// when the device is turned.
+/// deck draw edge-to-edge underneath both — a deck button in the corner is
+/// worth more than the sliver of screen a system bar would otherwise keep
+/// for itself. `immersiveSticky` over plain `immersive`: swiping from an
+/// edge still reveals the bars temporarily (so the system gestures/
+/// notifications a user actually needs stay reachable), but the swipe
+/// itself does not also land on whatever button was underneath it.
 ///
-/// On Android 15+ this call alone no longer actually hides anything —
-/// mandatory edge-to-edge enforcement overrides the legacy system-UI-flags
-/// API it is built on (see the Flutter team's own breaking-change note:
-/// https://docs.flutter.dev/release/breaking-changes/default-systemuimode-edge-to-edge).
-/// `MainActivity.kt`'s `hideSystemBars` drives the modern
-/// `WindowInsetsControllerCompat` API natively instead for that case; this
-/// call stays for iOS (which that native code cannot reach) and for
-/// pre-15 Android, where it still works fine on its own.
-void _hideSystemBars() {
+/// Matches YouTube's own landscape-fullscreen convention (see
+/// `EdgeBarScaffold`, which hides its own app bar the same way): landscape
+/// hides every bar, portrait — [showSystemBars] — brings them all back.
+void hideSystemBars() {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    unawaited(_systemBarsChannel.invokeMethod('setHidden', true));
+  }
+}
+
+/// The portrait counterpart to [hideSystemBars] — restores the normal
+/// edge-to-edge mode (bars shown, content still allowed to draw behind
+/// them) rather than plain `manual` with no overlays, so this still
+/// matches what the app already looked like before any of this landscape
+/// handling existed.
+void showSystemBars() {
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    unawaited(_systemBarsChannel.invokeMethod('setHidden', false));
+  }
 }
 
 void main() {
@@ -62,7 +79,7 @@ class _HotkeyPadClientAppState extends State<HotkeyPadClientApp>
     // the platform channel this rides on can still silently drop the
     // call. Here, once the binding backing this widget is actually live,
     // is the first point it reliably takes effect.
-    _hideSystemBars();
+    _applySystemBarsForCurrentOrientation();
     unawaited(_loadLocale());
   }
 
@@ -72,13 +89,35 @@ class _HotkeyPadClientAppState extends State<HotkeyPadClientApp>
     super.dispose();
   }
 
+  // The standard place Flutter itself recommends reacting to a rotation
+  // from — fires as soon as the new physical size is known, well before
+  // any particular screen's own build gets a chance to react to it.
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    _applySystemBarsForCurrentOrientation();
+  }
+
   // Returning to the foreground — from the recents screen, or after the
-  // user's own swipe-to-reveal in _hideSystemBars's sticky mode expired
-  // on its own — leaves Android showing the system bars again rather
-  // than restoring them to hidden by itself.
+  // user's own swipe-to-reveal in immersiveSticky's landscape mode expired
+  // on its own — leaves Android showing the system bars again rather than
+  // restoring them by itself, in whichever state the current orientation
+  // calls for.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _hideSystemBars();
+    if (state == AppLifecycleState.resumed) {
+      _applySystemBarsForCurrentOrientation();
+    }
+  }
+
+  void _applySystemBarsForCurrentOrientation() {
+    final size =
+        WidgetsBinding.instance.platformDispatcher.views.first.physicalSize;
+    if (size.height >= size.width) {
+      showSystemBars();
+    } else {
+      hideSystemBars();
+    }
   }
 
   Future<void> _loadLocale() async {

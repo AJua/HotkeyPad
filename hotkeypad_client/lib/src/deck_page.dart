@@ -560,7 +560,6 @@ class _DeckPageState extends State<DeckPage> {
           overlay: overlay,
         );
         return EdgeBarScaffold(
-          side: barSideFor(context),
           title: 'HotkeyPad',
           // Which Mac this is, not what app it is — the brand name above
           // it already says that, the same as every other screen.
@@ -856,7 +855,6 @@ class _DeckPageState extends State<DeckPage> {
   /// milliseconds at most, not worth its own chrome.
   Widget _loadingScaffold(BuildContext context) {
     return EdgeBarScaffold(
-      side: barSideFor(context),
       title: 'HotkeyPad',
       leading: _appIcon(),
       actions: const [],
@@ -871,7 +869,6 @@ class _DeckPageState extends State<DeckPage> {
   Widget _methodChoiceScaffold(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return EdgeBarScaffold(
-      side: barSideFor(context),
       title: 'HotkeyPad',
       leading: _appIcon(),
       actions: [
@@ -964,7 +961,6 @@ class _DeckPageState extends State<DeckPage> {
     final l10n = AppLocalizations.of(context)!;
     final method = _method!; // only reached once a method is chosen
     return EdgeBarScaffold(
-      side: barSideFor(context),
       title: 'HotkeyPad',
       leading: _appIcon(),
       actions: [
