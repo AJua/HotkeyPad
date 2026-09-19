@@ -22,7 +22,7 @@ jobs:
     outputs:
       version: ${{ steps.read.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - id: read
         run: |
           version=$(grep '^version:' hotkeypad_host/pubspec.yaml | sed -E 's/^version: *//' | cut -d+ -f1)
@@ -32,7 +32,7 @@ jobs:
     needs: version
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
@@ -49,7 +49,7 @@ jobs:
       - name: Build & package .dmg
         run: .claude/skills/release-macos/scripts/package_macos_dmg.sh
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: macos-dmg
           path: hotkeypad_host/dist/*.dmg
@@ -63,7 +63,7 @@ jobs:
     # of a warning. windows-2022's older toolset still accepts it.
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
@@ -86,7 +86,7 @@ jobs:
           Compress-Archive -Path "build/windows/x64/runner/Release/*" `
             -DestinationPath "dist/HotkeyPad-Host-$version-windows.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: windows-zip
           path: hotkeypad_host/dist/*.zip
@@ -96,13 +96,13 @@ jobs:
     needs: [version, build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: artifacts
 
       # Same tag on every run of the same version updates that one
       # pre-release in place instead of piling up duplicates.
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: host-v${{ needs.version.outputs.version }}
           name: HotkeyPad Host v${{ needs.version.outputs.version }}
