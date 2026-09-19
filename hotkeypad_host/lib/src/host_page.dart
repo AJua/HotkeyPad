@@ -15,6 +15,7 @@ import 'background_image_store.dart';
 import 'client_trust_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
+import 'glyph_icon_store.dart';
 import 'host_identity.dart';
 import 'layout_page.dart';
 import 'layout_store.dart';
@@ -442,7 +443,10 @@ class _HostPageState extends State<HostPage> {
               option(null, l10n.systemDefaultLanguage),
               option(const Locale('en'), 'English'),
               option(
-                const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
+                const Locale.fromSubtags(
+                  languageCode: 'zh',
+                  scriptCode: 'Hant',
+                ),
                 '繁體中文',
               ),
               option(const Locale('ja'), '日本語'),
@@ -700,9 +704,8 @@ class _HostPageState extends State<HostPage> {
       // than treating it as trusted.
       if (mounted) {
         setState(
-          () => _addLog(
-            '${source.transport.label} client sent no id; rejected',
-          ),
+          () =>
+              _addLog('${source.transport.label} client sent no id; rejected'),
         );
       }
       await reject();
@@ -1141,11 +1144,13 @@ class _HostPageState extends State<HostPage> {
     }
   }
 
-  /// Renders an app's icon, reads back a user-picked custom icon, or reads
-  /// back a custom background image, and streams it as binary frames sized
-  /// to the client's own frame-size limit either way — the transfer itself
-  /// does not care which [id] names, which of the three stores it came
-  /// from, or which transport [clientId] is on.
+  /// Renders an app's icon, reads back a user-picked custom icon, reads
+  /// back a custom background image, or renders an emoji or an action's
+  /// built-in glyph (see [GlyphIconStore]) — every icon a deck button can
+  /// show is one of these four, so the client never draws one itself —
+  /// and streams it as binary frames sized to the client's own frame-size
+  /// limit either way. The transfer itself does not care which [id]
+  /// names, which store it came from, or which transport [clientId] is on.
   Future<void> _sendIcon(String clientId, String id) async {
     final client = _clients[clientId];
     if (client == null) return;
@@ -1156,7 +1161,9 @@ class _HostPageState extends State<HostPage> {
     final path = _appPaths[id];
     final png = path != null
         ? await AppLauncher.icon(path, size: HotkeyPad.iconSize)
-        : await CustomIconStore.read(id) ?? await BackgroundImageStore.read(id);
+        : await CustomIconStore.read(id) ??
+              await BackgroundImageStore.read(id) ??
+              await GlyphIconStore.render(id);
     if (png == null) {
       await _send(clientId, IconUnavailable(name: id));
       return;
@@ -1624,7 +1631,9 @@ class _HostPageState extends State<HostPage> {
           wifiError: _wifiError,
           localAddresses: _localAddresses,
         ),
-        if (_wifiServer.running && _localAddresses.isNotEmpty && _hostId != null) ...[
+        if (_wifiServer.running &&
+            _localAddresses.isNotEmpty &&
+            _hostId != null) ...[
           const SizedBox(height: 12),
           _QrPairingCard(
             payload: WifiPairingQr(

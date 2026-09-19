@@ -1,40 +1,22 @@
-import 'package:flutter/material.dart';
-
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
-/// The key to fetch a rendered icon for, or null when nothing overrides the
-/// built-in glyph — an emoji, checked separately by the caller, always wins.
+/// The key to fetch a rendered icon for, or null when there is nothing to
+/// show but a plain letter-avatar placeholder.
 ///
-/// A custom image takes priority over an app's own icon, matching how
-/// [DeckItem.emoji] already takes priority over both. Presentation, so it
-/// lives outside the protocol, same as [deckFallbackIcon].
-String? iconKeyFor(DeckItem item) =>
-    item.customIconId ?? (item is AppItem ? item.name : null);
-
-/// Glyph shown for a deck item that has neither a custom emoji, a custom
-/// image, nor an app icon of its own.
-///
-/// Presentation, so it lives outside the protocol.
-IconData deckFallbackIcon(DeckItem item) => switch (item) {
-  AppItem() => Icons.apps,
-  ShellItem() => Icons.terminal,
-  KeyComboItem() => Icons.keyboard,
-  ShortcutItem() => Icons.bolt,
-  ComboItem() => Icons.playlist_play,
-  ActionItem(:final action) => switch (action) {
-    DeckAction.playPause => Icons.play_arrow,
-    DeckAction.next => Icons.skip_next,
-    DeckAction.previous => Icons.skip_previous,
-    DeckAction.volumeUp => Icons.volume_up,
-    DeckAction.volumeDown => Icons.volume_down,
-    DeckAction.mute => Icons.volume_off,
-  },
-  // Unreachable in practice — the deck's own cellBuilder renders a
-  // WidgetItem as a live AnalogClock/MonthCalendar before ever reaching
-  // this fallback — but the switch above is exhaustive over DeckItem, so
-  // this still has to exist.
-  WidgetItem(:final kind) => switch (kind) {
-    DeckWidgetKind.clock => Icons.access_time,
-    DeckWidgetKind.calendar => Icons.calendar_month,
-  },
-};
+/// Every case here — a custom image, an emoji, an app's own icon, or an
+/// action's built-in glyph — is rendered by the host into a PNG and sent
+/// over the same [RequestIcon] transfer, so `_DeckButton` only ever has
+/// to decide between "there are icon bytes" and "there are not"; it does
+/// not draw an emoji or a `DeckAction`'s glyph itself. The `emoji:`/
+/// `action:` prefixes are this client's own invention, not part of the
+/// protocol (an id is just an opaque string to it) — see
+/// `hotkeypad_host`'s `GlyphIconStore`, the other end that parses them.
+String? iconKeyFor(DeckItem item) {
+  final emoji = item.emoji;
+  if (emoji != null) return 'emoji:$emoji';
+  final customIconId = item.customIconId;
+  if (customIconId != null) return customIconId;
+  if (item is AppItem) return item.name;
+  if (item is ActionItem) return 'action:${item.action.wire}';
+  return null;
+}

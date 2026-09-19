@@ -1222,9 +1222,7 @@ class _DeckPageState extends State<DeckPage> {
                       if (item case final WidgetItem widgetItem) {
                         return _DeckWidgetTile(item: widgetItem);
                       }
-                      final iconKey = item.emoji == null
-                          ? iconKeyFor(item)
-                          : null;
+                      final iconKey = iconKeyFor(item);
                       if (iconKey != null) {
                         unawaited(session.ensureIcon(iconKey));
                       }
@@ -1592,22 +1590,12 @@ class _DeckButton extends StatelessWidget {
                       clipBehavior: showIconBackground
                           ? Clip.antiAlias
                           : Clip.none,
-                      child: item.emoji != null
-                          // Sized explicitly rather than with a FittedBox:
-                          // an emoji's advance box is wider than its glyph,
-                          // so fitting the box leaves the glyph small and
-                          // off to one side.
-                          ? Center(
-                              child: Text(
-                                item.emoji!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: iconSize * 0.82,
-                                  height: 1,
-                                ),
-                              ),
-                            )
-                          : icon != null
+                      // Every icon — an app's, a custom image, an emoji, or
+                      // an action's built-in glyph — is rendered by the
+                      // host into a PNG (see iconKeyFor/GlyphIconStore), so
+                      // this only ever has to decide between real bytes and
+                      // a placeholder, never what kind of icon it is.
+                      child: icon != null
                           ? Image.memory(
                               icon!,
                               fit: BoxFit.contain,
@@ -1615,21 +1603,17 @@ class _DeckButton extends StatelessWidget {
                               gaplessPlayback: true,
                             )
                           : FittedBox(
-                              // An action has a meaningful glyph; an app that
-                              // has not sent its icon yet only has its initial.
-                              child: item is ActionItem
-                                  ? Icon(
-                                      deckFallbackIcon(item),
-                                      color: theme.colorScheme.onSurface,
-                                    )
-                                  : Text(
-                                      item.label.characters.first.toUpperCase(),
-                                      style: theme.textTheme.displaySmall
-                                          ?.copyWith(
-                                            color: theme.colorScheme.onSurface
-                                                .withValues(alpha: 0.55),
-                                          ),
-                                    ),
+                              // Shown only until the real icon arrives, or
+                              // permanently for an item with no icon key at
+                              // all (see iconKeyFor).
+                              child: Text(
+                                item.label.characters.first.toUpperCase(),
+                                style: theme.textTheme.displaySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.55,
+                                  ),
+                                ),
+                              ),
                             ),
                     ),
                     // The label sits directly under the icon; the cell's
