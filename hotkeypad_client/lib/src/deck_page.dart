@@ -539,8 +539,13 @@ class _DeckPageState extends State<DeckPage> {
                 onBack: _forget,
               )
             : null;
+        // backgroundImage: null here on purpose — EdgeBarScaffold's own
+        // background slot draws it full-bleed, not inset by the same
+        // padding as body/overlay (see its own doc comment for why: a
+        // custom background left a visible margin of plain colour around
+        // it in landscape otherwise).
         final deck = buildDeckStack(
-          backgroundImage: session.backgroundImage,
+          backgroundImage: null,
           backgroundOpacity: session.backgroundOpacity,
           backgroundFit: session.backgroundFit,
           body: _body(session),
@@ -549,6 +554,11 @@ class _DeckPageState extends State<DeckPage> {
         return EdgeBarScaffold(
           title: 'HotkeyPad',
           leading: _appIcon(onTap: _jumpToFirstPage),
+          background: DeckBackground(
+            image: session.backgroundImage,
+            opacity: session.backgroundOpacity,
+            fit: session.backgroundFit,
+          ),
           actions: [
             IconButton(
               tooltip: AppLocalizations.of(context)!.language,

@@ -19,12 +19,24 @@ class EdgeBarScaffold extends StatelessWidget {
     required this.actions,
     required this.child,
     this.leading,
+    this.background,
   });
 
   final String title;
   final List<Widget> actions;
   final Widget? leading;
   final Widget child;
+
+  /// Drawn full-bleed behind [child] — not inset by the notch/home
+  /// indicator padding [child] itself respects. A wallpaper-style
+  /// background is exactly the thing that should extend behind a physical
+  /// cutout rather than stop short and show the [Scaffold]'s own colour
+  /// there; confirmed against a real device the other way round, where
+  /// wrapping it in the same padding as [child] left a visible margin of
+  /// plain background colour around a custom deck background in
+  /// landscape. Null draws nothing, leaving the [Scaffold]'s own
+  /// background colour showing through instead.
+  final Widget? background;
 
   static const _height = 56.0;
 
@@ -61,27 +73,32 @@ class EdgeBarScaffold extends StatelessWidget {
         // safeScrollPadding (deck_page.dart) reads the raw, un-consumed
         // MediaQuery.paddingOf further down the tree and adds the home
         // indicator's bottom inset a second time on top of this.
-        body: MediaQuery.removePadding(
-          context: context,
-          removeTop: true,
-          removeBottom: true,
-          removeLeft: true,
-          removeRight: true,
-          child: Padding(
-            padding: EdgeInsets.only(
-              top: vertical,
-              bottom: vertical,
-              left: viewInsets.left,
-              right: viewInsets.right,
+        body: Stack(
+          children: [
+            if (background != null) Positioned.fill(child: background!),
+            MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              removeBottom: true,
+              removeLeft: true,
+              removeRight: true,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: vertical,
+                  bottom: vertical,
+                  left: viewInsets.left,
+                  right: viewInsets.right,
+                ),
+                child: child,
+              ),
             ),
-            child: child,
-          ),
+          ],
         ),
       );
     }
 
     final theme = Theme.of(context);
-    final background = theme.colorScheme.primaryContainer;
+    final barColor = theme.colorScheme.primaryContainer;
     final onBackground = theme.colorScheme.onPrimaryContainer;
     final insets = MediaQuery.paddingOf(context);
 
@@ -90,7 +107,7 @@ class EdgeBarScaffold extends StatelessWidget {
       body: Column(
         children: [
           Material(
-            color: background,
+            color: barColor,
             child: Padding(
               padding: EdgeInsets.only(
                 top: insets.top,
@@ -128,13 +145,19 @@ class EdgeBarScaffold extends StatelessWidget {
             ),
           ),
           Expanded(
-            // The bar already consumed the top inset above, so child must
-            // not count it again — left/right/bottom are untouched: those
-            // are exactly what SafeArea below still needs to protect.
-            child: MediaQuery.removePadding(
-              context: context,
-              removeTop: true,
-              child: SafeArea(top: false, child: child),
+            child: Stack(
+              children: [
+                if (background != null) Positioned.fill(child: background!),
+                // The bar already consumed the top inset above, so child
+                // must not count it again — left/right/bottom are
+                // untouched: those are exactly what SafeArea below still
+                // needs to protect.
+                MediaQuery.removePadding(
+                  context: context,
+                  removeTop: true,
+                  child: SafeArea(top: false, child: child),
+                ),
+              ],
             ),
           ),
         ],

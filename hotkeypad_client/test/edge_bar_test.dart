@@ -205,5 +205,71 @@ void main() {
         expect(screenHeight - bodyRect.bottom, 21);
       },
     );
+
+    testWidgets(
+      'landscape: background fills the whole screen rather than being '
+      'inset the same as child — regression: a custom deck background '
+      'wrapped in the same padding as child left a visible margin of '
+      "plain Scaffold colour around it on a real device, since that "
+      'padding exists for child (body/overlay), not decoration',
+      (tester) async {
+        tester.view.physicalSize = const Size(2532, 1170);
+        addTearDown(tester.view.resetPhysicalSize);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetDevicePixelRatio);
+        tester.view.viewPadding = const FakeViewPadding(left: 59, bottom: 21);
+        addTearDown(tester.view.resetViewPadding);
+
+        const backgroundKey = Key('background-stand-in');
+        await tester.pumpWidget(
+          MaterialApp(
+            home: EdgeBarScaffold(
+              title: 'HotkeyPad',
+              actions: const [],
+              background: Container(key: backgroundKey, color: Colors.red),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        );
+
+        final screenSize =
+            tester.view.physicalSize / tester.view.devicePixelRatio;
+        expect(tester.getSize(find.byKey(backgroundKey)), screenSize);
+        expect(tester.getTopLeft(find.byKey(backgroundKey)), Offset.zero);
+      },
+    );
+
+    testWidgets(
+      'portrait: a bottom inset (the home indicator) shrinks child but '
+      'not background — the same distinction as the landscape case above, '
+      "just via SafeArea instead of this widget's own Padding",
+      (tester) async {
+        tester.view.physicalSize = const Size(1170, 2532);
+        addTearDown(tester.view.resetPhysicalSize);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetDevicePixelRatio);
+        tester.view.padding = const FakeViewPadding(bottom: 21);
+        addTearDown(tester.view.resetPadding);
+
+        const backgroundKey = Key('background-stand-in');
+        const bodyKey = Key('body-stand-in');
+        await tester.pumpWidget(
+          MaterialApp(
+            home: EdgeBarScaffold(
+              title: 'HotkeyPad',
+              actions: const [],
+              background: Container(key: backgroundKey, color: Colors.red),
+              child: SizedBox.expand(key: bodyKey),
+            ),
+          ),
+        );
+
+        final backgroundBottom = tester
+            .getBottomLeft(find.byKey(backgroundKey))
+            .dy;
+        final bodyBottom = tester.getBottomLeft(find.byKey(bodyKey)).dy;
+        expect(backgroundBottom, greaterThan(bodyBottom));
+      },
+    );
   });
 }
