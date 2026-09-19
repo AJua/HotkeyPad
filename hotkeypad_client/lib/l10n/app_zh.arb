@@ -53,6 +53,7 @@
   "step1Title": "安裝 HotkeyPad Host",
   "step1Body": "HotkeyPad Host 執行在電腦上，不是這支手機。點擊下方網址即可複製，再貼到電腦的瀏覽器開啟。",
   "urlCopiedMessage": "已複製到剪貼簿",
+  "connectedHostLabel": "已連線的 Host",
   "connectionMethodSettingsTitle": "連線方式",
   "settingsTitle": "設定",
   "done": "完成",

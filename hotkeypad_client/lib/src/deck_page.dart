@@ -539,19 +539,6 @@ class _DeckPageState extends State<DeckPage> {
                 onBack: _forget,
               )
             : null;
-        // Off, the title and debug-console button disappear and the grid
-        // takes the whole screen — see buildFullBleedDeck's own doc
-        // comment for why that is its own composition rather than
-        // buildDeckStack wrapped in a SafeArea.
-        if (!session.showAppBar) {
-          return buildFullBleedDeck(
-            backgroundImage: session.backgroundImage,
-            backgroundOpacity: session.backgroundOpacity,
-            backgroundFit: session.backgroundFit,
-            body: _body(session),
-            overlay: overlay,
-          );
-        }
         final deck = buildDeckStack(
           backgroundImage: session.backgroundImage,
           backgroundOpacity: session.backgroundOpacity,
@@ -561,9 +548,6 @@ class _DeckPageState extends State<DeckPage> {
         );
         return EdgeBarScaffold(
           title: 'HotkeyPad',
-          // Which Mac this is, not what app it is — the brand name above
-          // it already says that, the same as every other screen.
-          subtitle: session.name,
           leading: _appIcon(onTap: _jumpToFirstPage),
           actions: [
             IconButton(
@@ -751,6 +735,25 @@ class _DeckPageState extends State<DeckPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Which Mac this is, not what app it is — the brand
+                    // name in the app bar above already says that. Lives
+                    // here rather than in the app bar itself now that the
+                    // bar hides in landscape (see EdgeBarScaffold): a
+                    // second line there would just disappear along with
+                    // it exactly when there's the least other way to
+                    // check which host is connected.
+                    if (session != null) ...[
+                      Text(
+                        l10n.connectedHostLabel,
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        session.name,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Text(
                       l10n.connectionMethodSettingsTitle,
                       style: Theme.of(context).textTheme.labelLarge,
@@ -1192,7 +1195,13 @@ class _DeckPageState extends State<DeckPage> {
           horizontal: _slotMargin,
           vertical: _slotMargin,
         );
-        final dots = layout.pages > 1 && session.showPageDots ? 28.0 : 0.0;
+        // Same trade as the app bar itself (see EdgeBarScaffold): shown in
+        // portrait, where there's height to spare, and dropped in
+        // landscape to give the grid back that little bit of room.
+        final showDots =
+            layout.pages > 1 &&
+            MediaQuery.orientationOf(context) == Orientation.portrait;
+        final dots = showDots ? 28.0 : 0.0;
 
         final metrics = deckGridMetrics(
           maxWidth: constraints.maxWidth - padding.horizontal,
@@ -1260,7 +1269,7 @@ class _DeckPageState extends State<DeckPage> {
                   ),
                 ),
               ),
-              if (layout.pages > 1 && session.showPageDots)
+              if (showDots)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: _PageDots(count: layout.pages, current: _page),
@@ -1389,65 +1398,6 @@ Widget buildDeckStack({
       Positioned.fill(child: body),
       if (overlay != null) Positioned.fill(child: overlay),
     ],
-  );
-}
-
-/// The composition used in place of [buildDeckStack] whenever there is no
-/// app bar — see [HotkeyPadSession.showAppBar] — to consume the notch/home
-/// indicator inset a hidden [EdgeBarScaffold] would otherwise have
-/// absorbed on its own edge.
-///
-/// The background is built and positioned *outside* the [SafeArea] rather
-/// than [buildDeckStack] wrapped in one: a landscape phone's notch/Dynamic
-/// Island moves to a side edge, and a wallpaper-style background is
-/// exactly the thing that should bleed behind it rather than stop short
-/// and show the [Scaffold]'s own colour there — only [body] and [overlay]
-/// (real content, not decoration) need to stay clear of it. Confirmed
-/// against a real device: wrapping the whole stack (background included)
-/// in a [SafeArea] left a visible bar of blank space on the notch's edge
-/// in landscape.
-///
-/// Public, and its own top-level [Scaffold] rather than folded into
-/// [buildDeckStack] with a flag, so this exact layout can be pumped and
-/// measured in a test without a whole `DeckPage`/`HotkeyPadSession` behind
-/// it.
-Widget buildFullBleedDeck({
-  required Uint8List? backgroundImage,
-  required double backgroundOpacity,
-  required BackgroundFit backgroundFit,
-  required Widget body,
-  Widget? overlay,
-}) {
-  return Builder(
-    // Matches EdgeBarScaffold's own backgroundColor exactly — a plain
-    // Scaffold with none set falls back to colorScheme.surface, a
-    // different (if subtly so) Material 3 tone than surfaceContainer,
-    // which otherwise made toggling the app bar visibly shift the
-    // deck's own background color underneath everything else.
-    builder: (context) => Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: DeckBackground(
-              image: backgroundImage,
-              opacity: backgroundOpacity,
-              fit: backgroundFit,
-            ),
-          ),
-          SafeArea(
-            child: SizedBox.expand(
-              child: Stack(
-                children: [
-                  Positioned.fill(child: body),
-                  if (overlay != null) Positioned.fill(child: overlay),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
   );
 }
 

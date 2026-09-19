@@ -19,15 +19,9 @@ class EdgeBarScaffold extends StatelessWidget {
     required this.actions,
     required this.child,
     this.leading,
-    this.subtitle,
   });
 
   final String title;
-
-  /// A second, smaller line under [title] — e.g. which host the deck is
-  /// currently talking to, kept separate from the app's own brand name
-  /// rather than replacing it (see `DeckPage`'s connected-deck app bar).
-  final String? subtitle;
   final List<Widget> actions;
   final Widget? leading;
   final Widget child;
@@ -90,7 +84,6 @@ class EdgeBarScaffold extends StatelessWidget {
     final background = theme.colorScheme.primaryContainer;
     final onBackground = theme.colorScheme.onPrimaryContainer;
     final insets = MediaQuery.paddingOf(context);
-    final subtitle = this.subtitle;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surfaceContainer,
@@ -105,12 +98,7 @@ class EdgeBarScaffold extends StatelessWidget {
                 right: insets.right + 4,
               ),
               child: SizedBox(
-                // A second line needs more than a single title's worth of
-                // height — grown rather than shrinking the title's own
-                // font to make room, since the title is the app's brand
-                // name and should read the same whether or not a subtitle
-                // is present.
-                height: subtitle == null ? _height : _height + 14,
+                height: _height,
                 child: IconTheme.merge(
                   data: IconThemeData(color: onBackground),
                   child: Row(
@@ -129,14 +117,6 @@ class EdgeBarScaffold extends StatelessWidget {
                                 color: onBackground,
                               ),
                             ),
-                            if (subtitle != null)
-                              Text(
-                                subtitle,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: onBackground.withValues(alpha: 0.75),
-                                ),
-                              ),
                           ],
                         ),
                       ),

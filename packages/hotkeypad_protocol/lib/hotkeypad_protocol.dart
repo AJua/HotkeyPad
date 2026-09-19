@@ -97,10 +97,6 @@ sealed class HotkeyPadMessage {
           theme: DeckTheme.fromWire(json['v'] as String?),
           // Absent on an older host, which always drew labels.
           showLabels: json['lbl'] as bool? ?? true,
-          // Absent on an older host, which always showed the app bar.
-          showAppBar: json['bar'] as bool? ?? true,
-          // Absent on an older host, which always showed the page dots.
-          showPageDots: json['dot'] as bool? ?? true,
           // All three absent on a host built before backgrounds existed, or
           // simply means "no custom background" on a current one — either
           // way the client falls back to its own theme-derived background.
@@ -1293,8 +1289,6 @@ final class SetAppearance extends HotkeyPadMessage {
   const SetAppearance({
     required this.theme,
     required this.showLabels,
-    this.showAppBar = true,
-    this.showPageDots = true,
     this.backgroundImageId,
     this.backgroundOpacity = 1.0,
     this.backgroundFit = BackgroundFit.cover,
@@ -1305,18 +1299,6 @@ final class SetAppearance extends HotkeyPadMessage {
   /// With labels off the deck is icons alone: cells go square and the icon
   /// fills them, since there is no caption to leave room for.
   final bool showLabels;
-
-  /// With the app bar off, the deck's title/debug-console button are
-  /// hidden and the grid takes the whole screen — the same trade a kiosk
-  /// or a phone mounted as a dedicated deck would want to make, same
-  /// spirit as [showLabels].
-  final bool showAppBar;
-
-  /// The row of dots marking which page of a multi-page deck is showing
-  /// (see `_PageDots` on the client) — swiping between pages still works
-  /// with these off, this only hides the indicator itself, the same
-  /// "reclaim a little more of the screen" trade as [showAppBar].
-  final bool showPageDots;
 
   /// Names an image behind the deck's button grid, fetched and cached the
   /// same way an app's own icon or a button's custom image is — see
@@ -1338,8 +1320,6 @@ final class SetAppearance extends HotkeyPadMessage {
     't': 'thm',
     'v': theme.wire,
     'lbl': showLabels,
-    'bar': showAppBar,
-    'dot': showPageDots,
     // Omitted entirely rather than sent as null/defaults when there is no
     // background, so an older client parsing this message with a stricter
     // decoder would still see nothing background-shaped to misinterpret.

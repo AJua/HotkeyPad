@@ -4,11 +4,7 @@ import 'package:hotkeypad_client/src/edge_bar.dart';
 
 void main() {
   group('EdgeBarScaffold', () {
-    Future<void> pump(
-      WidgetTester tester, {
-      required Size size,
-      String? subtitle,
-    }) async {
+    Future<void> pump(WidgetTester tester, {required Size size}) async {
       tester.view.physicalSize = size;
       addTearDown(tester.view.resetPhysicalSize);
       tester.view.devicePixelRatio = 1.0;
@@ -18,7 +14,6 @@ void main() {
         MaterialApp(
           home: EdgeBarScaffold(
             title: 'HotkeyPad',
-            subtitle: subtitle,
             actions: const [Icon(Icons.settings)],
             child: const SizedBox.expand(),
           ),
@@ -47,17 +42,6 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('HotkeyPad'), findsNothing);
       expect(find.byIcon(Icons.settings), findsNothing);
-    });
-
-    testWidgets('portrait: shows the subtitle when given one', (tester) async {
-      await pump(
-        tester,
-        size: const Size(1170, 2532),
-        subtitle: 'linjianongdeMBP',
-      );
-
-      expect(tester.takeException(), isNull);
-      expect(find.text('linjianongdeMBP'), findsOneWidget);
     });
 
     testWidgets(

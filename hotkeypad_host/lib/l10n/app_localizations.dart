@@ -296,18 +296,6 @@ abstract class AppLocalizations {
   /// Settings switch title.
   ///
   /// In en, this message translates to:
-  /// **'App bar'**
-  String get appBarToggleTitle;
-
-  /// Settings switch subtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Off hides the title and debug console button, and gives the whole screen to the deck'**
-  String get appBarToggleSubtitle;
-
-  /// Settings switch title.
-  ///
-  /// In en, this message translates to:
   /// **'Button labels'**
   String get buttonLabelsToggleTitle;
 
@@ -316,18 +304,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off makes cells square and lets the icon fill them'**
   String get buttonLabelsToggleSubtitle;
-
-  /// Settings switch title.
-  ///
-  /// In en, this message translates to:
-  /// **'Page dots'**
-  String get pageDotsToggleTitle;
-
-  /// Settings switch subtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Off hides the page indicator below a multi-page deck — swiping between pages still works'**
-  String get pageDotsToggleSubtitle;
 
   /// Settings dialog section header.
   ///

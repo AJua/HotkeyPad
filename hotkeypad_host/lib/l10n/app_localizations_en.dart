@@ -115,25 +115,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeDark => 'Dark';
 
   @override
-  String get appBarToggleTitle => 'App bar';
-
-  @override
-  String get appBarToggleSubtitle =>
-      'Off hides the title and debug console button, and gives the whole screen to the deck';
-
-  @override
   String get buttonLabelsToggleTitle => 'Button labels';
 
   @override
   String get buttonLabelsToggleSubtitle =>
       'Off makes cells square and lets the icon fill them';
-
-  @override
-  String get pageDotsToggleTitle => 'Page dots';
-
-  @override
-  String get pageDotsToggleSubtitle =>
-      'Off hides the page indicator below a multi-page deck — swiping between pages still works';
 
   @override
   String get backgroundImageSectionHeader => 'Background image';

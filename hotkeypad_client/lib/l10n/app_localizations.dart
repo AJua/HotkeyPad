@@ -413,6 +413,12 @@ abstract class AppLocalizations {
   /// **'Copied to clipboard'**
   String get urlCopiedMessage;
 
+  /// Section heading above the connected host's name in the settings dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected host'**
+  String get connectedHostLabel;
+
   /// Section heading above the connection-method radio buttons in the settings dialog.
   ///
   /// In en, this message translates to:

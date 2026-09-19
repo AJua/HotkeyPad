@@ -133,7 +133,10 @@ void main() {
     });
 
     test('returns null for an unknown message type', () {
-      expect(HotkeyPadMessage.decode(utf8.encode('{"t":"from-the-future"}')), isNull);
+      expect(
+        HotkeyPadMessage.decode(utf8.encode('{"t":"from-the-future"}')),
+        isNull,
+      );
     });
 
     test('returns null for malformed input', () {
@@ -571,7 +574,8 @@ void main() {
   group('PressSlot', () {
     test('round-trips', () {
       final decoded =
-          HotkeyPadMessage.decode(const PressSlot(id: 12).encode()) as PressSlot?;
+          HotkeyPadMessage.decode(const PressSlot(id: 12).encode())
+              as PressSlot?;
 
       expect(decoded!.id, 12);
     });
@@ -728,52 +732,6 @@ void main() {
       expect(decoded.theme, DeckTheme.dark);
     });
 
-    test('round-trips the app bar setting', () {
-      for (final showAppBar in [true, false]) {
-        final decoded =
-            HotkeyPadMessage.decode(
-                  SetAppearance(
-                    theme: DeckTheme.dark,
-                    showLabels: true,
-                    showAppBar: showAppBar,
-                  ).encode(),
-                )
-                as SetAppearance?;
-        expect(decoded!.showAppBar, showAppBar);
-      }
-    });
-
-    test('the app bar defaults to on when an older host omits it', () {
-      final decoded =
-          HotkeyPadMessage.decode(utf8.encode('{"t":"thm","v":"dark","lbl":true}'))
-              as SetAppearance?;
-
-      expect(decoded!.showAppBar, isTrue);
-    });
-
-    test('round-trips the page dots setting', () {
-      for (final showPageDots in [true, false]) {
-        final decoded =
-            HotkeyPadMessage.decode(
-                  SetAppearance(
-                    theme: DeckTheme.dark,
-                    showLabels: true,
-                    showPageDots: showPageDots,
-                  ).encode(),
-                )
-                as SetAppearance?;
-        expect(decoded!.showPageDots, showPageDots);
-      }
-    });
-
-    test('the page dots default to on when an older host omits them', () {
-      final decoded =
-          HotkeyPadMessage.decode(utf8.encode('{"t":"thm","v":"dark","lbl":true}'))
-              as SetAppearance?;
-
-      expect(decoded!.showPageDots, isTrue);
-    });
-
     test('an unknown or missing value falls back to system', () {
       expect(DeckTheme.fromWire('solarized'), DeckTheme.system);
       expect(DeckTheme.fromWire(null), DeckTheme.system);
@@ -827,7 +785,9 @@ void main() {
 
     test('an older host omitting these fields yields no background', () {
       final decoded =
-          HotkeyPadMessage.decode(utf8.encode('{"t":"thm","v":"dark","lbl":true}'))
+          HotkeyPadMessage.decode(
+                utf8.encode('{"t":"thm","v":"dark","lbl":true}'),
+              )
               as SetAppearance?;
 
       expect(decoded!.backgroundImageId, isNull);
@@ -1003,9 +963,7 @@ void main() {
 
     test('rejects a URI with the wrong scheme', () {
       expect(
-        WifiPairingQr.tryParse(
-          'https://connect?host=x&address=1.2.3.4&port=1',
-        ),
+        WifiPairingQr.tryParse('https://connect?host=x&address=1.2.3.4&port=1'),
         isNull,
       );
     });
@@ -1020,7 +978,10 @@ void main() {
     });
 
     test('rejects a completely unrelated string, not a crash', () {
-      expect(WifiPairingQr.tryParse('WIFI:T:WPA;S:MyNetwork;P:secret;;'), isNull);
+      expect(
+        WifiPairingQr.tryParse('WIFI:T:WPA;S:MyNetwork;P:secret;;'),
+        isNull,
+      );
       expect(WifiPairingQr.tryParse(''), isNull);
     });
 
@@ -1191,11 +1152,7 @@ void main() {
     test('footprintAt reads a WidgetItem\'s own span', () {
       final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
         1,
-        const WidgetItem(
-          kind: DeckWidgetKind.clock,
-          rowSpan: 2,
-          columnSpan: 2,
-        ),
+        const WidgetItem(kind: DeckWidgetKind.clock, rowSpan: 2, columnSpan: 2),
       );
 
       final footprint = layout.footprintAt(1);
@@ -1212,11 +1169,7 @@ void main() {
 
       final placed = layout.withWidget(
         1,
-        const WidgetItem(
-          kind: DeckWidgetKind.clock,
-          rowSpan: 2,
-          columnSpan: 2,
-        ),
+        const WidgetItem(kind: DeckWidgetKind.clock, rowSpan: 2, columnSpan: 2),
       );
 
       expect(DeckItem.parse(placed.slots[1]!.value), isA<WidgetItem>());
@@ -1228,11 +1181,7 @@ void main() {
     test('widgetCoveredIndexes reports every non-anchor cell', () {
       final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
         1,
-        const WidgetItem(
-          kind: DeckWidgetKind.clock,
-          rowSpan: 2,
-          columnSpan: 2,
-        ),
+        const WidgetItem(kind: DeckWidgetKind.clock, rowSpan: 2, columnSpan: 2),
       );
 
       expect(layout.widgetCoveredIndexes, {2, 6, 7});
@@ -1243,11 +1192,7 @@ void main() {
     test('widgetPlacementBlocked refuses to reach into another widget', () {
       final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
         1,
-        const WidgetItem(
-          kind: DeckWidgetKind.clock,
-          rowSpan: 2,
-          columnSpan: 2,
-        ),
+        const WidgetItem(kind: DeckWidgetKind.clock, rowSpan: 2, columnSpan: 2),
       );
 
       // Anchored at column 0, this widget's own footprint (0, 1, 2) would
@@ -1262,11 +1207,7 @@ void main() {
     test('widgetPlacementBlocked allows resizing a widget in place', () {
       final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
         1,
-        const WidgetItem(
-          kind: DeckWidgetKind.clock,
-          rowSpan: 2,
-          columnSpan: 2,
-        ),
+        const WidgetItem(kind: DeckWidgetKind.clock, rowSpan: 2, columnSpan: 2),
       );
 
       // Growing the same anchor's own widget isn't blocked by itself.
@@ -1279,11 +1220,7 @@ void main() {
     test('widgetPlacementBlocked allows an ordinary, non-overlapping spot', () {
       final layout = DeckLayout.empty(columns: 5, rows: 3).withWidget(
         1,
-        const WidgetItem(
-          kind: DeckWidgetKind.clock,
-          rowSpan: 2,
-          columnSpan: 2,
-        ),
+        const WidgetItem(kind: DeckWidgetKind.clock, rowSpan: 2, columnSpan: 2),
       );
 
       expect(
@@ -1303,9 +1240,9 @@ void main() {
       );
 
       final turned = layout.transposed();
-      final item = DeckItem.parse(turned.slots[turned.slots.indexWhere(
-        (slot) => slot != null,
-      )]!.value);
+      final item = DeckItem.parse(
+        turned.slots[turned.slots.indexWhere((slot) => slot != null)]!.value,
+      );
 
       expect(item, isA<WidgetItem>());
       expect((item as WidgetItem).rowSpan, 3);

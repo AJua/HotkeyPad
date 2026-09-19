@@ -108,23 +108,11 @@
   "themeDark": "Dark",
   "@themeDark": {"description": "Appearance option for the dark theme."},
 
-  "appBarToggleTitle": "App bar",
-  "@appBarToggleTitle": {"description": "Settings switch title."},
-
-  "appBarToggleSubtitle": "Off hides the title and debug console button, and gives the whole screen to the deck",
-  "@appBarToggleSubtitle": {"description": "Settings switch subtitle."},
-
   "buttonLabelsToggleTitle": "Button labels",
   "@buttonLabelsToggleTitle": {"description": "Settings switch title."},
 
   "buttonLabelsToggleSubtitle": "Off makes cells square and lets the icon fill them",
   "@buttonLabelsToggleSubtitle": {"description": "Settings switch subtitle."},
-
-  "pageDotsToggleTitle": "Page dots",
-  "@pageDotsToggleTitle": {"description": "Settings switch title."},
-
-  "pageDotsToggleSubtitle": "Off hides the page indicator below a multi-page deck — swiping between pages still works",
-  "@pageDotsToggleSubtitle": {"description": "Settings switch subtitle."},
 
   "backgroundImageSectionHeader": "Background image",
   "@backgroundImageSectionHeader": {"description": "Settings dialog section header."},

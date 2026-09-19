@@ -176,6 +176,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get urlCopiedMessage => '已複製到剪貼簿';
 
   @override
+  String get connectedHostLabel => '已連線的 Host';
+
+  @override
   String get connectionMethodSettingsTitle => '連線方式';
 
   @override
@@ -462,6 +465,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get urlCopiedMessage => '已複製到剪貼簿';
+
+  @override
+  String get connectedHostLabel => '已連線的 Host';
 
   @override
   String get connectionMethodSettingsTitle => '連線方式';

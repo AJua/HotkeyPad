@@ -115,24 +115,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get themeDark => 'ダーク';
 
   @override
-  String get appBarToggleTitle => 'アプリバー';
-
-  @override
-  String get appBarToggleSubtitle =>
-      'オフにするとタイトルとデバッグコンソールボタンが非表示になり、画面全体がデッキに使われます';
-
-  @override
   String get buttonLabelsToggleTitle => 'ボタンラベル';
 
   @override
   String get buttonLabelsToggleSubtitle => 'オフにするとセルが正方形になり、アイコンがセル全体を埋めます';
-
-  @override
-  String get pageDotsToggleTitle => 'ページドット';
-
-  @override
-  String get pageDotsToggleSubtitle =>
-      'オフにすると複数ページのデッキ下部のページインジケーターが非表示になります(ページ間のスワイプは引き続き機能します)';
 
   @override
   String get backgroundImageSectionHeader => '背景画像';

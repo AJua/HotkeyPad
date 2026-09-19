@@ -175,6 +175,9 @@
   "urlCopiedMessage": "Copied to clipboard",
   "@urlCopiedMessage": {"description": "Snackbar shown after tapping the host download URL copies it to the clipboard."},
 
+  "connectedHostLabel": "Connected host",
+  "@connectedHostLabel": {"description": "Section heading above the connected host's name in the settings dialog."},
+
   "connectionMethodSettingsTitle": "Connection method",
   "@connectionMethodSettingsTitle": {"description": "Section heading above the connection-method radio buttons in the settings dialog."},
 

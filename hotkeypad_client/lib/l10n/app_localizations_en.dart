@@ -185,6 +185,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get urlCopiedMessage => 'Copied to clipboard';
 
   @override
+  String get connectedHostLabel => 'Connected host';
+
+  @override
   String get connectionMethodSettingsTitle => 'Connection method';
 
   @override

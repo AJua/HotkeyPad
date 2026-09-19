@@ -1093,8 +1093,6 @@ class _HostPageState extends State<HostPage> {
       SetAppearance(
         theme: appearance.theme,
         showLabels: appearance.showLabels,
-        showAppBar: appearance.showAppBar,
-        showPageDots: appearance.showPageDots,
         backgroundImageId: appearance.backgroundImageId,
         backgroundOpacity: appearance.backgroundOpacity,
         backgroundFit: appearance.backgroundFit,
@@ -1125,8 +1123,6 @@ class _HostPageState extends State<HostPage> {
     final message = SetAppearance(
       theme: appearance.theme,
       showLabels: appearance.showLabels,
-      showAppBar: appearance.showAppBar,
-      showPageDots: appearance.showPageDots,
       backgroundImageId: appearance.backgroundImageId,
       backgroundOpacity: appearance.backgroundOpacity,
       backgroundFit: appearance.backgroundFit,
@@ -1457,11 +1453,10 @@ class _HostPageState extends State<HostPage> {
             child: LayoutPage(
               key: _layoutPageKey,
               onChanged: _broadcastLayout,
-              onAppearanceChanged:
-                  (theme, showLabels, showAppBar, showPageDots) {
-                    widget.onThemeChanged(theme);
-                    _broadcastAppearance();
-                  },
+              onAppearanceChanged: (theme, showLabels) {
+                widget.onThemeChanged(theme);
+                _broadcastAppearance();
+              },
               onShowService: () => setState(() => _showingService = true),
               // Only meaningful once a lock names one unambiguous device to
               // match — see LayoutPage's own doc comment on this field.

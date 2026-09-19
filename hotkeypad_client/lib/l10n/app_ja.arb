@@ -53,6 +53,7 @@
   "step1Title": "HotkeyPad Host をインストール",
   "step1Body": "HotkeyPad Host はこのスマートフォンではなくパソコンで動作します。下のアドレスをタップしてコピーし、パソコンのブラウザで開いてください。",
   "urlCopiedMessage": "クリップボードにコピーしました",
+  "connectedHostLabel": "接続中の Host",
   "connectionMethodSettingsTitle": "接続方法",
   "settingsTitle": "設定",
   "done": "完了",

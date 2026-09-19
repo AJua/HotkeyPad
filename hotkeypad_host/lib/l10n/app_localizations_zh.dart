@@ -113,22 +113,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeDark => '深色';
 
   @override
-  String get appBarToggleTitle => '頂端列';
-
-  @override
-  String get appBarToggleSubtitle => '關閉後會隱藏標題與除錯主控台按鈕,讓整個畫面都用來顯示面板';
-
-  @override
   String get buttonLabelsToggleTitle => '按鈕文字標籤';
 
   @override
   String get buttonLabelsToggleSubtitle => '關閉後按鈕格會變成正方形,並讓圖示填滿整個格子';
-
-  @override
-  String get pageDotsToggleTitle => '頁面圓點';
-
-  @override
-  String get pageDotsToggleSubtitle => '關閉後會隱藏多頁面板下方的頁面指示器——仍然可以滑動切換頁面';
 
   @override
   String get backgroundImageSectionHeader => '背景圖片';
@@ -303,22 +291,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get themeDark => '深色';
 
   @override
-  String get appBarToggleTitle => '頂端列';
-
-  @override
-  String get appBarToggleSubtitle => '關閉後會隱藏標題與除錯主控台按鈕,讓整個畫面都用來顯示面板';
-
-  @override
   String get buttonLabelsToggleTitle => '按鈕文字標籤';
 
   @override
   String get buttonLabelsToggleSubtitle => '關閉後按鈕格會變成正方形,並讓圖示填滿整個格子';
-
-  @override
-  String get pageDotsToggleTitle => '頁面圓點';
-
-  @override
-  String get pageDotsToggleSubtitle => '關閉後會隱藏多頁面板下方的頁面指示器——仍然可以滑動切換頁面';
 
   @override
   String get backgroundImageSectionHeader => '背景圖片';

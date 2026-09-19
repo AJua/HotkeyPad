@@ -369,13 +369,7 @@ class LayoutPage extends StatefulWidget {
 
   /// Called when the appearance changes, so it can be applied here and
   /// pushed to the phone.
-  final void Function(
-    DeckTheme theme,
-    bool showLabels,
-    bool showAppBar,
-    bool showPageDots,
-  )
-  onAppearanceChanged;
+  final void Function(DeckTheme theme, bool showLabels) onAppearanceChanged;
 
   /// Opens the service view, which is reached from the settings dialog now
   /// that there are no tabs.
@@ -417,8 +411,6 @@ class LayoutPageState extends State<LayoutPage> {
   DeckLayout _layout = DeckLayout.empty();
   DeckTheme _theme = DeckTheme.system;
   bool _showLabels = true;
-  bool _showAppBar = true;
-  bool _showPageDots = true;
   String? _backgroundImageId;
   double _backgroundOpacity = 1.0;
   BackgroundFit _backgroundFit = BackgroundFit.cover;
@@ -444,8 +436,6 @@ class LayoutPageState extends State<LayoutPage> {
       _layout = layout;
       _theme = appearance.theme;
       _showLabels = appearance.showLabels;
-      _showAppBar = appearance.showAppBar;
-      _showPageDots = appearance.showPageDots;
       _backgroundImageId = appearance.backgroundImageId;
       _backgroundOpacity = appearance.backgroundOpacity;
       _backgroundFit = appearance.backgroundFit;
@@ -599,16 +589,6 @@ class LayoutPageState extends State<LayoutPage> {
                     const SizedBox(height: 4),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      value: _showAppBar,
-                      onChanged: (value) {
-                        setDialogState(() {});
-                        _setAppearance(showAppBar: value);
-                      },
-                      title: Text(l10n.appBarToggleTitle),
-                      subtitle: Text(l10n.appBarToggleSubtitle),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
                       value: _showLabels,
                       onChanged: (value) {
                         setDialogState(() {});
@@ -616,16 +596,6 @@ class LayoutPageState extends State<LayoutPage> {
                       },
                       title: Text(l10n.buttonLabelsToggleTitle),
                       subtitle: Text(l10n.buttonLabelsToggleSubtitle),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: _showPageDots,
-                      onChanged: (value) {
-                        setDialogState(() {});
-                        _setAppearance(showPageDots: value);
-                      },
-                      title: Text(l10n.pageDotsToggleTitle),
-                      subtitle: Text(l10n.pageDotsToggleSubtitle),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -783,17 +753,10 @@ class LayoutPageState extends State<LayoutPage> {
     );
   }
 
-  Future<void> _setAppearance({
-    DeckTheme? theme,
-    bool? showLabels,
-    bool? showAppBar,
-    bool? showPageDots,
-  }) async {
+  Future<void> _setAppearance({DeckTheme? theme, bool? showLabels}) async {
     setState(() {
       _theme = theme ?? _theme;
       _showLabels = showLabels ?? _showLabels;
-      _showAppBar = showAppBar ?? _showAppBar;
-      _showPageDots = showPageDots ?? _showPageDots;
     });
     await _saveAppearance();
   }
@@ -807,13 +770,11 @@ class LayoutPageState extends State<LayoutPage> {
     await SettingsStore.save(
       theme: _theme,
       showLabels: _showLabels,
-      showAppBar: _showAppBar,
-      showPageDots: _showPageDots,
       backgroundImageId: _backgroundImageId,
       backgroundOpacity: _backgroundOpacity,
       backgroundFit: _backgroundFit,
     );
-    widget.onAppearanceChanged(_theme, _showLabels, _showAppBar, _showPageDots);
+    widget.onAppearanceChanged(_theme, _showLabels);
   }
 
   /// Replaces the background image, deleting whatever file the previous id
@@ -878,8 +839,6 @@ class LayoutPageState extends State<LayoutPage> {
       _layout = bundle.layout;
       _theme = bundle.theme;
       _showLabels = bundle.showLabels;
-      _showAppBar = bundle.showAppBar;
-      _showPageDots = bundle.showPageDots;
       _clampPage();
       // Bytes for a restored icon can differ from whatever this session
       // already cached under the same id (a re-import of an edited backup,
@@ -887,12 +846,7 @@ class LayoutPageState extends State<LayoutPage> {
       _icons.clear();
     });
     widget.onChanged(bundle.layout);
-    widget.onAppearanceChanged(
-      bundle.theme,
-      bundle.showLabels,
-      bundle.showAppBar,
-      bundle.showPageDots,
-    );
+    widget.onAppearanceChanged(bundle.theme, bundle.showLabels);
     _showMessage('Settings imported.');
   }
 

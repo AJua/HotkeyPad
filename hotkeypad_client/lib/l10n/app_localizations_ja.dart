@@ -177,6 +177,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get urlCopiedMessage => 'クリップボードにコピーしました';
 
   @override
+  String get connectedHostLabel => '接続中の Host';
+
+  @override
   String get connectionMethodSettingsTitle => '接続方法';
 
   @override
