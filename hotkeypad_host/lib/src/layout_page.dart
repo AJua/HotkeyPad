@@ -143,9 +143,10 @@ String? currentButtonSummary(String? stored) {
 
 /// The largest row/column span a widget anchored at [index] could have
 /// without running off [layout]'s own edge from that position — what
-/// [_WidgetDialog]'s steppers are bounded to, so every span the dialog can
-/// actually produce is guaranteed to fit without [DeckLayout.footprintFor]'s
-/// own clamping ever having to kick in for a freshly-chosen size.
+/// [_PickerDialogState]'s own Rows/Columns steppers are bounded to, so
+/// every span they can actually produce is guaranteed to fit without
+/// [DeckLayout.footprintFor]'s own clamping ever having to kick in for a
+/// freshly-chosen size.
 ///
 /// A pure function of [layout] and [index], for the same isolated-testing
 /// reason as [itemsDroppedByResize].
@@ -153,7 +154,10 @@ String? currentButtonSummary(String? stored) {
   final cell = index % layout.pageCapacity;
   final anchorRow = cell ~/ layout.columns;
   final anchorColumn = cell % layout.columns;
-  return (rows: layout.rows - anchorRow, columns: layout.columns - anchorColumn);
+  return (
+    rows: layout.rows - anchorRow,
+    columns: layout.columns - anchorColumn,
+  );
 }
 
 /// The buttons placing [item] anchored at [index] in [layout] would clear —
@@ -545,220 +549,220 @@ class LayoutPageState extends State<LayoutPage> {
         builder: (context, setDialogState) {
           final l10n = AppLocalizations.of(context)!;
           return AlertDialog(
-          title: Text(l10n.settingsTitle),
-          // A short window (or a tall grid — many pages, custom icons, an
-          // export/import section, the service-details link all stacked
-          // in one Column) easily runs out of vertical room: the dialog
-          // itself already caps its height to the screen, but a bare
-          // Column can't shrink to fit inside that, so it silently
-          // overflowed past "Done" instead — this scroll view is what
-          // lets the content still fit, by scrolling, rather than
-          // overflowing.
-          content: SizedBox(
-            width: 380,
-            child: SingleChildScrollView(
-              // Desktop draws the scrollbar over the trailing edge of the
-              // content rather than reserving its own space for it, so
-              // without this the thumb/track sits right on top of the
-              // text — this padding is that reserved space instead.
-              padding: const EdgeInsets.only(right: 14),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.appearanceSectionHeader,
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<DeckTheme>(
-                    segments: [
-                      for (final theme in DeckTheme.values)
-                        ButtonSegment(
-                          value: theme,
-                          label: Text(_themeLabel(l10n, theme)),
-                        ),
-                    ],
-                    selected: {_theme},
-                    showSelectedIcon: false,
-                    onSelectionChanged: (selection) {
-                      setDialogState(() {});
-                      _setAppearance(theme: selection.first);
-                    },
-                  ),
-                  const SizedBox(height: 4),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _showAppBar,
-                    onChanged: (value) {
-                      setDialogState(() {});
-                      _setAppearance(showAppBar: value);
-                    },
-                    title: Text(l10n.appBarToggleTitle),
-                    subtitle: Text(l10n.appBarToggleSubtitle),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _showLabels,
-                    onChanged: (value) {
-                      setDialogState(() {});
-                      _setAppearance(showLabels: value);
-                    },
-                    title: Text(l10n.buttonLabelsToggleTitle),
-                    subtitle: Text(l10n.buttonLabelsToggleSubtitle),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _showPageDots,
-                    onChanged: (value) {
-                      setDialogState(() {});
-                      _setAppearance(showPageDots: value);
-                    },
-                    title: Text(l10n.pageDotsToggleTitle),
-                    subtitle: Text(l10n.pageDotsToggleSubtitle),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    l10n.backgroundImageSectionHeader,
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  BackgroundPicker(
-                    imageId: _backgroundImageId,
-                    onChanged: (id) {
-                      setDialogState(() {});
-                      _setBackgroundImage(id);
-                    },
-                  ),
-                  const SizedBox(height: 4),
-                  Opacity(
-                    opacity: _backgroundImageId == null ? 0.5 : 1,
-                    child: Row(
-                      children: [
-                        Text(l10n.opacityLabel),
-                        Expanded(
-                          child: Slider(
-                            value: _backgroundOpacity,
-                            divisions: 20,
-                            label: '${(_backgroundOpacity * 100).round()}%',
-                            onChanged: _backgroundImageId == null
-                                ? null
-                                : (value) {
-                                    setDialogState(() {});
-                                    _setBackgroundOpacity(value);
-                                  },
-                          ),
-                        ),
-                      ],
+            title: Text(l10n.settingsTitle),
+            // A short window (or a tall grid — many pages, custom icons, an
+            // export/import section, the service-details link all stacked
+            // in one Column) easily runs out of vertical room: the dialog
+            // itself already caps its height to the screen, but a bare
+            // Column can't shrink to fit inside that, so it silently
+            // overflowed past "Done" instead — this scroll view is what
+            // lets the content still fit, by scrolling, rather than
+            // overflowing.
+            content: SizedBox(
+              width: 380,
+              child: SingleChildScrollView(
+                // Desktop draws the scrollbar over the trailing edge of the
+                // content rather than reserving its own space for it, so
+                // without this the thumb/track sits right on top of the
+                // text — this padding is that reserved space instead.
+                padding: const EdgeInsets.only(right: 14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.appearanceSectionHeader,
+                      style: Theme.of(context).textTheme.labelLarge,
                     ),
-                  ),
-                  Opacity(
-                    opacity: _backgroundImageId == null ? 0.5 : 1,
-                    child: SegmentedButton<BackgroundFit>(
+                    const SizedBox(height: 8),
+                    SegmentedButton<DeckTheme>(
                       segments: [
-                        for (final fit in BackgroundFit.values)
+                        for (final theme in DeckTheme.values)
                           ButtonSegment(
-                            value: fit,
-                            label: Text(_backgroundFitLabel(l10n, fit)),
+                            value: theme,
+                            label: Text(_themeLabel(l10n, theme)),
                           ),
                       ],
-                      selected: {_backgroundFit},
+                      selected: {_theme},
                       showSelectedIcon: false,
-                      onSelectionChanged: _backgroundImageId == null
-                          ? null
-                          : (selection) {
-                              setDialogState(() {});
-                              _setBackgroundFit(selection.first);
-                            },
+                      onSelectionChanged: (selection) {
+                        setDialogState(() {});
+                        _setAppearance(theme: selection.first);
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    l10n.gridSectionHeader,
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 4),
-                  _NumberStepper(
-                    label: l10n.columnsLabel,
-                    value: _layout.columns,
-                    onChanged: (value) async {
-                      await _resize(columns: value);
-                      setDialogState(() {});
-                    },
-                  ),
-                  _NumberStepper(
-                    label: l10n.rowsLabel,
-                    value: _layout.rows,
-                    onChanged: (value) async {
-                      await _resize(rows: value);
-                      setDialogState(() {});
-                    },
-                  ),
-                  _NumberStepper(
-                    label: l10n.pagesLabel,
-                    value: _layout.pages,
-                    max: DeckLayout.maxPages,
-                    onChanged: (value) async {
-                      await _resize(pages: value);
-                      setDialogState(() {});
-                    },
-                  ),
-                  const Divider(height: 32),
-                  Text(
-                    l10n.backupSectionHeader,
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 4),
-                  // Two entry points rather than one "Backup..." tile with a
-                  // sub-choice: export is safe to tap on a whim and import is
-                  // destructive, so keeping them visually distinct here
-                  // matches that difference before either is even tapped.
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.upload_outlined),
-                    title: Text(l10n.exportSettingsTitle),
-                    subtitle: Text(l10n.exportSettingsSubtitle),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _exportSettings();
-                    },
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.download_outlined),
-                    title: Text(l10n.importSettingsTitle),
-                    subtitle: Text(l10n.importSettingsSubtitle),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _importSettings();
-                    },
-                  ),
-                  const Divider(height: 32),
-                  // A diagnostic, like the client's debug console: for
-                  // working out why the deck is misbehaving, not for daily use.
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.bug_report_outlined),
-                    title: Text(l10n.serviceDetailsTitle),
-                    subtitle: Text(l10n.serviceDetailsSubtitle),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      widget.onShowService();
-                    },
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _showAppBar,
+                      onChanged: (value) {
+                        setDialogState(() {});
+                        _setAppearance(showAppBar: value);
+                      },
+                      title: Text(l10n.appBarToggleTitle),
+                      subtitle: Text(l10n.appBarToggleSubtitle),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _showLabels,
+                      onChanged: (value) {
+                        setDialogState(() {});
+                        _setAppearance(showLabels: value);
+                      },
+                      title: Text(l10n.buttonLabelsToggleTitle),
+                      subtitle: Text(l10n.buttonLabelsToggleSubtitle),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _showPageDots,
+                      onChanged: (value) {
+                        setDialogState(() {});
+                        _setAppearance(showPageDots: value);
+                      },
+                      title: Text(l10n.pageDotsToggleTitle),
+                      subtitle: Text(l10n.pageDotsToggleSubtitle),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      l10n.backgroundImageSectionHeader,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    BackgroundPicker(
+                      imageId: _backgroundImageId,
+                      onChanged: (id) {
+                        setDialogState(() {});
+                        _setBackgroundImage(id);
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                    Opacity(
+                      opacity: _backgroundImageId == null ? 0.5 : 1,
+                      child: Row(
+                        children: [
+                          Text(l10n.opacityLabel),
+                          Expanded(
+                            child: Slider(
+                              value: _backgroundOpacity,
+                              divisions: 20,
+                              label: '${(_backgroundOpacity * 100).round()}%',
+                              onChanged: _backgroundImageId == null
+                                  ? null
+                                  : (value) {
+                                      setDialogState(() {});
+                                      _setBackgroundOpacity(value);
+                                    },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Opacity(
+                      opacity: _backgroundImageId == null ? 0.5 : 1,
+                      child: SegmentedButton<BackgroundFit>(
+                        segments: [
+                          for (final fit in BackgroundFit.values)
+                            ButtonSegment(
+                              value: fit,
+                              label: Text(_backgroundFitLabel(l10n, fit)),
+                            ),
+                        ],
+                        selected: {_backgroundFit},
+                        showSelectedIcon: false,
+                        onSelectionChanged: _backgroundImageId == null
+                            ? null
+                            : (selection) {
+                                setDialogState(() {});
+                                _setBackgroundFit(selection.first);
+                              },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      l10n.gridSectionHeader,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    _NumberStepper(
+                      label: l10n.columnsLabel,
+                      value: _layout.columns,
+                      onChanged: (value) async {
+                        await _resize(columns: value);
+                        setDialogState(() {});
+                      },
+                    ),
+                    _NumberStepper(
+                      label: l10n.rowsLabel,
+                      value: _layout.rows,
+                      onChanged: (value) async {
+                        await _resize(rows: value);
+                        setDialogState(() {});
+                      },
+                    ),
+                    _NumberStepper(
+                      label: l10n.pagesLabel,
+                      value: _layout.pages,
+                      max: DeckLayout.maxPages,
+                      onChanged: (value) async {
+                        await _resize(pages: value);
+                        setDialogState(() {});
+                      },
+                    ),
+                    const Divider(height: 32),
+                    Text(
+                      l10n.backupSectionHeader,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    // Two entry points rather than one "Backup..." tile with a
+                    // sub-choice: export is safe to tap on a whim and import is
+                    // destructive, so keeping them visually distinct here
+                    // matches that difference before either is even tapped.
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.upload_outlined),
+                      title: Text(l10n.exportSettingsTitle),
+                      subtitle: Text(l10n.exportSettingsSubtitle),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _exportSettings();
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.download_outlined),
+                      title: Text(l10n.importSettingsTitle),
+                      subtitle: Text(l10n.importSettingsSubtitle),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _importSettings();
+                      },
+                    ),
+                    const Divider(height: 32),
+                    // A diagnostic, like the client's debug console: for
+                    // working out why the deck is misbehaving, not for daily use.
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.bug_report_outlined),
+                      title: Text(l10n.serviceDetailsTitle),
+                      subtitle: Text(l10n.serviceDetailsSubtitle),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        widget.onShowService();
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l10n.done),
-            ),
-          ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(l10n.done),
+              ),
+            ],
           );
         },
       ),
@@ -1377,13 +1381,25 @@ class _PickerDialogState extends State<_PickerDialog> {
   /// Which widget kind, if any, already sits here — used only to highlight
   /// the matching "Widgets" entry below, the same way every other section
   /// marks its own current choice as `selected`.
-  DeckWidgetKind? get _existingWidgetKind =>
-      switch (_existing) { final WidgetItem item => item.kind, _ => null };
+  DeckWidgetKind? get _existingWidgetKind => switch (_existing) {
+    final WidgetItem item => item.kind,
+    _ => null,
+  };
 
   String? get _currentSummary => currentButtonSummary(widget.current);
 
   void _choose(DeckItem item) =>
       Navigator.of(context).pop(DeckItemChoice(item.stored));
+
+  /// Which widget kind's rows/columns steppers [build] should show instead
+  /// of the ordinary list — null means "showing the list". Swapped in in
+  /// place, inside this same dialog, rather than opening a second `showDialog`
+  /// on top of this one: two stacked dialogs left both dialogs' own Cancel
+  /// buttons visible at once, and it was unclear which one a tap would
+  /// dismiss.
+  DeckWidgetKind? _composingWidgetKind;
+  int? _composeRows;
+  int? _composeColumns;
 
   Future<void> _composeKeyCombo() async {
     final existing = _existing;
@@ -1429,25 +1445,70 @@ class _PickerDialogState extends State<_PickerDialog> {
     _choose(item);
   }
 
-  Future<void> _composeWidget(DeckWidgetKind kind) async {
+  void _startComposingWidget(DeckWidgetKind kind) {
     final existing = _existing;
-    final item = await showDialog<WidgetItem>(
-      context: context,
-      builder: (context) => _WidgetDialog(
-        kind: kind,
-        existing: existing is WidgetItem && existing.kind == kind
-            ? existing
-            : null,
-        maxRowSpan: widget.maxRowSpan!,
-        maxColumnSpan: widget.maxColumnSpan!,
-      ),
-    );
-    if (item == null || !mounted) return;
-    _choose(item);
+    final prefill = existing is WidgetItem && existing.kind == kind
+        ? existing
+        : null;
+    setState(() {
+      _composingWidgetKind = kind;
+      _composeRows = (prefill?.rowSpan ?? 2).clamp(1, widget.maxRowSpan!);
+      _composeColumns = (prefill?.columnSpan ?? 2).clamp(
+        1,
+        widget.maxColumnSpan!,
+      );
+    });
   }
+
+  void _cancelComposingWidget() => setState(() => _composingWidgetKind = null);
+
+  void _saveComposingWidget() => _choose(
+    WidgetItem(
+      kind: _composingWidgetKind!,
+      rowSpan: _composeRows!,
+      columnSpan: _composeColumns!,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
+    final composingKind = _composingWidgetKind;
+    if (composingKind != null) {
+      return AlertDialog(
+        title: Text(composingKind.label),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _NumberStepper(
+                label: 'Rows',
+                value: _composeRows!,
+                max: widget.maxRowSpan!,
+                onChanged: (value) => setState(() => _composeRows = value),
+              ),
+              _NumberStepper(
+                label: 'Columns',
+                value: _composeColumns!,
+                max: widget.maxColumnSpan!,
+                onChanged: (value) => setState(() => _composeColumns = value),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _cancelComposingWidget,
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _saveComposingWidget,
+            child: const Text('Save'),
+          ),
+        ],
+      );
+    }
+
     final needle = _query.toLowerCase();
     final apps = _query.isEmpty
         ? widget.apps
@@ -1466,6 +1527,10 @@ class _PickerDialogState extends State<_PickerDialog> {
         width: 440,
         height: 560,
         child: Column(
+          // Left-aligned to match the list below — a Column centers its
+          // children by default, which only ever showed on _currentSummary
+          // (everything else here is already full-width).
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1537,7 +1602,8 @@ class _PickerDialogState extends State<_PickerDialog> {
                         title: const Text('Clock...'),
                         subtitle: const Text('Live analog clock'),
                         selected: _existingWidgetKind == DeckWidgetKind.clock,
-                        onTap: () => _composeWidget(DeckWidgetKind.clock),
+                        onTap: () =>
+                            _startComposingWidget(DeckWidgetKind.clock),
                       ),
                       ListTile(
                         leading: const Icon(Icons.calendar_month),
@@ -1545,7 +1611,8 @@ class _PickerDialogState extends State<_PickerDialog> {
                         subtitle: const Text('Current month'),
                         selected:
                             _existingWidgetKind == DeckWidgetKind.calendar,
-                        onTap: () => _composeWidget(DeckWidgetKind.calendar),
+                        onTap: () =>
+                            _startComposingWidget(DeckWidgetKind.calendar),
                       ),
                     ],
                     const _SectionLabel('Media controls'),
@@ -2064,82 +2131,6 @@ class _ShellDialogState extends State<_ShellDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(onPressed: _save, child: const Text('Add')),
-      ],
-    );
-  }
-}
-
-/// Composes a Clock or Calendar widget: how many rows and columns of the
-/// grid it should occupy, anchored at whichever cell was tapped to open
-/// this — see [DeckLayout.footprintFor]. [maxRowSpan]/[maxColumnSpan] are
-/// already bounded to what actually fits there (from
-/// [LayoutPageState._pick] via [maxWidgetSpanAt]), so every combination the
-/// steppers below can reach is guaranteed to fit without ever needing
-/// [DeckLayout.footprintFor]'s own clamping.
-class _WidgetDialog extends StatefulWidget {
-  const _WidgetDialog({
-    required this.kind,
-    required this.existing,
-    required this.maxRowSpan,
-    required this.maxColumnSpan,
-  });
-
-  final DeckWidgetKind kind;
-
-  /// Prefills the steppers when reconfiguring a widget already here, rather
-  /// than always starting from a fixed default size.
-  final WidgetItem? existing;
-
-  final int maxRowSpan;
-  final int maxColumnSpan;
-
-  @override
-  State<_WidgetDialog> createState() => _WidgetDialogState();
-}
-
-class _WidgetDialogState extends State<_WidgetDialog> {
-  late int _rows = (widget.existing?.rowSpan ?? 2).clamp(1, widget.maxRowSpan);
-  late int _columns = (widget.existing?.columnSpan ?? 2).clamp(
-    1,
-    widget.maxColumnSpan,
-  );
-
-  void _save() {
-    Navigator.of(
-      context,
-    ).pop(WidgetItem(kind: widget.kind, rowSpan: _rows, columnSpan: _columns));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.kind.label),
-      content: SizedBox(
-        width: 320,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _NumberStepper(
-              label: 'Rows',
-              value: _rows,
-              max: widget.maxRowSpan,
-              onChanged: (value) => setState(() => _rows = value),
-            ),
-            _NumberStepper(
-              label: 'Columns',
-              value: _columns,
-              max: widget.maxColumnSpan,
-              onChanged: (value) => setState(() => _columns = value),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }

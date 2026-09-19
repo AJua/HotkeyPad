@@ -1440,17 +1440,28 @@ class _DeckWidgetTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) => switch (item.kind) {
-        DeckWidgetKind.clock => AnalogClock(
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
+    return Material(
+      color: Colors.transparent,
+      // A tap here does nothing — there's no press to send the host for a
+      // Clock or Calendar — but a first touch with no ripple and no haptic
+      // at all reads as "is this broken?", the same way any other dead
+      // spot on screen would. This is the same acknowledgement _DeckButton
+      // gives a real press, without pretending there's a real one here.
+      child: InkWell(
+        onTap: () => unawaited(HapticFeedback.selectionClick()),
+        child: LayoutBuilder(
+          builder: (context, constraints) => switch (item.kind) {
+            DeckWidgetKind.clock => AnalogClock(
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+            ),
+            DeckWidgetKind.calendar => MonthCalendar(
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+            ),
+          },
         ),
-        DeckWidgetKind.calendar => MonthCalendar(
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
-        ),
-      },
+      ),
     );
   }
 }

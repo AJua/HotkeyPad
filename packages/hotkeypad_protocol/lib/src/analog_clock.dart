@@ -75,32 +75,40 @@ class _AnalogClockState extends State<AnalogClock> {
     // the block itself to widget.width/height minus the margin, and only
     // then wrapping it in that much Padding, keeps this explicit rather
     // than depending on whatever constraint happens to reach here.
-    return Padding(
-      padding: const EdgeInsets.all(margin),
-      // The dial itself paints a circular backing in the app's own
-      // surface color (see _ClockPainter's own doc comment) — there is no
-      // separate square card behind it beyond that.
-      child: SizedBox(
-        width: outerWidth,
-        height: outerHeight,
-        // Center, not the outer SizedBox, is what actually shrinks the
-        // face by _blockScale — the outer SizedBox still claims the full
-        // outerWidth x outerHeight so nothing else in the grid reflows.
-        child: Center(
-          child: SizedBox(
-            width: faceWidth,
-            height: faceHeight,
-            // A childless CustomPaint sizes itself to this explicitly —
-            // without it, Center's own loose constraint would leave it
-            // nothing to measure against and it would collapse to zero
-            // size, painting nothing.
-            child: CustomPaint(
-              size: Size(faceWidth, faceHeight),
-              painter: _ClockPainter(
-                _now,
-                dark: dark,
-                accent: Theme.of(context).colorScheme.primary,
-                surface: Theme.of(context).colorScheme.surface,
+    // A screen reader has nothing else to go on here — the face is a single
+    // CustomPaint with no text of its own — so it gets an explicit label
+    // instead of silently announcing "unlabeled image". No liveRegion: the
+    // label is current whenever it's actually read (on focus), but the
+    // widget ticking every second isn't worth re-announcing constantly.
+    return Semantics(
+      label: 'Clock, ${TimeOfDay.fromDateTime(_now).format(context)}',
+      child: Padding(
+        padding: const EdgeInsets.all(margin),
+        // The dial itself paints a circular backing in the app's own
+        // surface color (see _ClockPainter's own doc comment) — there is no
+        // separate square card behind it beyond that.
+        child: SizedBox(
+          width: outerWidth,
+          height: outerHeight,
+          // Center, not the outer SizedBox, is what actually shrinks the
+          // face by _blockScale — the outer SizedBox still claims the full
+          // outerWidth x outerHeight so nothing else in the grid reflows.
+          child: Center(
+            child: SizedBox(
+              width: faceWidth,
+              height: faceHeight,
+              // A childless CustomPaint sizes itself to this explicitly —
+              // without it, Center's own loose constraint would leave it
+              // nothing to measure against and it would collapse to zero
+              // size, painting nothing.
+              child: CustomPaint(
+                size: Size(faceWidth, faceHeight),
+                painter: _ClockPainter(
+                  _now,
+                  dark: dark,
+                  accent: Theme.of(context).colorScheme.primary,
+                  surface: Theme.of(context).colorScheme.surface,
+                ),
               ),
             ),
           ),
@@ -155,7 +163,7 @@ class _ClockPainter extends CustomPainter {
       progress * 2 * math.pi,
       false,
       Paint()
-        ..color = accent.withValues(alpha: 0.55)
+        ..color = accent.withValues(alpha: 0.75)
         ..style = PaintingStyle.stroke
         ..strokeWidth = radius * 0.026
         ..strokeCap = StrokeCap.round,
