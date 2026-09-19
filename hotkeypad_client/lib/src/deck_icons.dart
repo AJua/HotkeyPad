@@ -52,14 +52,23 @@ bool looksLikeSvgIcon(Uint8List bytes) {
 /// should be recolored to, given the deck's current theme and whether a
 /// custom background image is showing behind it.
 ///
-/// Without a custom background, the icon floats directly on the deck's
-/// own themed background, so the app's brand color alone (for both the
-/// border and the glyph, on a transparent fill) already reads clearly
-/// against either theme — this is the look the icon shipped with before
-/// it became recolorable at all. With a custom background, an arbitrary
-/// photo could sit behind it, so a solid scrim is added — white in a
-/// light theme, black in a dark one — to stay legible regardless of what
-/// the photo itself looks like.
+/// The border and the glyph both use the same black-or-white-by-brightness
+/// logic as [AnalogClock]'s own numbers (its `faceColor`: `Colors.white`
+/// in dark mode, `Colors.black87` in light mode) rather than the brand
+/// accent — consistent with how every other piece of deck chrome reads
+/// against either theme, and it reads as one shape (an outlined glyph)
+/// rather than a two-tone one.
+///
+/// Without a custom background, that alone (on a transparent fill) is
+/// what makes an action button read as a drawn icon rather than a photo —
+/// the look the icon shipped with before it became recolorable at all,
+/// just monochrome now instead of a fixed accent. With a custom
+/// background, an arbitrary photo could sit behind it, so a solid scrim
+/// is added — white in a light theme, black in a dark one — to stay
+/// legible regardless of what the photo itself looks like; since the
+/// scrim and the glyph/border would otherwise be the same color and
+/// disappear into each other, the scrim always takes the *opposite* of
+/// `faceColor`, not the theme's own light/dark choice directly.
 ///
 /// The scrim is fully opaque, not merely translucent, on purpose: Impeller
 /// on Android has a real bug (github.com/flutter/flutter, e.g. #158749/
@@ -73,14 +82,18 @@ bool looksLikeSvgIcon(Uint8List bytes) {
   required Brightness brightness,
   required bool hasCustomBackground,
 }) {
-  const accent = HotkeyPad.themeSeedColor;
+  final dark = brightness == Brightness.dark;
+  // Matches AnalogClock's own `faceColor` exactly.
+  final faceColor = dark ? Colors.white : Colors.black87;
   if (!hasCustomBackground) {
-    return (border: accent, glyph: accent, background: Colors.transparent);
+    return (
+      border: faceColor,
+      glyph: faceColor,
+      background: Colors.transparent,
+    );
   }
-  final background = brightness == Brightness.dark
-      ? Colors.black
-      : Colors.white;
-  return (border: accent, glyph: accent, background: background);
+  final background = dark ? Colors.black : Colors.white;
+  return (border: faceColor, glyph: faceColor, background: background);
 }
 
 /// Substitutes [glyphIconColors]' output into an SVG template's

@@ -71,38 +71,47 @@ void main() {
   });
 
   group('glyphIconColors', () {
-    test('no custom background: transparent, brand-colored border/glyph', () {
-      final colors = glyphIconColors(
+    test('no custom background: transparent, clock-style border and glyph', () {
+      final light = glyphIconColors(
         brightness: Brightness.light,
         hasCustomBackground: false,
       );
-      expect(colors.background, Colors.transparent);
-      expect(colors.border, HotkeyPad.themeSeedColor);
-      expect(colors.glyph, HotkeyPad.themeSeedColor);
+      expect(light.background, Colors.transparent);
+      // Both match AnalogClock's own faceColor exactly.
+      expect(light.border, Colors.black87);
+      expect(light.glyph, Colors.black87);
+
+      final dark = glyphIconColors(
+        brightness: Brightness.dark,
+        hasCustomBackground: false,
+      );
+      expect(dark.border, Colors.white);
+      expect(dark.glyph, Colors.white);
     });
 
-    test(
-      'custom background in light theme gets a fully opaque white scrim',
-      () {
-        final colors = glyphIconColors(
-          brightness: Brightness.light,
-          hasCustomBackground: true,
-        );
-        expect(colors.background, isNot(Colors.transparent));
-        expect(colors.background.r, 1.0);
-        expect(colors.background.g, 1.0);
-        expect(colors.background.b, 1.0);
-        // Not merely translucent — see glyphIconColors' own doc comment for
-        // the Impeller/Android bug this specifically works around.
-        expect(colors.background.a, 1.0);
-      },
-    );
+    test('custom background in light theme gets a fully opaque white scrim, '
+        'opposite the black border/glyph', () {
+      final colors = glyphIconColors(
+        brightness: Brightness.light,
+        hasCustomBackground: true,
+      );
+      expect(colors.border, Colors.black87);
+      expect(colors.background, isNot(Colors.transparent));
+      expect(colors.background.r, 1.0);
+      expect(colors.background.g, 1.0);
+      expect(colors.background.b, 1.0);
+      // Not merely translucent — see glyphIconColors' own doc comment for
+      // the Impeller/Android bug this specifically works around.
+      expect(colors.background.a, 1.0);
+    });
 
-    test('custom background in dark theme gets a fully opaque black scrim', () {
+    test('custom background in dark theme gets a fully opaque black scrim, '
+        'opposite the white border/glyph', () {
       final colors = glyphIconColors(
         brightness: Brightness.dark,
         hasCustomBackground: true,
       );
+      expect(colors.border, Colors.white);
       expect(colors.background, isNot(Colors.transparent));
       expect(colors.background.r, 0.0);
       expect(colors.background.g, 0.0);
