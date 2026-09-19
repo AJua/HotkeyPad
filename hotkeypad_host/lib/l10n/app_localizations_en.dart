@@ -194,4 +194,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get serviceDetailsSubtitle =>
       'Advertising state, connected clients, activity log';
+
+  @override
+  String get reportIssueTitle => 'Report an issue';
+
+  @override
+  String get reportIssueSubtitle => 'Opens the HotkeyPad GitHub repository';
 }

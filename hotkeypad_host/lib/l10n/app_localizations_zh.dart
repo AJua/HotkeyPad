@@ -186,6 +186,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get serviceDetailsSubtitle => '廣播狀態、已連線裝置、活動紀錄';
+
+  @override
+  String get reportIssueTitle => '回報問題';
+
+  @override
+  String get reportIssueSubtitle => '開啟 HotkeyPad 的 GitHub 頁面';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -370,4 +376,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get serviceDetailsSubtitle => '廣播狀態、已連線裝置、活動紀錄';
+
+  @override
+  String get reportIssueTitle => '回報問題';
+
+  @override
+  String get reportIssueSubtitle => '開啟 HotkeyPad 的 GitHub 頁面';
 }

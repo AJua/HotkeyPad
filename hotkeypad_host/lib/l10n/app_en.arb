@@ -181,5 +181,11 @@
   "@serviceDetailsTitle": {"description": "Settings dialog list tile title."},
 
   "serviceDetailsSubtitle": "Advertising state, connected clients, activity log",
-  "@serviceDetailsSubtitle": {"description": "Settings dialog list tile subtitle."}
+  "@serviceDetailsSubtitle": {"description": "Settings dialog list tile subtitle."},
+
+  "reportIssueTitle": "Report an issue",
+  "@reportIssueTitle": {"description": "Settings dialog list tile title that opens the HotkeyPad GitHub issue tracker in a browser."},
+
+  "reportIssueSubtitle": "Opens the HotkeyPad GitHub repository",
+  "@reportIssueSubtitle": {"description": "Settings dialog list tile subtitle."}
 }

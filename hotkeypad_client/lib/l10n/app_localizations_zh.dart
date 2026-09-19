@@ -172,6 +172,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get done => '完成';
 
   @override
+  String get reportIssueTitle => '回報問題';
+
+  @override
+  String get reportIssueSubtitle => '開啟 HotkeyPad 的 GitHub 頁面';
+
+  @override
   String get nearbyDevices => '附近裝置';
 
   @override
@@ -439,6 +445,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get done => '完成';
+
+  @override
+  String get reportIssueTitle => '回報問題';
+
+  @override
+  String get reportIssueSubtitle => '開啟 HotkeyPad 的 GitHub 頁面';
 
   @override
   String get nearbyDevices => '附近裝置';

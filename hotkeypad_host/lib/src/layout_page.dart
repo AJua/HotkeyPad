@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import 'app_launcher.dart';
@@ -13,6 +14,11 @@ import 'deck_icons.dart';
 import 'layout_store.dart';
 import 'settings_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
+
+/// Where the Settings dialog's "Report an issue" entry sends the user —
+/// straight to composing a new issue rather than just the repository root,
+/// since that's the actual next step anyone tapping it wants.
+const _githubIssuesUrl = 'https://github.com/AJua/HotkeyPad/issues/new';
 
 /// The buttons a resize to this shape would leave outside the grid.
 ///
@@ -753,6 +759,14 @@ class LayoutPageState extends State<LayoutPage> {
                         widget.onShowService();
                       },
                     ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.feedback_outlined),
+                      title: Text(l10n.reportIssueTitle),
+                      subtitle: Text(l10n.reportIssueSubtitle),
+                      trailing: const Icon(Icons.open_in_new),
+                      onTap: _reportIssue,
+                    ),
                   ],
                 ),
               ),
@@ -823,6 +837,16 @@ class LayoutPageState extends State<LayoutPage> {
   Future<void> _setBackgroundFit(BackgroundFit fit) async {
     setState(() => _backgroundFit = fit);
     await _saveAppearance();
+  }
+
+  /// Opens the GitHub issue tracker in the user's default browser — the
+  /// dialog itself stays open underneath, unlike Export/Import/Service
+  /// details, since this doesn't navigate anywhere inside the app.
+  Future<void> _reportIssue() async {
+    await launchUrl(
+      Uri.parse(_githubIssuesUrl),
+      mode: LaunchMode.externalApplication,
+    );
   }
 
   /// Saves the current appearance, layout, and custom icons to a file the

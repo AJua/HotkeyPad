@@ -173,6 +173,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get done => '完了';
 
   @override
+  String get reportIssueTitle => '問題を報告';
+
+  @override
+  String get reportIssueSubtitle => 'HotkeyPad の GitHub リポジトリを開きます';
+
+  @override
   String get nearbyDevices => '近くのデバイス';
 
   @override

@@ -181,6 +181,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get done => 'Done';
 
   @override
+  String get reportIssueTitle => 'Report an issue';
+
+  @override
+  String get reportIssueSubtitle => 'Opens the HotkeyPad GitHub repository';
+
+  @override
   String get nearbyDevices => 'Nearby devices';
 
   @override

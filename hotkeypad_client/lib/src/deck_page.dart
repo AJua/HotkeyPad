@@ -5,6 +5,7 @@ import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import 'background_fit.dart';
@@ -20,6 +21,11 @@ import 'scan_page.dart';
 import 'deck_icons.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'session.dart';
+
+/// Where the Settings dialog's "Report an issue" entry sends the user —
+/// straight to composing a new issue rather than just the repository root,
+/// since that's the actual next step anyone tapping it wants.
+const _githubIssuesUrl = 'https://github.com/AJua/HotkeyPad/issues/new';
 
 /// What port a manually-entered host address should be dialed on: the
 /// typed value if it parses to a positive integer, [WifiLink.tcpPort] (the
@@ -446,6 +452,16 @@ class _DeckPageState extends State<DeckPage> {
     await session.press(id, item);
   }
 
+  /// Opens the GitHub issue tracker in the device's browser — the settings
+  /// dialog itself stays open underneath, since this doesn't navigate
+  /// anywhere inside the app the way Nearby devices/Debug console do.
+  Future<void> _reportIssue() async {
+    await launchUrl(
+      Uri.parse(_githubIssuesUrl),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = _session;
@@ -743,6 +759,15 @@ class _DeckPageState extends State<DeckPage> {
                           ),
                         ],
                       ),
+                    ),
+                    const Divider(height: 32),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.feedback_outlined),
+                      title: Text(l10n.reportIssueTitle),
+                      subtitle: Text(l10n.reportIssueSubtitle),
+                      trailing: const Icon(Icons.open_in_new),
+                      onTap: _reportIssue,
                     ),
                     // Developer diagnostics, like the host's own "Service
                     // details" — for working out why the deck is

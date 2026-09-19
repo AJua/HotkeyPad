@@ -407,6 +407,18 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get done;
 
+  /// Settings-dialog entry that opens the HotkeyPad GitHub issue tracker in a browser.
+  ///
+  /// In en, this message translates to:
+  /// **'Report an issue'**
+  String get reportIssueTitle;
+
+  /// Subtitle under reportIssueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the HotkeyPad GitHub repository'**
+  String get reportIssueSubtitle;
+
   /// Settings-dialog entry opening the Bluetooth scanner diagnostic, and title of the page it opens.
   ///
   /// In en, this message translates to:

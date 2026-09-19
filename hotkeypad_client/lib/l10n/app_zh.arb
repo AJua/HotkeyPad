@@ -52,6 +52,8 @@
   "connectionMethodSettingsTitle": "連線方式",
   "settingsTitle": "設定",
   "done": "完成",
+  "reportIssueTitle": "回報問題",
+  "reportIssueSubtitle": "開啟 HotkeyPad 的 GitHub 頁面",
   "nearbyDevices": "附近裝置",
   "notConnectedToHostYet": "尚未連上 host。",
   "noTrafficYet": "尚無任何流量。",

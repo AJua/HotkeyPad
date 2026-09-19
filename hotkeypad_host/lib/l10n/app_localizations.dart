@@ -442,6 +442,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Advertising state, connected clients, activity log'**
   String get serviceDetailsSubtitle;
+
+  /// Settings dialog list tile title that opens the HotkeyPad GitHub issue tracker in a browser.
+  ///
+  /// In en, this message translates to:
+  /// **'Report an issue'**
+  String get reportIssueTitle;
+
+  /// Settings dialog list tile subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the HotkeyPad GitHub repository'**
+  String get reportIssueSubtitle;
 }
 
 class _AppLocalizationsDelegate

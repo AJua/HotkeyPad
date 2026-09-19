@@ -57,5 +57,7 @@
   "importSettingsTitle": "匯入設定…",
   "importSettingsSubtitle": "以備份檔取代目前的設定",
   "serviceDetailsTitle": "服務詳細資訊",
-  "serviceDetailsSubtitle": "廣播狀態、已連線裝置、活動紀錄"
+  "serviceDetailsSubtitle": "廣播狀態、已連線裝置、活動紀錄",
+  "reportIssueTitle": "回報問題",
+  "reportIssueSubtitle": "開啟 HotkeyPad 的 GitHub 頁面"
 }

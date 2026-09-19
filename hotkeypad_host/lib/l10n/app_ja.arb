@@ -57,5 +57,7 @@
   "importSettingsTitle": "設定をインポート…",
   "importSettingsSubtitle": "バックアップファイルで現在の設定を置き換えます",
   "serviceDetailsTitle": "サービスの詳細",
-  "serviceDetailsSubtitle": "アドバタイズ状態、接続中のデバイス、アクティビティログ"
+  "serviceDetailsSubtitle": "アドバタイズ状態、接続中のデバイス、アクティビティログ",
+  "reportIssueTitle": "問題を報告",
+  "reportIssueSubtitle": "HotkeyPad の GitHub リポジトリを開きます"
 }

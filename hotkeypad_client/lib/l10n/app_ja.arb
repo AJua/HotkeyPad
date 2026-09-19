@@ -52,6 +52,8 @@
   "connectionMethodSettingsTitle": "接続方法",
   "settingsTitle": "設定",
   "done": "完了",
+  "reportIssueTitle": "問題を報告",
+  "reportIssueSubtitle": "HotkeyPad の GitHub リポジトリを開きます",
   "nearbyDevices": "近くのデバイス",
   "notConnectedToHostYet": "まだ host に接続していません。",
   "noTrafficYet": "まだ通信がありません。",

@@ -190,4 +190,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get serviceDetailsSubtitle => 'アドバタイズ状態、接続中のデバイス、アクティビティログ';
+
+  @override
+  String get reportIssueTitle => '問題を報告';
+
+  @override
+  String get reportIssueSubtitle => 'HotkeyPad の GitHub リポジトリを開きます';
 }

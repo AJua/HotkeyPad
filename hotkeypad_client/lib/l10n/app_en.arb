@@ -172,6 +172,11 @@
   "done": "Done",
   "@done": {"description": "Button that closes the settings dialog."},
 
+  "reportIssueTitle": "Report an issue",
+  "@reportIssueTitle": {"description": "Settings-dialog entry that opens the HotkeyPad GitHub issue tracker in a browser."},
+  "reportIssueSubtitle": "Opens the HotkeyPad GitHub repository",
+  "@reportIssueSubtitle": {"description": "Subtitle under reportIssueTitle."},
+
   "nearbyDevices": "Nearby devices",
   "@nearbyDevices": {"description": "Settings-dialog entry opening the Bluetooth scanner diagnostic, and title of the page it opens."},
 
