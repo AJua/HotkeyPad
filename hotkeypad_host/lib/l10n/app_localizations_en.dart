@@ -53,15 +53,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nothingYet => 'Nothing yet.';
 
   @override
-  String wifiPinNewDevice(String name) {
-    return '$name wants to connect over WiFi — code:';
+  String pinChallengeNewDevice(String name) {
+    return '$name wants to connect — code:';
   }
 
   @override
   String get newDeviceFallback => 'A new device';
 
   @override
-  String get wifiPinReject => 'Reject — don\'t let this device connect';
+  String get pinChallengeReject => 'Reject — don\'t let this device connect';
 
   @override
   String updateAvailable(String version) {

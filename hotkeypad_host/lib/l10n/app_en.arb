@@ -46,17 +46,17 @@
   "nothingYet": "Nothing yet.",
   "@nothingYet": {"description": "Empty state for the activity log."},
 
-  "wifiPinNewDevice": "{name} wants to connect over WiFi — code:",
-  "@wifiPinNewDevice": {
-    "description": "WiFi pairing banner, before the PIN itself.",
+  "pinChallengeNewDevice": "{name} wants to connect — code:",
+  "@pinChallengeNewDevice": {
+    "description": "Pairing banner, before the PIN itself. Shown for a new WiFi or Bluetooth connection alike.",
     "placeholders": {"name": {"type": "String"}}
   },
 
   "newDeviceFallback": "A new device",
   "@newDeviceFallback": {"description": "Used in place of a name the connecting device didn't give."},
 
-  "wifiPinReject": "Reject — don't let this device connect",
-  "@wifiPinReject": {"description": "Tooltip on the WiFi pairing banner's close button."},
+  "pinChallengeReject": "Reject — don't let this device connect",
+  "@pinChallengeReject": {"description": "Tooltip on the pairing banner's close button."},
 
   "updateAvailable": "HotkeyPad Host {version} is available.",
   "@updateAvailable": {

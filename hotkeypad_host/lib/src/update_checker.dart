@@ -29,7 +29,7 @@ class LatestRelease {
 ///
 /// Returns null for anything that doesn't look like a real release
 /// response — the same "degrade quietly" stance every other optional
-/// feature in this codebase takes (see e.g. `WifiTrustStore.load`).
+/// feature in this codebase takes (see e.g. `ClientTrustStore.load`).
 LatestRelease? parseLatestRelease(Map<String, dynamic> json) {
   final tag = json['tag_name'];
   final url = json['html_url'];

@@ -12,7 +12,7 @@ import 'config_dir.dart';
 /// one should follow to the other.
 ///
 /// Persisted the same `~/.config/HotkeyPad/*` file way as every other
-/// host-side store (`WifiTrustStore`, `UpdateStore`, ...) — plain text,
+/// host-side store (`ClientTrustStore`, `UpdateStore`, ...) — plain text,
 /// not JSON, since there is exactly one value to hold.
 abstract final class LocaleStore {
   static File? get _file {

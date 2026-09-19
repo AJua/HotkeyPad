@@ -179,11 +179,11 @@ abstract class AppLocalizations {
   /// **'Nothing yet.'**
   String get nothingYet;
 
-  /// WiFi pairing banner, before the PIN itself.
+  /// Pairing banner, before the PIN itself. Shown for a new WiFi or Bluetooth connection alike.
   ///
   /// In en, this message translates to:
-  /// **'{name} wants to connect over WiFi — code:'**
-  String wifiPinNewDevice(String name);
+  /// **'{name} wants to connect — code:'**
+  String pinChallengeNewDevice(String name);
 
   /// Used in place of a name the connecting device didn't give.
   ///
@@ -191,11 +191,11 @@ abstract class AppLocalizations {
   /// **'A new device'**
   String get newDeviceFallback;
 
-  /// Tooltip on the WiFi pairing banner's close button.
+  /// Tooltip on the pairing banner's close button.
   ///
   /// In en, this message translates to:
   /// **'Reject — don\'t let this device connect'**
-  String get wifiPinReject;
+  String get pinChallengeReject;
 
   /// Update banner text.
   ///

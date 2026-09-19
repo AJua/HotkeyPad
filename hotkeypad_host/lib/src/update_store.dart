@@ -42,7 +42,7 @@ bool shouldShowBanner(String? dismissedVersion, String latestVersion) =>
     dismissedVersion != latestVersion;
 
 /// Persists what the host knows about available updates, the same
-/// `~/.config/HotkeyPad/*.json` pattern as `WifiTrustStore`/
+/// `~/.config/HotkeyPad/*.json` pattern as `ClientTrustStore`/
 /// `SettingsStore` — one small file, static-only class, never throws
 /// outward.
 abstract final class UpdateStore {

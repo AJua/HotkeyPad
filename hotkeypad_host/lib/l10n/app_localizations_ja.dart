@@ -53,15 +53,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get nothingYet => 'まだ何もありません。';
 
   @override
-  String wifiPinNewDevice(String name) {
-    return '$name が WiFi で接続しようとしています — コード:';
+  String pinChallengeNewDevice(String name) {
+    return '$name が接続しようとしています — コード:';
   }
 
   @override
   String get newDeviceFallback => '新しいデバイス';
 
   @override
-  String get wifiPinReject => '拒否 — このデバイスの接続を許可しない';
+  String get pinChallengeReject => '拒否 — このデバイスの接続を許可しない';
 
   @override
   String updateAvailable(String version) {

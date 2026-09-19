@@ -45,9 +45,10 @@ enum LinkStage {
   discovering('Discovering services'),
   subscribing('Subscribing'),
 
-  /// WiFi only: the host does not recognize this install yet and is
-  /// waiting on [HotkeyPadSession.submitPin] — see [RequestPin]. Bluetooth
-  /// never enters this stage.
+  /// The host does not recognize this install yet and is waiting on
+  /// [HotkeyPadSession.submitPin] — see [RequestPin]. Reachable on either
+  /// transport: the host runs the same PIN challenge over Bluetooth as it
+  /// does over WiFi.
   awaitingPin('Enter the code shown on the host'),
   ready('Connected'),
   disconnected('Disconnected'),
@@ -450,9 +451,17 @@ class HotkeyPadSession extends ChangeNotifier {
           _pinError = 'Incorrect PIN';
           _pinRejectedDisconnect = true;
           _append('PIN rejected', inbound: true);
-          // The host closes the connection shortly; the existing
-          // reconnect flow (a fresh attempt, a fresh PIN) takes it from
-          // here rather than this offering its own retry path.
+          // A WiFi host can simply close the rejected socket, but a BLE
+          // peripheral cannot force a central off its own connection on
+          // most platforms (see the host's own `_rejectBleCentral`), so
+          // the central — this side of the link — ends it instead, to
+          // reach the same "fresh connection, fresh PIN" outcome WiFi
+          // already gets for free. The existing reconnect flow (a fresh
+          // attempt, a fresh PIN) takes it from either transport's
+          // disconnect rather than this offering its own retry path.
+          if (target case BleTarget(:final peripheral)) {
+            unawaited(_central.disconnect(peripheral));
+          }
         }
       case Hello() ||
           SetOrientation() ||
@@ -710,8 +719,9 @@ class HotkeyPadSession extends ChangeNotifier {
       notifyListeners();
 
       // So the host can tell this device apart from any other connected at
-      // the same time — see its device lock. clientId is what a WiFi
-      // host's PIN-pairing remembers across reconnects; see RequestPin.
+      // the same time — see its device lock. clientId is also what the
+      // host's PIN-pairing remembers across reconnects, on either
+      // transport; see RequestPin.
       await _send(
         Hello(
           name: await DeviceInfo.name(),

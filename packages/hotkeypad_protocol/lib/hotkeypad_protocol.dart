@@ -142,10 +142,9 @@ final class Hello extends HotkeyPadMessage {
   /// Generated once per install and persisted (see `hotkeypad_client`'s
   /// `ClientIdentity`), unrelated to any transport-level id — a BLE
   /// central's uuid or a WiFi socket's address:port are both scoped to
-  /// one connection, but the WiFi PIN-pairing flow (`RequestPin`/
-  /// `SubmitPin`/`PinResult`) needs an identity that survives a
-  /// reconnect, which is what this is for. BLE ignores it entirely; it
-  /// travels regardless since both transports share this one message.
+  /// one connection, but the PIN-pairing flow (`RequestPin`/`SubmitPin`/
+  /// `PinResult`) needs an identity that survives a reconnect on either
+  /// transport, which is what this is for.
   final String clientId;
 
   @override
@@ -165,12 +164,13 @@ final class SetOrientation extends HotkeyPadMessage {
   Map<String, Object?> toJson() => {'t': 'ori', 'p': portrait};
 }
 
-/// Host -> client, WiFi only: this is the first time the host has seen
-/// this [Hello.clientId], so it needs a PIN — displayed on the host's own
+/// Host -> client: this is the first time the host has seen this
+/// [Hello.clientId], so it needs a PIN — displayed on the host's own
 /// screen for the user to read off and type into the client — before
-/// anything else from this connection is acted on. Bluetooth never sends
-/// this: physical proximity to discover the host at all is already a
-/// meaningfully higher bar than being on the same WiFi network.
+/// anything else from this connection is acted on. Sent on either
+/// transport: a BLE central being close enough to discover the host is
+/// no more trusted on its own than a WiFi client being on the same
+/// network is.
 final class RequestPin extends HotkeyPadMessage {
   const RequestPin();
 
@@ -190,8 +190,14 @@ final class SubmitPin extends HotkeyPadMessage {
 
 /// Host -> client: whether [SubmitPin] matched. `true` means this
 /// [Hello.clientId] is now remembered and will not be asked again; `false`
-/// means the host is about to close the connection — trying again means a
-/// fresh connection and a fresh PIN, not another guess on this one.
+/// means the host is done with this connection — trying again means a
+/// fresh connection and a fresh PIN, not another guess on this one. Over
+/// WiFi that is an explicit closed socket; a BLE peripheral cannot always
+/// force a central to disconnect, so there the host instead simply stops
+/// responding to anything else this central sends, and it is the
+/// well-behaved client (see `hotkeypad_client`'s `HotkeyPadSession`) that
+/// disconnects itself on a rejected PIN to get the same fresh-connection
+/// outcome.
 final class PinResult extends HotkeyPadMessage {
   const PinResult({required this.ok});
 

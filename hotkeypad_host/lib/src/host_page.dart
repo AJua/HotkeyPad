@@ -12,6 +12,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../l10n/app_localizations.dart';
 import 'app_launcher.dart';
 import 'background_image_store.dart';
+import 'client_trust_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
 import 'host_identity.dart';
@@ -25,7 +26,6 @@ import 'unsupported_page.dart';
 import 'update_checker.dart';
 import 'update_store.dart';
 import 'wifi_server.dart';
-import 'wifi_trust_store.dart';
 
 /// What running one action came to — every `AppLauncher.open`-style helper
 /// already returns this shape, so a combo step and a top-level press report
@@ -94,6 +94,40 @@ String? nextLockedClientId({
   return connectedClientIds.length == 1 ? connectedClientIds.single : null;
 }
 
+/// Whether an incoming message from a not-yet-trusted BLE central should
+/// be dropped outright, without even looking at whether it is a fresh
+/// [Hello] — pulled out of [_HostPageState._routeMessage] for the same
+/// reason [isPressAllowed] is its own function.
+///
+/// True only once this central has already used its one PIN attempt (or
+/// was blocked outright) on this very connection — see
+/// [_HostPageState._rejectBleCentral]'s own doc comment for why that
+/// central cannot simply be disconnected and made to reconnect for a
+/// fresh one on most platforms. WiFi never reaches this check: a rejected
+/// WiFi socket is actually closed, so there is no later message from it
+/// to drop.
+bool bleAttemptExhausted({
+  required LinkTransport transport,
+  required bool alreadyRejected,
+}) => transport == LinkTransport.bluetooth && alreadyRejected;
+
+/// What a client should count as subscribed the moment it is first
+/// touched into `_clients` — pulled out of [_HostPageState._onHello]/
+/// [_HostPageState._verifyPin] for the same reason [isPressAllowed] is
+/// its own function.
+///
+/// Always true for WiFi: a raw socket has no subscribe step of its own,
+/// so it always receives whatever is sent once it is trusted (see the
+/// long-form comment this replaced, still worth reading in git history).
+/// For BLE, whatever [bleSubscribed] says — a real GATT subscribe/
+/// unsubscribe the central may well have already done before trust was
+/// even decided, since a client's own connect sequence subscribes before
+/// it ever sends [Hello].
+bool? initialSubscribedFor({
+  required LinkTransport transport,
+  required bool? bleSubscribed,
+}) => transport == LinkTransport.wifi ? true : bleSubscribed;
+
 /// Everything needed to identify a client and talk to it, before it has
 /// necessarily been seen — passed into [_HostPageState._touch] and
 /// [_HostPageState._pressSlot], which create a [ConnectedClient] entry on
@@ -108,13 +142,22 @@ typedef ClientSource = ({
   Future<int> Function() maxFrameSize,
 });
 
-/// A WiFi connection waiting on its [SubmitPin] — see
-/// [_HostPageState._pendingWifiPins].
-typedef _PendingWifiPin = ({
-  WifiClient client,
+/// A connection waiting on its [SubmitPin] — see
+/// [_HostPageState._pendingPins]. Transport-agnostic: a WiFi socket and a
+/// BLE central both reach this exact shape once an unrecognized [Hello]
+/// arrives (see [_HostPageState._onHello]), so there is one PIN flow, not
+/// one per transport.
+typedef _PendingPin = ({
+  ClientSource source,
   String pin,
   String clientId,
   String? name,
+
+  /// Ends this connection on a wrong PIN or a blocked client, however
+  /// that's actually done on this source's transport — see
+  /// [_HostPageState._rejectBleCentral]'s own doc comment for why that is
+  /// not a real disconnect on every platform.
+  Future<void> Function() reject,
 });
 
 /// A client that the host has seen. A BLE central is only reported to us
@@ -240,16 +283,31 @@ class _HostPageState extends State<HostPage> {
   /// of its own every time it builds.
   String? _hostId;
 
-  /// Every WiFi client id the host has ever decided about — loaded once at
-  /// startup, kept in memory, and written through to [WifiTrustStore] on
-  /// every decision so it never falls out of sync with the file. See
-  /// [wifiTrustFor]/[_onWifiMessage].
-  var _wifiTrust = <String, bool>{};
+  /// Every client id the host has ever decided about, on either transport —
+  /// loaded once at startup, kept in memory, and written through to
+  /// [ClientTrustStore] on every decision so it never falls out of sync
+  /// with the file. See [trustFor]/[_routeMessage].
+  var _trust = <String, bool>{};
 
-  /// A WiFi connection mid PIN challenge, keyed by [WifiClient.id] — the
+  /// A connection mid PIN challenge, keyed by [ClientSource.id] — the
   /// [SubmitPin] this is waiting on has nowhere else to be routed to yet,
   /// since [_clients] does not get an entry for it until the PIN is right.
-  final _pendingWifiPins = <String, _PendingWifiPin>{};
+  final _pendingPins = <String, _PendingPin>{};
+
+  /// Whether a BLE central has subscribed to notifications, keyed by its
+  /// central uuid — tracked independently of [_clients] because a client's
+  /// own connect sequence subscribes before it ever sends [Hello] (see
+  /// `HotkeyPadSession._connectBle`), so this often has to be read back
+  /// later, once [_onHello]/[_verifyPin] decide the central is trusted and
+  /// actually create its [ConnectedClient] entry.
+  final _bleSubscribed = <String, bool>{};
+
+  /// BLE central uuids that have already used their one PIN attempt on
+  /// this connection and failed, or were blocked outright — see
+  /// [_rejectBleCentral]. Checked by [_routeMessage] so a central that
+  /// cannot actually be disconnected does not just send a fresh [Hello]
+  /// and get another guess on the same link.
+  final _bleRejected = <String>{};
 
   final _clients = <String, ConnectedClient>{};
   final _log = <String>[];
@@ -443,26 +501,52 @@ class _HostPageState extends State<HostPage> {
         CentralConnectionStateChangedEventArgs event,
       ) {
         if (event.state == ConnectionState.connected) {
-          _touch(_bleSource(event.central), 'connected');
+          // Not touched into _clients here — a raw GATT connection is not
+          // trust, only a correct PIN is (see _onHello/_routeMessage), the
+          // same reasoning WiFi's own onConnected already followed below.
+          if (mounted) {
+            setState(
+              () => _addLog(
+                'BLE central connected — '
+                '${_short(event.central.uuid.toString())}',
+              ),
+            );
+          }
         } else {
-          _remove(event.central.uuid.toString(), 'disconnected');
+          final id = event.central.uuid.toString();
+          _pendingPins.remove(id);
+          _bleSubscribed.remove(id);
+          _bleRejected.remove(id);
+          _remove(id, 'disconnected');
         }
       }, 'connection events');
 
       _listenSafely(() => peripheral.characteristicNotifyStateChanged, (
         GATTCharacteristicNotifyStateChangedEventArgs event,
       ) {
-        _touch(
-          _bleSource(event.central),
-          event.state ? 'subscribed' : 'unsubscribed',
-          subscribed: event.state,
-        );
+        final id = event.central.uuid.toString();
+        // Recorded regardless of trust — see _bleSubscribed's own doc
+        // comment for why the subscribe can arrive before there is a
+        // _clients entry to update at all.
+        _bleSubscribed[id] = event.state;
+        if (_clients.containsKey(id)) {
+          _touch(
+            _bleSource(event.central),
+            event.state ? 'subscribed' : 'unsubscribed',
+            subscribed: event.state,
+          );
+        }
       }, 'subscription events');
 
       _listenSafely(() => peripheral.characteristicReadRequested, (
         GATTCharacteristicReadRequestedEventArgs event,
       ) async {
-        _touch(_bleSource(event.central), 'read');
+        // Bookkeeping only for a central already trusted in — touching an
+        // unidentified one here would let a bare GATT read stand in for
+        // the PIN challenge every write already goes through.
+        if (_clients.containsKey(event.central.uuid.toString())) {
+          _touch(_bleSource(event.central), 'read');
+        }
         await peripheral.respondReadRequestWithValue(
           event.request,
           value: const Ack(ok: true, message: 'ready').encode(),
@@ -475,7 +559,11 @@ class _HostPageState extends State<HostPage> {
         // Respond first: the client is blocked on the ATT response, and
         // launching an app takes far longer than the ATT timeout allows.
         await peripheral.respondWriteRequest(event.request);
-        await _handleCommand(_bleSource(event.central), event.request.value);
+        _routeMessage(
+          _bleSource(event.central),
+          event.request.value,
+          reject: () => _rejectBleCentral(event.central),
+        );
       }, 'write requests');
     } catch (error) {
       // On web there is no `bluetooth_low_energy` platform implementation
@@ -520,17 +608,15 @@ class _HostPageState extends State<HostPage> {
 
   Future<void> _startWifi() async {
     try {
-      _wifiTrust = await WifiTrustStore.load();
+      _trust = await ClientTrustStore.load();
       final hostId = await HostIdentity.id();
       await _wifiServer.start(
         hostId: hostId,
         hostName: Platform.localHostname,
-        // Not touched into _clients here the way a BLE central is on
-        // connect — unlike Bluetooth, which needs physical proximity to
-        // even discover the host, anyone on the same network can open a
-        // WiFi connection, so this waits for Hello (see _onWifiMessage)
-        // to learn *which* client this is before deciding whether it is
-        // already trusted or needs a PIN.
+        // Not touched into _clients here — same as a BLE central on
+        // connect (see connectionStateChanged above), this waits for
+        // Hello (see _routeMessage) to learn *which* client this is
+        // before deciding whether it is already trusted or needs a PIN.
         onConnected: (_) {},
         onMessage: _onWifiMessage,
         onDisconnected: _onWifiDisconnected,
@@ -554,127 +640,185 @@ class _HostPageState extends State<HostPage> {
     }
   }
 
-  /// Routes a WiFi client's message depending on how far it has got:
-  /// already trusted and fully connected (normal [_handleCommand], same
-  /// as any BLE central), mid PIN challenge (only a [SubmitPin] means
-  /// anything), or not yet identified at all (only a [Hello] means
-  /// anything — see [_onWifiHello]). Security, not just bookkeeping:
-  /// unlike Bluetooth, which needs physical proximity to even discover
-  /// the host, anyone on the same network can open a WiFi connection, so
-  /// nothing from one is acted on until it has answered a PIN correctly.
+  /// Wires a WiFi client's messages into [_routeMessage], supplying the
+  /// WiFi-specific way to end a rejected connection: closing the socket.
   void _onWifiMessage(WifiClient client, Uint8List bytes) {
-    if (_clients.containsKey(client.id)) {
-      unawaited(_handleCommand(_wifiSource(client), bytes));
+    _routeMessage(
+      _wifiSource(client),
+      bytes,
+      reject: () => client.socket.close(),
+    );
+  }
+
+  /// Routes a client's message depending on how far its connection has
+  /// got: already trusted and fully connected (normal [_handleCommand]),
+  /// mid PIN challenge (only a [SubmitPin] means anything), or not yet
+  /// identified at all (only a [Hello] means anything — see [_onHello]).
+  /// Security, not just bookkeeping, on both transports: anyone on the
+  /// same WiFi network can open a connection, and — a deliberate change
+  /// from this file's earlier behavior — merely being close enough to
+  /// discover the host over Bluetooth is no longer treated as proof of
+  /// anything either.
+  void _routeMessage(
+    ClientSource source,
+    Uint8List bytes, {
+    required Future<void> Function() reject,
+  }) {
+    if (_clients.containsKey(source.id)) {
+      unawaited(_handleCommand(source, bytes));
       return;
     }
-    final pending = _pendingWifiPins[client.id];
+    final pending = _pendingPins[source.id];
     if (pending != null) {
       final message = HotkeyPadMessage.decode(bytes);
-      if (message is SubmitPin) unawaited(_verifyWifiPin(pending, message.pin));
+      if (message is SubmitPin) unawaited(_verifyPin(pending, message.pin));
+      return;
+    }
+    if (bleAttemptExhausted(
+      transport: source.transport,
+      alreadyRejected: _bleRejected.contains(source.id),
+    )) {
       return;
     }
     final message = HotkeyPadMessage.decode(bytes);
-    if (message is Hello) unawaited(_onWifiHello(client, message));
+    if (message is Hello) unawaited(_onHello(source, message, reject: reject));
   }
 
-  /// A first message from a WiFi connection is only ever meaningful if it
-  /// is a [Hello] — everything else from an unidentified connection is
-  /// silently ignored (see [_onWifiMessage]) — and [Hello.clientId] is
-  /// what decides what happens next.
-  Future<void> _onWifiHello(WifiClient client, Hello hello) async {
+  /// A first message from an unidentified connection is only ever
+  /// meaningful if it is a [Hello] — everything else is silently ignored
+  /// (see [_routeMessage]) — and [Hello.clientId] is what decides what
+  /// happens next.
+  Future<void> _onHello(
+    ClientSource source,
+    Hello hello, {
+    required Future<void> Function() reject,
+  }) async {
     final clientId = hello.clientId;
     if (clientId.isEmpty) {
       // An old client build, or a malformed one — either way there is no
       // id to remember a decision against, so this fails closed rather
       // than treating it as trusted.
       if (mounted) {
-        setState(() => _addLog('WiFi client sent no id; connection closed'));
+        setState(
+          () => _addLog(
+            '${source.transport.label} client sent no id; rejected',
+          ),
+        );
       }
-      await client.socket.close();
+      await reject();
       return;
     }
-    switch (wifiTrustFor(clientId, _wifiTrust)) {
-      case WifiTrust.trusted:
+    switch (trustFor(clientId, _trust)) {
+      case ClientTrust.trusted:
         _touch(
-          _wifiSource(client),
+          source,
           'said hello as ${hello.name}',
-          // Unlike BLE, which tracks a real GATT subscribe/unsubscribe
-          // handshake (see characteristicNotifyStateChanged below), a WiFi
-          // client has no such step — its raw socket always receives
-          // whatever is sent once it's connected and trusted, so it counts
-          // as subscribed from the moment it's touched in. Omitting this
-          // left every WiFi client permanently unsubscribed: _broadcastLayout
-          // and _broadcastAppearance both filter on `subscribed`, so a
-          // layout/appearance edit while the host is running never reached
-          // a WiFi client, only a BLE one — confirmed against a real client.
-          subscribed: true,
+          subscribed: _initialSubscribed(source),
           name: hello.name,
         );
-      case WifiTrust.blocked:
+      case ClientTrust.blocked:
         if (mounted) {
-          setState(() => _addLog('WiFi client $clientId rejected (blocked)'));
+          setState(
+            () => _addLog(
+              '${source.transport.label} client $clientId rejected (blocked)',
+            ),
+          );
         }
-        await client.socket.close();
-      case WifiTrust.unknown:
+        await reject();
+      case ClientTrust.unknown:
         final pin = _generatePin();
         if (mounted) {
           setState(() {
-            _pendingWifiPins[client.id] = (
-              client: client,
+            _pendingPins[source.id] = (
+              source: source,
               pin: pin,
               clientId: clientId,
               name: hello.name,
+              reject: reject,
             );
-            _addLog('WiFi device ${hello.name} needs a PIN: $pin');
+            _addLog('${hello.name} needs a PIN: $pin');
           });
         }
-        await client.send(const RequestPin().encode());
+        await source.send(const RequestPin().encode());
     }
   }
 
+  /// Thin wrapper around [initialSubscribedFor] supplying this instance's
+  /// own [_bleSubscribed] bookkeeping.
+  bool? _initialSubscribed(ClientSource source) => initialSubscribedFor(
+    transport: source.transport,
+    bleSubscribed: _bleSubscribed[source.id],
+  );
+
   /// Six digits — enough that guessing is not practical over the handful
-  /// of tries a single TCP connection allows before [_onWifiMessage]'s
-  /// wrong-PIN handling below closes it, short enough to comfortably read
-  /// off a screen and type into a phone.
+  /// of tries a connection allows before a wrong PIN ends it (see
+  /// [_verifyPin] and [_rejectBleCentral]), short enough to comfortably
+  /// read off a screen and type into a phone.
   String _generatePin() => (Random().nextInt(900000) + 100000).toString();
 
-  Future<void> _verifyWifiPin(_PendingWifiPin pending, String submitted) async {
-    _pendingWifiPins.remove(pending.client.id);
+  Future<void> _verifyPin(_PendingPin pending, String submitted) async {
+    _pendingPins.remove(pending.source.id);
     final ok = submitted.trim() == pending.pin;
-    await pending.client.send(PinResult(ok: ok).encode());
+    await pending.source.send(PinResult(ok: ok).encode());
     if (!ok) {
       if (mounted) {
-        setState(() => _addLog('WiFi PIN rejected for ${pending.clientId}'));
+        setState(() => _addLog('PIN rejected for ${pending.clientId}'));
       }
-      await pending.client.socket.close();
+      await pending.reject();
       return;
     }
     // _touch (synchronous) runs before the trust file write, not after: the
     // client receives PinResult(ok:true) the instant it's flushed above and
     // immediately re-sends RequestLayout — see HotkeyPadSession's PinResult
     // handler. That can easily beat a disk write back to the host. Until
-    // _touch adds this client to _clients, _onWifiMessage has nowhere to
-    // route that RequestLayout (its _pendingWifiPins entry is already gone,
+    // _touch adds this client to _clients, _routeMessage has nowhere to
+    // route that RequestLayout (its _pendingPins entry is already gone,
     // removed above) and silently drops it — the client was then stuck on
     // "Loading the deck..." with nothing to prompt a retry, only fixed by
     // whatever next happened to reconnect it. Confirmed against a real
-    // client hitting exactly this on first pairing.
-    if (mounted) setState(() => _wifiTrust[pending.clientId] = true);
+    // WiFi client hitting exactly this on first pairing; BLE shares the
+    // same ordering for the same reason.
+    if (mounted) setState(() => _trust[pending.clientId] = true);
     _touch(
-      _wifiSource(pending.client),
+      pending.source,
       'said hello as ${pending.name}',
-      // See the matching comment in _onWifiHello's WifiTrust.trusted case —
-      // a WiFi client has no GATT-style subscribe step, so it counts as
-      // subscribed the moment it's trusted in, same as that path.
-      subscribed: true,
+      subscribed: _initialSubscribed(pending.source),
       name: pending.name,
     );
-    await WifiTrustStore.setDecision(pending.clientId, true);
+    await ClientTrustStore.setDecision(pending.clientId, true);
+  }
+
+  /// Ends a rejected BLE connection (a wrong PIN, or an already-blocked
+  /// client) the same way [WifiClient.socket]'s `close()` ends a rejected
+  /// WiFi one.
+  ///
+  /// `PeripheralManager.disconnect` is the obvious candidate, but it only
+  /// works on Android — it throws [UnsupportedError] on Darwin and
+  /// Windows, the two platforms this app actually ships as a host on
+  /// (confirmed against the `bluetooth_low_energy` plugin's own platform
+  /// implementations). There is no other API to force a central off a
+  /// GATT connection it initiated. So this falls back to marking the
+  /// connection rejected instead: [_routeMessage] then silently drops
+  /// everything else this central sends — no further [RequestPin], no
+  /// further [Ack] — until it actually disconnects and reconnects, rather
+  /// than letting it just send a fresh [Hello] and get another guess on
+  /// the same link. That reconnect is real friction (a fresh GATT
+  /// connection, not just another ATT write), the same brute-force
+  /// mitigation a fresh TCP connection gives WiFi.
+  Future<void> _rejectBleCentral(Central central) async {
+    _bleRejected.add(central.uuid.toString());
+    try {
+      await _peripheral?.disconnect(central);
+    } on UnsupportedError {
+      // Expected on Darwin/Windows — see this method's own doc comment.
+    } catch (error) {
+      if (mounted) setState(() => _addLog('BLE disconnect failed: $error'));
+    }
   }
 
   void _onWifiDisconnected(WifiClient client) {
     // _remove's own setState below covers this mutation too.
-    _pendingWifiPins.remove(client.id);
+    _pendingPins.remove(client.id);
     _remove(client.id, 'disconnected');
   }
 
@@ -792,7 +936,7 @@ class _HostPageState extends State<HostPage> {
       case DebugText(:final text):
         _touch(source, 'said: $text');
       case SubmitPin():
-        // Only meaningful from a connection _onWifiMessage still has
+        // Only meaningful from a connection _routeMessage still has
         // pending — one that has already reached _handleCommand (this
         // method) is, by definition, already trusted and has nothing
         // left to submit a PIN for.
@@ -1254,7 +1398,7 @@ class _HostPageState extends State<HostPage> {
         ),
         body: Column(
           children: [
-            _wifiPinBanner(context),
+            _pinBanner(context),
             _updateBanner(context),
             Expanded(child: _serviceTab(context, clients, subscribedCount)),
           ],
@@ -1300,7 +1444,7 @@ class _HostPageState extends State<HostPage> {
       ),
       body: Column(
         children: [
-          _wifiPinBanner(context),
+          _pinBanner(context),
           _updateBanner(context),
           Expanded(
             child: LayoutPage(
@@ -1324,15 +1468,16 @@ class _HostPageState extends State<HostPage> {
     );
   }
 
-  /// A device that has never connected over WiFi before needs a PIN read
-  /// off this screen and typed into it — see `_onWifiHello`. Shown above
-  /// whichever screen the host is already looking at (the deck or the
-  /// service tab) rather than as a blocking dialog, since there is no
-  /// decision for the host user to make here beyond reading a number: the
-  /// PIN itself is the security boundary, not a separate accept/reject
-  /// click. The (X) is for a device the user does not recognize at all.
-  Widget _wifiPinBanner(BuildContext context) {
-    if (_pendingWifiPins.isEmpty) return const SizedBox.shrink();
+  /// A device that has never connected before — over either transport —
+  /// needs a PIN read off this screen and typed into it — see [_onHello].
+  /// Shown above whichever screen the host is already looking at (the
+  /// deck or the service tab) rather than as a blocking dialog, since
+  /// there is no decision for the host user to make here beyond reading a
+  /// number: the PIN itself is the security boundary, not a separate
+  /// accept/reject click. The (X) is for a device the user does not
+  /// recognize at all.
+  Widget _pinBanner(BuildContext context) {
+    if (_pendingPins.isEmpty) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final onContainer = theme.colorScheme.onPrimaryContainer;
@@ -1342,7 +1487,7 @@ class _HostPageState extends State<HostPage> {
         bottom: false,
         child: Column(
           children: [
-            for (final pending in _pendingWifiPins.values)
+            for (final pending in _pendingPins.values)
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -1359,7 +1504,7 @@ class _HostPageState extends State<HostPage> {
                           children: [
                             TextSpan(
                               text:
-                                  '${l10n.wifiPinNewDevice(pending.name?.isNotEmpty == true ? pending.name! : l10n.newDeviceFallback)} ',
+                                  '${l10n.pinChallengeNewDevice(pending.name?.isNotEmpty == true ? pending.name! : l10n.newDeviceFallback)} ',
                             ),
                             TextSpan(
                               text: pending.pin,
@@ -1373,9 +1518,9 @@ class _HostPageState extends State<HostPage> {
                       ),
                     ),
                     IconButton(
-                      tooltip: l10n.wifiPinReject,
+                      tooltip: l10n.pinChallengeReject,
                       icon: Icon(Icons.close, color: onContainer),
-                      onPressed: () => _rejectPendingWifiPin(pending),
+                      onPressed: () => _rejectPendingPin(pending),
                     ),
                   ],
                 ),
@@ -1387,7 +1532,7 @@ class _HostPageState extends State<HostPage> {
   }
 
   /// A quiet notice that a newer host version is out — see
-  /// [_checkForUpdate]. Below [_wifiPinBanner] rather than above it: an
+  /// [_checkForUpdate]. Below [_pinBanner] rather than above it: an
   /// unapproved connection is time-sensitive, a new release isn't.
   Widget _updateBanner(BuildContext context) {
     final release = _updateAvailable;
@@ -1427,16 +1572,17 @@ class _HostPageState extends State<HostPage> {
     );
   }
 
-  /// Closes a still-pending WiFi connection without recording a decision —
-  /// the device is free to try again (and get a fresh PIN) rather than
-  /// being permanently blocked, the same leniency a wrong PIN gets in
-  /// [_verifyWifiPin].
-  void _rejectPendingWifiPin(_PendingWifiPin pending) {
+  /// Ends a still-pending connection without recording a decision — the
+  /// device is free to try again (and get a fresh PIN) rather than being
+  /// permanently blocked, the same leniency a wrong PIN gets in
+  /// [_verifyPin]. Goes through [_PendingPin.reject] so this works
+  /// whether the pending connection is WiFi or BLE.
+  void _rejectPendingPin(_PendingPin pending) {
     setState(() {
-      _pendingWifiPins.remove(pending.client.id);
-      _addLog('WiFi device ${pending.clientId} rejected');
+      _pendingPins.remove(pending.source.id);
+      _addLog('${pending.clientId} rejected');
     });
-    unawaited(pending.client.socket.close());
+    unawaited(pending.reject());
   }
 
   Widget _serviceTab(
@@ -1571,9 +1717,9 @@ class _HostPageState extends State<HostPage> {
 /// shown outright mainly for a tidier status screen: it carries no more
 /// than the plaintext address already visible above it, and scanning it
 /// still goes through the exact same `Hello`/trust-on-first-use PIN
-/// challenge any other WiFi connection does (see `_onWifiHello`) — this
-/// only replaces typing the IP in, nothing about how the connection is
-/// authorized.
+/// challenge any other connection does, WiFi or BLE (see `_onHello`) —
+/// this only replaces typing the IP in, nothing about how the connection
+/// is authorized.
 class _QrPairingCard extends StatelessWidget {
   const _QrPairingCard({required this.payload});
 

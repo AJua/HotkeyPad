@@ -52,15 +52,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nothingYet => '還沒有任何紀錄。';
 
   @override
-  String wifiPinNewDevice(String name) {
-    return '$name 想要透過 WiFi 連線——代碼:';
+  String pinChallengeNewDevice(String name) {
+    return '$name 想要連線——代碼:';
   }
 
   @override
   String get newDeviceFallback => '有新裝置';
 
   @override
-  String get wifiPinReject => '拒絕——不允許這個裝置連線';
+  String get pinChallengeReject => '拒絕——不允許這個裝置連線';
 
   @override
   String updateAvailable(String version) {
@@ -242,15 +242,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get nothingYet => '還沒有任何紀錄。';
 
   @override
-  String wifiPinNewDevice(String name) {
-    return '$name 想要透過 WiFi 連線——代碼:';
+  String pinChallengeNewDevice(String name) {
+    return '$name 想要連線——代碼:';
   }
 
   @override
   String get newDeviceFallback => '有新裝置';
 
   @override
-  String get wifiPinReject => '拒絕——不允許這個裝置連線';
+  String get pinChallengeReject => '拒絕——不允許這個裝置連線';
 
   @override
   String updateAvailable(String version) {
