@@ -353,6 +353,12 @@ abstract class AppLocalizations {
   /// **'System default'**
   String get systemDefaultLanguage;
 
+  /// Large heading above the two setup steps on the first-run connection-method choice screen.
+  ///
+  /// In en, this message translates to:
+  /// **'How to use'**
+  String get howToUseTitle;
+
   /// Heading on the first-run connection-method choice screen.
   ///
   /// In en, this message translates to:
@@ -388,6 +394,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Find a host on the same network, or enter its address.'**
   String get connectionMethodWifiHint;
+
+  /// Heading for step 1 of the first-run connection-method choice screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Install HotkeyPad Host'**
+  String get step1Title;
+
+  /// Body text for step 1 of the first-run connection-method choice screen, above the copyable host download URL.
+  ///
+  /// In en, this message translates to:
+  /// **'HotkeyPad Host runs on a computer, not this phone. Tap the address below to copy it, then open it in a browser on that computer.'**
+  String get step1Body;
+
+  /// Snackbar shown after tapping the host download URL copies it to the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get urlCopiedMessage;
 
   /// Section heading above the connection-method radio buttons in the settings dialog.
   ///

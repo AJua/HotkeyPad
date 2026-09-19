@@ -145,6 +145,9 @@
   "systemDefaultLanguage": "System default",
   "@systemDefaultLanguage": {"description": "Option in the language picker that follows the phone's own language."},
 
+  "howToUseTitle": "How to use",
+  "@howToUseTitle": {"description": "Large heading above the two setup steps on the first-run connection-method choice screen."},
+
   "connectionMethodTitle": "Choose how to connect",
   "@connectionMethodTitle": {"description": "Heading on the first-run connection-method choice screen."},
 
@@ -162,6 +165,15 @@
 
   "connectionMethodWifiHint": "Find a host on the same network, or enter its address.",
   "@connectionMethodWifiHint": {"description": "Description of the WiFi connection method."},
+
+  "step1Title": "Install HotkeyPad Host",
+  "@step1Title": {"description": "Heading for step 1 of the first-run connection-method choice screen."},
+
+  "step1Body": "HotkeyPad Host runs on a computer, not this phone. Tap the address below to copy it, then open it in a browser on that computer.",
+  "@step1Body": {"description": "Body text for step 1 of the first-run connection-method choice screen, above the copyable host download URL."},
+
+  "urlCopiedMessage": "Copied to clipboard",
+  "@urlCopiedMessage": {"description": "Snackbar shown after tapping the host download URL copies it to the clipboard."},
 
   "connectionMethodSettingsTitle": "Connection method",
   "@connectionMethodSettingsTitle": {"description": "Section heading above the connection-method radio buttons in the settings dialog."},

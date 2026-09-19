@@ -151,6 +151,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get systemDefaultLanguage => 'System default';
 
   @override
+  String get howToUseTitle => 'How to use';
+
+  @override
   String get connectionMethodTitle => 'Choose how to connect';
 
   @override
@@ -170,6 +173,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get connectionMethodWifiHint =>
       'Find a host on the same network, or enter its address.';
+
+  @override
+  String get step1Title => 'Install HotkeyPad Host';
+
+  @override
+  String get step1Body =>
+      'HotkeyPad Host runs on a computer, not this phone. Tap the address below to copy it, then open it in a browser on that computer.';
+
+  @override
+  String get urlCopiedMessage => 'Copied to clipboard';
 
   @override
   String get connectionMethodSettingsTitle => 'Connection method';

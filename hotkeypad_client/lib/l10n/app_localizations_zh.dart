@@ -145,6 +145,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get systemDefaultLanguage => '跟隨系統';
 
   @override
+  String get howToUseTitle => '如何使用';
+
+  @override
   String get connectionMethodTitle => '選擇連線方式';
 
   @override
@@ -161,6 +164,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get connectionMethodWifiHint => '在同一網路中尋找 host，或手動輸入位址。';
+
+  @override
+  String get step1Title => '安裝 HotkeyPad Host';
+
+  @override
+  String get step1Body =>
+      'HotkeyPad Host 執行在電腦上，不是這支手機。點擊下方網址即可複製，再貼到電腦的瀏覽器開啟。';
+
+  @override
+  String get urlCopiedMessage => '已複製到剪貼簿';
 
   @override
   String get connectionMethodSettingsTitle => '連線方式';
@@ -420,6 +433,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get systemDefaultLanguage => '跟隨系統';
 
   @override
+  String get howToUseTitle => '如何使用';
+
+  @override
   String get connectionMethodTitle => '選擇連線方式';
 
   @override
@@ -436,6 +452,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get connectionMethodWifiHint => '在同一網路中尋找 host，或手動輸入位址。';
+
+  @override
+  String get step1Title => '安裝 HotkeyPad Host';
+
+  @override
+  String get step1Body =>
+      'HotkeyPad Host 執行在電腦上，不是這支手機。點擊下方網址即可複製，再貼到電腦的瀏覽器開啟。';
+
+  @override
+  String get urlCopiedMessage => '已複製到剪貼簿';
 
   @override
   String get connectionMethodSettingsTitle => '連線方式';

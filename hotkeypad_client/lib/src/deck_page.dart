@@ -27,6 +27,12 @@ import 'session.dart';
 /// since that's the actual next step anyone tapping it wants.
 const _githubIssuesUrl = 'https://github.com/AJua/HotkeyPad/issues/new';
 
+/// Where the first-run connection-method screen's "Get it on GitHub" link
+/// sends the user — the latest release directly, since a phone without the
+/// host installed yet has nothing to pair with regardless of which
+/// transport it picks below.
+const _githubReleasesUrl = 'https://github.com/AJua/HotkeyPad/releases/latest';
+
 /// What port a manually-entered host address should be dialed on: the
 /// typed value if it parses to a positive integer, [WifiLink.tcpPort] (the
 /// only port a real HotkeyPad host ever listens on) otherwise — so leaving
@@ -462,6 +468,22 @@ class _DeckPageState extends State<DeckPage> {
     );
   }
 
+  /// Copies the host's GitHub releases URL to the clipboard — step 1 of
+  /// the first-run screen. HotkeyPad Host runs on a computer, not this
+  /// phone, so opening the link here would land in a mobile browser that
+  /// can't do anything useful with it; what a first-time user actually
+  /// needs is to get that address onto their computer, which pasting it
+  /// into any browser there does regardless of platform.
+  Future<void> _copyHostUrl() async {
+    await Clipboard.setData(const ClipboardData(text: _githubReleasesUrl));
+    unawaited(HapticFeedback.selectionClick());
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.urlCopiedMessage)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = _session;
@@ -864,29 +886,34 @@ class _DeckPageState extends State<DeckPage> {
             constraints: const BoxConstraints(maxWidth: 420),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // An anchor for the page, not a hero — the first screen a
-                // fresh install shows had nothing above the title before
-                // this, which on a tall phone screen read as unfinished
-                // rather than intentionally centered.
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.asset(
-                    'assets/icon/app_icon.png',
-                    width: 72,
-                    height: 72,
+                // Where a purely decorative app icon used to sit — walking
+                // a fresh install through the two things it actually needs,
+                // in order, is more useful there than a logo: nothing below
+                // works until a host exists on a computer to pair with.
+                Text(
+                  l10n.howToUseTitle,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 20),
+                _StepHeader(step: 1, title: l10n.step1Title),
+                const SizedBox(height: 8),
                 Text(
-                  l10n.connectionMethodTitle,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge,
+                  l10n.step1Body,
+                  textAlign: TextAlign.left,
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
+                const SizedBox(height: 12),
+                _CopyableUrl(url: _githubReleasesUrl, onTap: _copyHostUrl),
+                const SizedBox(height: 28),
+                _StepHeader(step: 2, title: l10n.connectionMethodTitle),
                 const SizedBox(height: 4),
                 Text(
                   l10n.connectionMethodSubtitle,
-                  textAlign: TextAlign.center,
+                  textAlign: TextAlign.left,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 24),
@@ -1894,6 +1921,92 @@ class _PreviousHostsList extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A numbered heading for one step of
+/// [_DeckPageState._methodChoiceScaffold] — a small badge instead of a
+/// literal "1." in the translated string, so the wording stays a plain
+/// sentence in every locale rather than something that has to embed a
+/// digit correctly.
+class _StepHeader extends StatelessWidget {
+  const _StepHeader({required this.step, required this.title});
+
+  final int step;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 14,
+          backgroundColor: theme.colorScheme.primary,
+          child: Text(
+            '$step',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(
+            title,
+            textAlign: TextAlign.left,
+            style: theme.textTheme.titleLarge,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Step 1's address, shown as plain text rather than a link: HotkeyPad
+/// Host runs on a computer, not this phone, so what a first-time user
+/// needs is to get this address onto that other device — tapping it
+/// copies it to the clipboard for pasting into a browser there, rather
+/// than opening it in a browser here where it wouldn't help.
+class _CopyableUrl extends StatelessWidget {
+  const _CopyableUrl({required this.url, required this.onTap});
+
+  final String url;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  url,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.copy_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
