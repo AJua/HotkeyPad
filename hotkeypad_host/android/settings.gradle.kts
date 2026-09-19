@@ -19,8 +19,13 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "8.11.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    id("com.android.application") version "9.0.1" apply false
+    // Not applied directly anywhere (AGP 9's built-in Kotlin support,
+    // configured via the `kotlin { compilerOptions {} }` block in
+    // app/build.gradle.kts, replaces the separate kotlin-android plugin) —
+    // declared here with "apply false" purely to pin the Kotlin Gradle
+    // Plugin version AGP resolves internally above its own default (2.2.10).
+    id("org.jetbrains.kotlin.android") version "2.3.21" apply false
 }
 
 include(":app")
