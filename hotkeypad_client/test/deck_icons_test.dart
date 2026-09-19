@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:hotkeypad_client/src/deck_icons.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -42,6 +46,99 @@ void main() {
         iconKeyFor(const ShellItem(command: 'echo hi', label: 'Hi')),
         isNull,
       );
+    });
+  });
+
+  group('looksLikeSvgIcon', () {
+    test('a PNG is never mistaken for SVG', () {
+      final png = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0]);
+      expect(looksLikeSvgIcon(png), isFalse);
+    });
+
+    test('SVG markup starting with the tag itself is recognised', () {
+      final svg = Uint8List.fromList(utf8.encode('<svg></svg>'));
+      expect(looksLikeSvgIcon(svg), isTrue);
+    });
+
+    test('leading whitespace before the tag is skipped over', () {
+      final svg = Uint8List.fromList(utf8.encode('  \n<svg></svg>'));
+      expect(looksLikeSvgIcon(svg), isTrue);
+    });
+
+    test('empty bytes are not SVG', () {
+      expect(looksLikeSvgIcon(Uint8List(0)), isFalse);
+    });
+  });
+
+  group('glyphIconColors', () {
+    test('no custom background: transparent, brand-colored border/glyph', () {
+      final colors = glyphIconColors(
+        brightness: Brightness.light,
+        hasCustomBackground: false,
+      );
+      expect(colors.background, Colors.transparent);
+      expect(colors.border, HotkeyPad.themeSeedColor);
+      expect(colors.glyph, HotkeyPad.themeSeedColor);
+    });
+
+    test(
+      'custom background in light theme gets a fully opaque white scrim',
+      () {
+        final colors = glyphIconColors(
+          brightness: Brightness.light,
+          hasCustomBackground: true,
+        );
+        expect(colors.background, isNot(Colors.transparent));
+        expect(colors.background.r, 1.0);
+        expect(colors.background.g, 1.0);
+        expect(colors.background.b, 1.0);
+        // Not merely translucent — see glyphIconColors' own doc comment for
+        // the Impeller/Android bug this specifically works around.
+        expect(colors.background.a, 1.0);
+      },
+    );
+
+    test('custom background in dark theme gets a fully opaque black scrim', () {
+      final colors = glyphIconColors(
+        brightness: Brightness.dark,
+        hasCustomBackground: true,
+      );
+      expect(colors.background, isNot(Colors.transparent));
+      expect(colors.background.r, 0.0);
+      expect(colors.background.g, 0.0);
+      expect(colors.background.b, 0.0);
+      expect(colors.background.a, 1.0);
+    });
+  });
+
+  group('recolorGlyphSvg', () {
+    test('substitutes all three placeholders', () {
+      const template =
+          '<rect fill="{{bg}}" stroke="{{border}}"/>'
+          '<path fill="{{glyph}}"/>';
+
+      final result = recolorGlyphSvg(
+        template,
+        border: const Color(0xFFFF0000),
+        glyph: const Color(0xFF00FF00),
+        background: const Color(0xFF0000FF),
+      );
+
+      expect(result, isNot(contains('{{')));
+      expect(result, contains('rgba(255, 0, 0, 1.000)'));
+      expect(result, contains('rgba(0, 255, 0, 1.000)'));
+      expect(result, contains('rgba(0, 0, 255, 1.000)'));
+    });
+
+    test('a transparent color still substitutes, with alpha 0', () {
+      final result = recolorGlyphSvg(
+        '{{bg}}',
+        border: Colors.black,
+        glyph: Colors.black,
+        background: Colors.transparent,
+      );
+
+      expect(result, 'rgba(0, 0, 0, 0.000)');
     });
   });
 }

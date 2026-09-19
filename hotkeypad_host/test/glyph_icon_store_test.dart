@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -5,12 +6,12 @@ import 'package:hotkeypad_host/src/glyph_icon_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// Note: `flutter test` substitutes real fonts (Material Icons, the
-// system emoji font) with a deterministic test font, so nothing here
-// checks *where* ink actually landed — only that a real, correctly
-// sized PNG comes back. The real glyph shapes are only ever real fonts
-// in the built app, verified there instead (see the session's manual
-// on-device check when this was written).
+// Note: `flutter test` substitutes real fonts (the system emoji font,
+// for the PNG path below) with a deterministic test font, so nothing
+// here checks *where* ink actually landed in the emoji PNG — only that
+// a real, correctly sized image comes back. Action icons are vector
+// path data embedded directly (no font involved), so those checks can
+// assert on the actual SVG markup.
 Future<({int width, int height})> _decodedSize(Uint8List bytes) async {
   final codec = await ui.instantiateImageCodec(bytes);
   final frame = await codec.getNextFrame();
@@ -46,18 +47,27 @@ void main() {
       expect(size.height, 64);
     });
 
-    test('renders a known action at the requested square size', () async {
-      final png = await GlyphIconStore.render('action:mute', size: 64);
-      final size = await _decodedSize(png!);
+    test('renders a known action as an SVG at the requested viewBox size, '
+        'with colour placeholders for the client to fill in', () async {
+      final bytes = await GlyphIconStore.render('action:mute', size: 64);
+      final svg = utf8.decode(bytes!);
 
-      expect(size.width, 64);
-      expect(size.height, 64);
+      expect(svg, contains('viewBox="0 0 64 64"'));
+      expect(svg, contains('{{border}}'));
+      expect(svg, contains('{{glyph}}'));
+      expect(svg, contains('{{bg}}'));
     });
 
-    test('renders every DeckAction without throwing', () async {
+    test('renders every DeckAction as SVG containing real path data', () async {
       for (final action in DeckAction.values) {
-        final png = await GlyphIconStore.render('action:${action.wire}');
-        expect(png, isNotNull, reason: 'no icon for ${action.wire}');
+        final bytes = await GlyphIconStore.render('action:${action.wire}');
+        expect(bytes, isNotNull, reason: 'no icon for ${action.wire}');
+        final svg = utf8.decode(bytes!);
+        expect(
+          svg,
+          contains('<path'),
+          reason: '${action.wire} has no path element',
+        );
       }
     });
 

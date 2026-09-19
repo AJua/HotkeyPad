@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
@@ -1229,6 +1231,7 @@ class _DeckPageState extends State<DeckPage> {
                       return _DeckButton(
                         item: item,
                         icon: iconKey == null ? null : session.iconFor(iconKey),
+                        hasCustomBackground: session.backgroundImage != null,
                         showLabel: labels,
                         pressing: session.isPressing(item),
                         outcome: session.feedbackFor(item),
@@ -1520,6 +1523,7 @@ class _DeckButton extends StatelessWidget {
   const _DeckButton({
     required this.item,
     required this.icon,
+    required this.hasCustomBackground,
     required this.showLabel,
     required this.pressing,
     required this.outcome,
@@ -1528,6 +1532,13 @@ class _DeckButton extends StatelessWidget {
 
   final DeckItem item;
   final Uint8List? icon;
+
+  /// Whether the deck has a custom background image behind it right now —
+  /// see [glyphIconColors], the only thing this affects: an action's SVG
+  /// glyph icon needs a background scrim to stay legible against an
+  /// arbitrary photo, where it needs none sitting on the deck's own
+  /// themed background.
+  final bool hasCustomBackground;
   final bool showLabel;
   final bool pressing;
 
@@ -1554,6 +1565,14 @@ class _DeckButton extends StatelessWidget {
     // distinguishable at a glance, so it stays until a real icon arrives —
     // behind just the icon, not the label below it.
     final showIconBackground = icon == null;
+
+    // Only actually used if icon turns out to be an SVG glyph — computed
+    // unconditionally anyway since it is cheap and keeps the ternary below
+    // from recomputing it three times.
+    final glyphColors = glyphIconColors(
+      brightness: theme.brightness,
+      hasCustomBackground: hasCustomBackground,
+    );
 
     return Material(
       color: Colors.transparent,
@@ -1592,17 +1611,15 @@ class _DeckButton extends StatelessWidget {
                           : Clip.none,
                       // Every icon — an app's, a custom image, an emoji, or
                       // an action's built-in glyph — is rendered by the
-                      // host into a PNG (see iconKeyFor/GlyphIconStore), so
-                      // this only ever has to decide between real bytes and
-                      // a placeholder, never what kind of icon it is.
-                      child: icon != null
-                          ? Image.memory(
-                              icon!,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.medium,
-                              gaplessPlayback: true,
-                            )
-                          : FittedBox(
+                      // host (see iconKeyFor/GlyphIconStore), so this only
+                      // ever has to decide between real bytes and a
+                      // placeholder, never what kind of icon it is — with
+                      // one exception: an action's glyph arrives as SVG
+                      // with color placeholders (see looksLikeSvgIcon),
+                      // since only the client knows what colors it needs
+                      // to stay legible against its own theme/background.
+                      child: icon == null
+                          ? FittedBox(
                               // Shown only until the real icon arrives, or
                               // permanently for an item with no icon key at
                               // all (see iconKeyFor).
@@ -1614,6 +1631,22 @@ class _DeckButton extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                            )
+                          : looksLikeSvgIcon(icon!)
+                          ? SvgPicture.string(
+                              recolorGlyphSvg(
+                                utf8.decode(icon!),
+                                border: glyphColors.border,
+                                glyph: glyphColors.glyph,
+                                background: glyphColors.background,
+                              ),
+                              fit: BoxFit.contain,
+                            )
+                          : Image.memory(
+                              icon!,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                              gaplessPlayback: true,
                             ),
                     ),
                     // The label sits directly under the icon; the cell's
