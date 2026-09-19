@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="images/app-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@500;600;700;800&family=Noto+Sans+JP:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: light dark;
@@ -62,11 +62,11 @@
     margin: 0;
     background: var(--bg);
     color: var(--fg);
-    font-family: 'Manrope', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Manrope', 'Noto Sans TC', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3 { font-family: 'Sora', 'Noto Sans TC', sans-serif; text-wrap: balance; margin: 0; }
+  h1, h2, h3 { font-family: 'Sora', 'Noto Sans TC', 'Noto Sans JP', sans-serif; text-wrap: balance; margin: 0; }
   p { margin: 0; }
   a { color: inherit; }
   .label {
@@ -77,7 +77,7 @@
     text-transform: uppercase;
     color: var(--accent);
   }
-  html[lang="zh-Hant"] .label { letter-spacing: .04em; text-transform: none; }
+  html[lang="zh-Hant"] .label, html[lang="ja"] .label { letter-spacing: .04em; text-transform: none; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
 
   /* ---------- nav ---------- */
@@ -152,6 +152,7 @@
   }
   .pill svg { width: 14px; height: 14px; flex: none; }
   html[lang="zh-Hant"] .pill { font-family: 'Manrope', 'Noto Sans TC'; }
+  html[lang="ja"] .pill { font-family: 'Manrope', 'Noto Sans JP'; }
 
   /* ---------- section shell ---------- */
   section { padding: 4.5rem 0; }
@@ -211,6 +212,7 @@
     padding: .3rem .6rem; border-radius: 8px;
   }
   html[lang="zh-Hant"] .soon-badge { font-family: 'Manrope', 'Noto Sans TC'; }
+  html[lang="ja"] .soon-badge { font-family: 'Manrope', 'Noto Sans JP'; }
 
   /* ---------- privacy callout ---------- */
   .privacy-band {
@@ -525,22 +527,86 @@
       'footer.github': 'GitHub',
       'footer.releases': '版本下載',
       'footer.privacy': '隱私權政策'
+    },
+    ja: {
+      'meta.title': 'HotkeyPad',
+      'meta.description': 'スマホを Mac や Windows パソコン用のカスタムボタンデッキに変える——クラウドもアカウントも不要、2台の端末が直接つながるだけ。',
+      'nav.how': '使い方',
+      'nav.buttons': 'ボタンの種類',
+      'nav.platforms': '対応プラットフォーム',
+      'nav.download': 'ダウンロード',
+      'hero.eyebrow': '無料・オープンソース',
+      'hero.title': 'あなたのスマホは、すでに<br>最高の <span class="accent">ボタンデッキ</span><br>になれる。',
+      'hero.lede': 'HotkeyPad は iPhone や Android のスマホを、Mac や Windows パソコン用のカスタムボタンデッキに変えます——アプリを起動したり、Shortcut を実行したり、メディアを操作したり、キーの組み合わせを送ったり。すべて自分で配置したボタンのグリッドから。',
+      'hero.pill.bluetooth': 'Bluetooth',
+      'hero.pill.wifi': 'WiFi',
+      'hero.pill.privacy': 'アカウント不要・クラウドなし',
+      'hero.cta.primary': 'パソコン用アプリをダウンロード',
+      'hero.cta.secondary': '使い方を見る',
+      'hero.note': 'パソコン用アプリは Mac と Windows に対応。スマホ用アプリ（iOS / Android）は近日公開予定。',
+      'hero.badge': '実機画面',
+      'hero.img.alt': 'スマホの HotkeyPad デッキ画面。アプリのアイコンが並び、Mac に接続されている',
+      'how.eyebrow': '設定の流れ',
+      'how.title': '2つのアプリと1本の接続、それだけ。',
+      'how.lede': 'クラウドアカウントの登録も、間に入るサーバーも不要——スマホがパソコンと直接会話します。',
+      'how.step1.title': 'ホストをインストール',
+      'how.step1.body': 'Mac や PC で小さなアプリを実行しておくだけ。あとはスマホから挨拶が届くのを静かに待ちます。',
+      'how.step2.title': 'HotkeyPad をインストール',
+      'how.step2.body': 'スマホでアプリを開くと、Bluetooth または WiFi ネットワーク経由で自動的にホストを探します。',
+      'how.step3.title': 'デッキを組み立てる',
+      'how.step3.body': 'アプリ、メディア操作、Shortcut をグリッドにドラッグ。ページを左右にスワイプして切り替え、ボタン名を変更し、好きなアイコンに差し替えられます。',
+      'how.img.alt': 'HotkeyPad の初回起動画面。Bluetooth か WiFi のどちらで接続するか選択する',
+      'how.img.src': 'images/screenshot-choose-ja.png',
+      'buttons.eyebrow': 'デッキ上で',
+      'buttons.title': 'ボタン1つひとつが、実際の操作を1つ実行する。',
+      'buttons.lede': 'マクロを書く必要も、プラグインストアを探し回る必要もありません——5種類のボタンで、ショートカットキーとして使いたいほぼすべての操作をカバーします。',
+      'buttons.app.title': 'アプリを起動',
+      'buttons.app.body': 'または Windows 上の Steam ゲーム——インストール済みの項目から選ぶだけ。',
+      'buttons.media.title': 'メディアを操作',
+      'buttons.media.body': '再生、一時停止、スキップ、音量——今再生しているものを操作します。',
+      'buttons.shell.title': 'シェルコマンドを実行',
+      'buttons.shell.body': '1行のコマンドを即実行——普段使っているスクリプトのために。',
+      'buttons.shortcut.title': 'Shortcut を実行',
+      'buttons.shortcut.body': 'スクリプトを書かずに、名前で任意の macOS Shortcut を実行。',
+      'buttons.key.title': 'キーの組み合わせを送信',
+      'buttons.key.body': '⌘⇧4、ミュート切り替えなど、覚えておく必要のあったキーの組み合わせを。',
+      'platforms.eyebrow': '対応プラットフォーム',
+      'platforms.title': '今持っている端末でそのまま動く。',
+      'platforms.computer.title': 'パソコン——ホスト側',
+      'platforms.computer.macos': 'macOS——フル機能：アプリ、メディア、Shortcut、シェルコマンド、キーの組み合わせ',
+      'platforms.computer.windows': 'Windows——現在はアプリと Steam ゲームの起動に対応。メディアなどの機能は今後追加予定',
+      'platforms.phone.title': 'スマホ——デッキ側',
+      'platforms.phone.ios': 'iOS',
+      'platforms.phone.android': 'Android',
+      'platforms.soon': 'App Store・Google Play への公開は近日予定',
+      'privacy.title': 'データは2台の端末の外へ出ません。',
+      'privacy.body': 'ログインも、解析トラッキングも、間に入るサーバーもありません。スマホとパソコンは Bluetooth かあなた自身の WiFi ネットワークを通じて直接会話します。',
+      'privacy.cta': 'プライバシーポリシーを読む',
+      'footer.github': 'GitHub',
+      'footer.releases': 'リリース',
+      'footer.privacy': 'プライバシー'
     }
   };
 
   var LANG_KEY = 'hotkeypad-lang';
 
+  var LANG_ORDER = ['en', 'zh', 'ja'];
+  var LANG_TOGGLE_LABEL = { en: '中文', zh: '日本語', ja: 'EN' };
+
   function detectDefaultLang() {
     try {
       var saved = localStorage.getItem(LANG_KEY);
-      if (saved === 'en' || saved === 'zh') return saved;
+      if (LANG_ORDER.indexOf(saved) !== -1) return saved;
     } catch (e) {}
-    return (navigator.language || '').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
+    var navLang = (navigator.language || '').toLowerCase();
+    if (navLang.indexOf('zh') === 0) return 'zh';
+    if (navLang.indexOf('ja') === 0) return 'ja';
+    return 'en';
   }
 
   function applyLang(lang) {
     var dict = STRINGS[lang];
-    document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
+    document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : (lang === 'ja' ? 'ja' : 'en');
 
     var nodes = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < nodes.length; i++) {
@@ -568,7 +634,7 @@
     if (metaDesc && dict['meta.description']) metaDesc.setAttribute('content', dict['meta.description']);
 
     var toggle = document.getElementById('langToggle');
-    if (toggle) toggle.textContent = lang === 'zh' ? 'EN' : '中文';
+    if (toggle) toggle.textContent = LANG_TOGGLE_LABEL[lang] || '中文';
 
     try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
     window.__hotkeypadLang = lang;
@@ -577,7 +643,8 @@
   applyLang(detectDefaultLang());
 
   document.getElementById('langToggle').addEventListener('click', function () {
-    applyLang(window.__hotkeypadLang === 'zh' ? 'en' : 'zh');
+    var idx = LANG_ORDER.indexOf(window.__hotkeypadLang);
+    applyLang(LANG_ORDER[(idx + 1) % LANG_ORDER.length]);
   });
 })();
 </script>
