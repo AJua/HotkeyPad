@@ -17,6 +17,15 @@ import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 /// swipe itself does not also land on whatever button was underneath it.
 /// Independent of orientation — Android does not need this reapplied
 /// when the device is turned.
+///
+/// On Android 15+ this call alone no longer actually hides anything —
+/// mandatory edge-to-edge enforcement overrides the legacy system-UI-flags
+/// API it is built on (see the Flutter team's own breaking-change note:
+/// https://docs.flutter.dev/release/breaking-changes/default-systemuimode-edge-to-edge).
+/// `MainActivity.kt`'s `hideSystemBars` drives the modern
+/// `WindowInsetsControllerCompat` API natively instead for that case; this
+/// call stays for iOS (which that native code cannot reach) and for
+/// pre-15 Android, where it still works fine on its own.
 void _hideSystemBars() {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 }

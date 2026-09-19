@@ -60,3 +60,10 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // WindowInsetsControllerCompat, for hiding the system bars natively —
+    // see MainActivity.kt's own doc comment for why Flutter's Dart-side
+    // SystemChrome call alone is not enough on Android 15+.
+    implementation("androidx.core:core-ktx:1.17.0")
+}
