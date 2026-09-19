@@ -881,61 +881,80 @@ class _DeckPageState extends State<DeckPage> {
           icon: const Icon(Icons.language),
         ),
       ],
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Where a purely decorative app icon used to sit — walking
-                // a fresh install through the two things it actually needs,
-                // in order, is more useful there than a logo: nothing below
-                // works until a host exists on a computer to pair with.
-                Text(
-                  l10n.howToUseTitle,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+      // A scroll view, not a bare Center — see _searchScaffold's own
+      // comment on the same pattern: on a small phone in landscape, the
+      // two full setup steps (heading, URL box, both method cards) can
+      // be taller than the available height, which a bare Center only
+      // clips silently in release builds while flagging a real
+      // RenderFlex overflow in debug — confirmed on a real device.
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Where a purely decorative app icon used to sit —
+                        // walking a fresh install through the two things it
+                        // actually needs, in order, is more useful there
+                        // than a logo: nothing below works until a host
+                        // exists on a computer to pair with.
+                        Text(
+                          l10n.howToUseTitle,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 20),
+                        _StepHeader(step: 1, title: l10n.step1Title),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.step1Body,
+                          textAlign: TextAlign.left,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 12),
+                        _CopyableUrl(
+                          url: _githubReleasesUrl,
+                          onTap: _copyHostUrl,
+                        ),
+                        const SizedBox(height: 28),
+                        _StepHeader(step: 2, title: l10n.connectionMethodTitle),
+                        const SizedBox(height: 4),
+                        Text(
+                          l10n.connectionMethodSubtitle,
+                          textAlign: TextAlign.left,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 24),
+                        _MethodCard(
+                          icon: Icons.bluetooth,
+                          title: l10n.connectionMethodBluetooth,
+                          subtitle: l10n.connectionMethodBluetoothHint,
+                          onTap: () =>
+                              _chooseMethod(ConnectionMethod.bluetooth),
+                        ),
+                        const SizedBox(height: 12),
+                        _MethodCard(
+                          icon: Icons.wifi,
+                          title: l10n.connectionMethodWifi,
+                          subtitle: l10n.connectionMethodWifiHint,
+                          onTap: () => _chooseMethod(ConnectionMethod.wifi),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                _StepHeader(step: 1, title: l10n.step1Title),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.step1Body,
-                  textAlign: TextAlign.left,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                _CopyableUrl(url: _githubReleasesUrl, onTap: _copyHostUrl),
-                const SizedBox(height: 28),
-                _StepHeader(step: 2, title: l10n.connectionMethodTitle),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.connectionMethodSubtitle,
-                  textAlign: TextAlign.left,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 24),
-                _MethodCard(
-                  icon: Icons.bluetooth,
-                  title: l10n.connectionMethodBluetooth,
-                  subtitle: l10n.connectionMethodBluetoothHint,
-                  onTap: () => _chooseMethod(ConnectionMethod.bluetooth),
-                ),
-                const SizedBox(height: 12),
-                _MethodCard(
-                  icon: Icons.wifi,
-                  title: l10n.connectionMethodWifi,
-                  subtitle: l10n.connectionMethodWifiHint,
-                  onTap: () => _chooseMethod(ConnectionMethod.wifi),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
