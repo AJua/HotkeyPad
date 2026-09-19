@@ -1,11 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'l10n/app_localizations.dart';
 import 'src/deck_page.dart';
 import 'src/locale_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
+
+/// Hides the status bar and (on Android) the navigation bar, and lets the
+/// deck draw edge-to-edge underneath both — a deck button in the corner
+/// is worth more than the sliver of screen a system bar would otherwise
+/// keep for itself. `immersiveSticky` over plain `immersive`: swiping
+/// from an edge still reveals the bars temporarily (so the system
+/// gestures/notifications a user actually needs stay reachable), but the
+/// swipe itself does not also land on whatever button was underneath it.
+/// Independent of orientation — Android does not need this reapplied
+/// when the device is turned.
+void _hideSystemBars() {
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+}
 
 void main() {
   runApp(const HotkeyPadClientApp());
@@ -18,7 +32,8 @@ class HotkeyPadClientApp extends StatefulWidget {
   State<HotkeyPadClientApp> createState() => _HotkeyPadClientAppState();
 }
 
-class _HotkeyPadClientAppState extends State<HotkeyPadClientApp> {
+class _HotkeyPadClientAppState extends State<HotkeyPadClientApp>
+    with WidgetsBindingObserver {
   /// Set by the host, which owns configuration here as it owns the grid.
   DeckTheme _theme = DeckTheme.system;
 
@@ -33,7 +48,28 @@ class _HotkeyPadClientAppState extends State<HotkeyPadClientApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Not called from bare main(), before runApp: that is early enough
+    // the platform channel this rides on can still silently drop the
+    // call. Here, once the binding backing this widget is actually live,
+    // is the first point it reliably takes effect.
+    _hideSystemBars();
     unawaited(_loadLocale());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Returning to the foreground — from the recents screen, or after the
+  // user's own swipe-to-reveal in _hideSystemBars's sticky mode expired
+  // on its own — leaves Android showing the system bars again rather
+  // than restoring them to hidden by itself.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _hideSystemBars();
   }
 
   Future<void> _loadLocale() async {
