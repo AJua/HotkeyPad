@@ -87,6 +87,36 @@ void main() {
       );
     });
 
+    testWidgets("the Scaffold's background matches EdgeBarScaffold's exactly — "
+        'regression: with none set, a plain Scaffold falls back to '
+        "colorScheme.surface, a different Material 3 tone than "
+        'surfaceContainer, so the deck visibly changed shade under the '
+        'grid depending only on whether the app bar happened to be on', (
+      tester,
+    ) async {
+      late Color expected;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(colorSchemeSeed: Colors.blue),
+          home: Builder(
+            builder: (context) {
+              expected = Theme.of(context).colorScheme.surfaceContainer;
+              return buildFullBleedDeck(
+                backgroundImage: null,
+                backgroundOpacity: 1,
+                backgroundFit: BackgroundFit.cover,
+                body: const SizedBox.shrink(),
+              );
+            },
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+      expect(scaffold.backgroundColor, expected);
+    });
+
     testWidgets('with no inset at all, background and body agree', (
       tester,
     ) async {

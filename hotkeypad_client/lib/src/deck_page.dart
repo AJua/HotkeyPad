@@ -1403,27 +1403,35 @@ Widget buildFullBleedDeck({
   required Widget body,
   Widget? overlay,
 }) {
-  return Scaffold(
-    body: Stack(
-      children: [
-        Positioned.fill(
-          child: DeckBackground(
-            image: backgroundImage,
-            opacity: backgroundOpacity,
-            fit: backgroundFit,
-          ),
-        ),
-        SafeArea(
-          child: SizedBox.expand(
-            child: Stack(
-              children: [
-                Positioned.fill(child: body),
-                if (overlay != null) Positioned.fill(child: overlay),
-              ],
+  return Builder(
+    // Matches EdgeBarScaffold's own backgroundColor exactly — a plain
+    // Scaffold with none set falls back to colorScheme.surface, a
+    // different (if subtly so) Material 3 tone than surfaceContainer,
+    // which otherwise made toggling the app bar visibly shift the
+    // deck's own background color underneath everything else.
+    builder: (context) => Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DeckBackground(
+              image: backgroundImage,
+              opacity: backgroundOpacity,
+              fit: backgroundFit,
             ),
           ),
-        ),
-      ],
+          SafeArea(
+            child: SizedBox.expand(
+              child: Stack(
+                children: [
+                  Positioned.fill(child: body),
+                  if (overlay != null) Positioned.fill(child: overlay),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
