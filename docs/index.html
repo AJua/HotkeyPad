@@ -306,7 +306,7 @@
       </div>
     </div>
     <div class="how-visual">
-      <div class="tablet-frame"><img src="images/screenshot-choose.png" data-i18n-alt="how.img.alt" alt="HotkeyPad's first-launch screen, asking whether to connect over Bluetooth or Wi-Fi"></div>
+      <div class="tablet-frame"><img src="images/screenshot-choose.png" data-i18n-src="how.img.src" data-i18n-alt="how.img.alt" alt="HotkeyPad's first-launch screen, asking whether to connect over Bluetooth or Wi-Fi"></div>
     </div>
   </div>
 </section>
@@ -438,6 +438,7 @@
       'how.step3.title': 'Build your deck',
       'how.step3.body': 'Drag apps, media controls, and shortcuts onto a grid. Swipe between pages, rename buttons, pick your own icons.',
       'how.img.alt': "HotkeyPad's first-launch screen, asking whether to connect over Bluetooth or Wi-Fi",
+      'how.img.src': 'images/screenshot-choose.png',
       'buttons.eyebrow': 'On the deck',
       'buttons.title': 'Every button does one real thing.',
       'buttons.lede': "No macros to script, no plugin marketplace to dig through — five kinds of button cover almost everything you'd reach for a shortcut key for.",
@@ -495,6 +496,7 @@
       'how.step3.title': '排出你的按鍵面板',
       'how.step3.body': '把應用程式、媒體控制、Shortcut 拖進網格。左右滑動切換頁面，重新命名按鍵，換上自己喜歡的圖示。',
       'how.img.alt': 'HotkeyPad 首次啟動畫面，詢問要用藍牙還是 WiFi 連線',
+      'how.img.src': 'images/screenshot-choose-zh.png',
       'buttons.eyebrow': '按鍵面板上',
       'buttons.title': '每顆按鍵都做一件實際的事。',
       'buttons.lede': '不用寫巨集，也不用翻套件市集——五種按鍵類型幾乎涵蓋你平常會想按快速鍵做的每件事。',
@@ -554,6 +556,11 @@
     for (var k = 0; k < altNodes.length; k++) {
       var aKey = altNodes[k].getAttribute('data-i18n-alt');
       if (dict[aKey] != null) altNodes[k].setAttribute('alt', dict[aKey]);
+    }
+    var srcNodes = document.querySelectorAll('[data-i18n-src]');
+    for (var m = 0; m < srcNodes.length; m++) {
+      var sKey = srcNodes[m].getAttribute('data-i18n-src');
+      if (dict[sKey] != null) srcNodes[m].setAttribute('src', dict[sKey]);
     }
 
     if (dict['meta.title']) document.title = dict['meta.title'];
