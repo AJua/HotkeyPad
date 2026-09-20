@@ -35,6 +35,7 @@ IconData deckFallbackIcon(DeckItem item) => switch (item) {
   // to exist.
   WidgetItem(:final kind) => switch (kind) {
     DeckWidgetKind.clock => Icons.access_time,
+    DeckWidgetKind.digitalClock => Icons.watch_later_outlined,
     DeckWidgetKind.calendar => Icons.calendar_month,
   },
 };

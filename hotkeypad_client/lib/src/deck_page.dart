@@ -1491,6 +1491,10 @@ class _DeckWidgetTile extends StatelessWidget {
               width: constraints.maxWidth,
               height: constraints.maxHeight,
             ),
+            DeckWidgetKind.digitalClock => DigitalClock(
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+            ),
             DeckWidgetKind.calendar => MonthCalendar(
               width: constraints.maxWidth,
               height: constraints.maxHeight,

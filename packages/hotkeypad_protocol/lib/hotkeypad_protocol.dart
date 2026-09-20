@@ -6,6 +6,7 @@ import 'package:bluetooth_low_energy/bluetooth_low_energy.dart';
 import 'package:flutter/widgets.dart';
 
 export 'src/analog_clock.dart';
+export 'src/digital_clock.dart';
 export 'src/month_calendar.dart';
 
 /// The contract shared by the host service and the client app.
@@ -667,6 +668,7 @@ final class ComboItem extends DeckItem {
 /// runs.
 enum DeckWidgetKind {
   clock('clock', 'Clock'),
+  digitalClock('digital_clock', 'Digital clock'),
   calendar('calendar', 'Calendar');
 
   const DeckWidgetKind(this.wire, this.label);

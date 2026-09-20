@@ -1144,6 +1144,10 @@ class _Cell extends StatelessWidget {
                     width: constraints.maxWidth,
                     height: constraints.maxHeight,
                   ),
+                  DeckWidgetKind.digitalClock => DigitalClock(
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                  ),
                   DeckWidgetKind.calendar => MonthCalendar(
                     width: constraints.maxWidth,
                     height: constraints.maxHeight,
@@ -1581,6 +1585,15 @@ class _PickerDialogState extends State<_PickerDialog> {
                         selected: _existingWidgetKind == DeckWidgetKind.clock,
                         onTap: () =>
                             _startComposingWidget(DeckWidgetKind.clock),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.watch_later_outlined),
+                        title: const Text('Digital clock...'),
+                        subtitle: const Text('Bold time with the date below'),
+                        selected:
+                            _existingWidgetKind == DeckWidgetKind.digitalClock,
+                        onTap: () =>
+                            _startComposingWidget(DeckWidgetKind.digitalClock),
                       ),
                       ListTile(
                         leading: const Icon(Icons.calendar_month),
