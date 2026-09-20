@@ -33,9 +33,9 @@ abstract final class SettingsStore {
   }
 
   static const _fallback = (
-    theme: DeckTheme.system,
-    showLabels: true,
-    backgroundImageId: null,
+    theme: DeckTheme.light,
+    showLabels: false,
+    backgroundImageId: 'bgbuiltin:sunny',
     backgroundOpacity: 1.0,
     backgroundFit: BackgroundFit.cover,
   );

@@ -13,23 +13,53 @@ import 'config_dir.dart';
 /// client caches what it is sent but never edits it.
 abstract final class LayoutStore {
   /// Shown before anything has ever been saved, so a first install is not a
-  /// blank grid — a handful of stock apps to start from, picked per platform
-  /// since an app that does not exist there would just be a dead button.
+  /// blank grid — a stock deck to start from, picked per platform since an
+  /// app that does not exist there would just be a dead button.
   static DeckLayout get _defaultLayout =>
       !kIsWeb && Platform.isWindows ? _defaultLayoutWindows : _defaultLayoutMac;
 
   static final _defaultLayoutMac =
       DeckLayout.fromJson({
-        'columns': 3,
-        'rows': 2,
-        'pages': 1,
+        'columns': 6,
+        'rows': 3,
+        'pages': 2,
         'slots': [
-          'app:App Store',
+          '{"t":"widget","k":"digital_clock","rs":3,"cs":2}',
+          null,
           'app:Finder',
+          'app:Mail',
+          'app:Contacts',
+          'app:Xcode',
+          null,
+          null,
+          'app:App Store',
+          'app:Calendar',
+          'app:Messages',
+          'app:Terminal',
+          null,
+          null,
           'app:Safari',
           'app:Maps',
-          'app:Mail',
-          'app:Calendar',
+          'app:FaceTime',
+          'app:Activity Monitor',
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
         ],
       })!;
 
