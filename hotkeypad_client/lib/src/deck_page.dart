@@ -89,6 +89,17 @@ class _DeckPageState extends State<DeckPage> {
   final _pages = PageController();
   int _page = 0;
 
+  /// [EdgeBarScaffold] wraps [child] in a completely different ancestor
+  /// shape between portrait and landscape (a plain [Padding] one way, a
+  /// [Column] > [Expanded] > [SafeArea] the other) — without a stable
+  /// identity spanning both, an orientation change reads as the deck's
+  /// entire element being torn down and a fresh one built in its place,
+  /// which drops [_pages]'s attached scroll position and silently
+  /// reattaches at page 0. Keying the subtree lets the framework recognise
+  /// it as the same element moving to a new parent instead, so [_pages] —
+  /// and its current page — survive the move.
+  final _deckKey = GlobalKey();
+
   /// The gap between slots — shared with the host's own editor preview via
   /// [kDeckGridSpacing], so a button looks the same size relative to its
   /// neighbours on both.
@@ -571,7 +582,10 @@ class _DeckPageState extends State<DeckPage> {
               icon: const Icon(Icons.settings_outlined),
             ),
           ],
-          child: deck,
+          // Keyed so this survives EdgeBarScaffold's own ancestor swap
+          // between orientations as a move rather than a rebuild — see
+          // _deckKey's own doc comment.
+          child: KeyedSubtree(key: _deckKey, child: deck),
         );
       },
     );
