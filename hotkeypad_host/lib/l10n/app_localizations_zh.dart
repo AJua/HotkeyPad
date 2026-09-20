@@ -125,10 +125,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chooseImageAction => '選擇圖片…';
 
   @override
-  String get changeImageAction => '更換…';
+  String get noBackgroundOption => '無';
 
   @override
-  String get removeImageAction => '移除';
+  String get backgroundSpring => '春天';
+
+  @override
+  String get backgroundSummer => '夏天';
+
+  @override
+  String get backgroundAutumn => '秋天';
+
+  @override
+  String get backgroundWinter => '冬天';
+
+  @override
+  String get backgroundSunny => '晴天';
+
+  @override
+  String get backgroundCloudy => '多雲';
+
+  @override
+  String get backgroundRainy => '雨天';
+
+  @override
+  String get backgroundSnowy => '下雪';
+
+  @override
+  String get backgroundMountains => '山巒';
 
   @override
   String get opacityLabel => '不透明度';
@@ -303,10 +327,34 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chooseImageAction => '選擇圖片…';
 
   @override
-  String get changeImageAction => '更換…';
+  String get noBackgroundOption => '無';
 
   @override
-  String get removeImageAction => '移除';
+  String get backgroundSpring => '春天';
+
+  @override
+  String get backgroundSummer => '夏天';
+
+  @override
+  String get backgroundAutumn => '秋天';
+
+  @override
+  String get backgroundWinter => '冬天';
+
+  @override
+  String get backgroundSunny => '晴天';
+
+  @override
+  String get backgroundCloudy => '多雲';
+
+  @override
+  String get backgroundRainy => '雨天';
+
+  @override
+  String get backgroundSnowy => '下雪';
+
+  @override
+  String get backgroundMountains => '山巒';
 
   @override
   String get opacityLabel => '不透明度';

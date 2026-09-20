@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import 'app_launcher.dart';
 import 'backup_store.dart';
 import 'background_image_store.dart';
+import 'builtin_background_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
 import 'deck_icons.dart';
@@ -1831,9 +1832,12 @@ class _IconPickerState extends State<IconPicker> {
   }
 }
 
-/// Preview and picker for the deck's background image — [IconPicker]'s
-/// image half without the emoji/text alternative, since there is no
-/// glyph-sized stand-in for a whole-screen photo.
+/// Picker for the deck's background image: a row of tiles offering "no
+/// background", each of [BuiltinBackgroundStore]'s ready-made scenes, and
+/// the user's own picked image — so there is something worth trying before
+/// anyone has to go find a picture of their own, and a previously-chosen
+/// custom image still shows up in the same row rather than needing a
+/// separate "current image" preview.
 ///
 /// Public, not a private implementation detail of the settings dialog, for
 /// the same reason [IconPicker] is: it can be pumped and tapped through in
@@ -1847,7 +1851,7 @@ class BackgroundPicker extends StatefulWidget {
 
   final String? imageId;
 
-  /// Reports the newly picked id, or null when "Remove" is tapped.
+  /// Reports the newly picked id, or null for "no background".
   final ValueChanged<String?> onChanged;
 
   @override
@@ -1855,45 +1859,55 @@ class BackgroundPicker extends StatefulWidget {
 }
 
 class _BackgroundPickerState extends State<BackgroundPicker> {
-  Uint8List? _bytes;
+  Uint8List? _customBytes;
 
-  /// Same reason as [_IconPickerState._loading]: distinct from [_bytes]
-  /// being null, which is also true once a read finishes and finds nothing.
-  bool _loading = false;
+  /// Same reason as [_IconPickerState._loading]: distinct from
+  /// [_customBytes] being null, which is also true once a read finishes and
+  /// finds nothing.
+  bool _loadingCustom = false;
+
+  /// Builtin scenes are re-rendered from scratch on every request (nothing
+  /// is cached to disk — see [BuiltinBackgroundStore]'s own doc comment),
+  /// so this keeps a settings-dialog rebuild from re-drawing all nine
+  /// thumbnails every time.
+  static final _builtinThumbnails = <String, Future<Uint8List?>>{};
+
+  bool get _isCustomSelected =>
+      widget.imageId != null && !BuiltinBackgroundStore.handles(widget.imageId!);
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadCustom();
   }
 
   @override
   void didUpdateWidget(covariant BackgroundPicker oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageId != widget.imageId) _load();
+    if (oldWidget.imageId != widget.imageId) _loadCustom();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadCustom() async {
     final id = widget.imageId;
-    if (id == null) {
+    if (id == null || BuiltinBackgroundStore.handles(id)) {
       setState(() {
-        _bytes = null;
-        _loading = false;
+        _customBytes = null;
+        _loadingCustom = false;
       });
       return;
     }
-    setState(() => _loading = true);
+    setState(() => _loadingCustom = true);
     final bytes = await BackgroundImageStore.read(id);
     // The id could have changed again while this was in flight.
     if (mounted && widget.imageId == id) {
       setState(() {
-        _bytes = bytes;
-        _loading = false;
+        _customBytes = bytes;
+        _loadingCustom = false;
       });
     }
   }
 
-  Future<void> _pick() async {
+  Future<void> _pickCustom() async {
     final png = await BackgroundImageStore.pickAndProcess();
     if (png == null || !mounted) return;
     final id = await BackgroundImageStore.save(png);
@@ -1901,49 +1915,70 @@ class _BackgroundPickerState extends State<BackgroundPicker> {
     widget.onChanged(id);
   }
 
+  Future<Uint8List?> _builtinThumbnail(String id) {
+    return _builtinThumbnails.putIfAbsent(
+      id,
+      () => BuiltinBackgroundStore.render(id, width: 160, height: 160),
+    );
+  }
+
+  String _builtinLabel(AppLocalizations l10n, String name) {
+    return switch (name) {
+      'spring' => l10n.backgroundSpring,
+      'summer' => l10n.backgroundSummer,
+      'autumn' => l10n.backgroundAutumn,
+      'winter' => l10n.backgroundWinter,
+      'sunny' => l10n.backgroundSunny,
+      'cloudy' => l10n.backgroundCloudy,
+      'rainy' => l10n.backgroundRainy,
+      'snowy' => l10n.backgroundSnowy,
+      'mountains' => l10n.backgroundMountains,
+      _ => name,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final l10n = AppLocalizations.of(context)!;
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
       children: [
-        SizedBox(
-          width: 64,
-          height: 64,
-          child: Material(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(onTap: _pick, child: _preview(context)),
+        _tile(
+          selected: widget.imageId == null,
+          onTap: () => widget.onChanged(null),
+          tooltip: l10n.noBackgroundOption,
+          child: Icon(
+            Icons.block,
+            color: Theme.of(context).colorScheme.outline,
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              OutlinedButton(
-                onPressed: _pick,
-                child: Text(
-                  widget.imageId == null
-                      ? AppLocalizations.of(context)!.chooseImageAction
-                      : AppLocalizations.of(context)!.changeImageAction,
-                ),
-              ),
-              if (widget.imageId != null)
-                TextButton(
-                  onPressed: () => widget.onChanged(null),
-                  child: Text(AppLocalizations.of(context)!.removeImageAction),
-                ),
-            ],
+        for (final name in BuiltinBackgroundStore.ids)
+          _tile(
+            selected: widget.imageId == BuiltinBackgroundStore.idFor(name),
+            onTap: () => widget.onChanged(BuiltinBackgroundStore.idFor(name)),
+            tooltip: _builtinLabel(l10n, name),
+            child: FutureBuilder<Uint8List?>(
+              future: _builtinThumbnail(BuiltinBackgroundStore.idFor(name)),
+              builder: (context, snapshot) {
+                final bytes = snapshot.data;
+                if (bytes == null) return const SizedBox.shrink();
+                return Image.memory(bytes, fit: BoxFit.cover);
+              },
+            ),
           ),
+        _tile(
+          selected: _isCustomSelected,
+          onTap: _pickCustom,
+          tooltip: l10n.chooseImageAction,
+          child: _customPreview(context),
         ),
       ],
     );
   }
 
-  Widget _preview(BuildContext context) {
-    if (_loading) {
+  Widget _customPreview(BuildContext context) {
+    if (_loadingCustom) {
       return const Center(
         child: SizedBox(
           width: 20,
@@ -1952,12 +1987,38 @@ class _BackgroundPickerState extends State<BackgroundPicker> {
         ),
       );
     }
-    final bytes = _bytes;
+    final bytes = _customBytes;
     // A dangling id falls through to the placeholder, same as IconPicker.
     if (bytes != null) return Image.memory(bytes, fit: BoxFit.cover);
     return Icon(
-      Icons.image_outlined,
+      Icons.add_photo_alternate_outlined,
       color: Theme.of(context).colorScheme.outline,
+    );
+  }
+
+  Widget _tile({
+    required bool selected,
+    required VoidCallback onTap,
+    required String tooltip,
+    required Widget child,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: selected ? Border.all(color: scheme.primary, width: 3) : null,
+        ),
+        child: Material(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(onTap: onTap, child: child),
+        ),
+      ),
     );
   }
 }

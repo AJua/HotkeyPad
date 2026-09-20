@@ -311,23 +311,71 @@ abstract class AppLocalizations {
   /// **'Background image'**
   String get backgroundImageSectionHeader;
 
-  /// Button that opens a file picker when no background image is set.
+  /// Tooltip on the background picker's tile that opens a file picker for a custom image.
   ///
   /// In en, this message translates to:
   /// **'Choose image...'**
   String get chooseImageAction;
 
-  /// Button that opens a file picker when a background image is already set.
+  /// Tooltip on the background picker's tile that clears the background image.
   ///
   /// In en, this message translates to:
-  /// **'Change...'**
-  String get changeImageAction;
+  /// **'None'**
+  String get noBackgroundOption;
 
-  /// Button that clears the background image.
+  /// Tooltip on a built-in background thumbnail.
   ///
   /// In en, this message translates to:
-  /// **'Remove'**
-  String get removeImageAction;
+  /// **'Spring'**
+  String get backgroundSpring;
+
+  /// Tooltip on a built-in background thumbnail.
+  ///
+  /// In en, this message translates to:
+  /// **'Summer'**
+  String get backgroundSummer;
+
+  /// Tooltip on a built-in background thumbnail.
+  ///
+  /// In en, this message translates to:
+  /// **'Autumn'**
+  String get backgroundAutumn;
+
+  /// Tooltip on a built-in background thumbnail.
+  ///
+  /// In en, this message translates to:
+  /// **'Winter'**
+  String get backgroundWinter;
+
+  /// Tooltip on a built-in background thumbnail.
+  ///
+  /// In en, this message translates to:
+  /// **'Sunny'**
+  String get backgroundSunny;
+
+  /// Tooltip on a built-in background thumbnail.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloudy'**
+  String get backgroundCloudy;
+
+  /// Tooltip on a built-in background thumbnail.
+  ///
+  /// In en, this message translates to:
+  /// **'Rainy'**
+  String get backgroundRainy;
+
+  /// Tooltip on a built-in background thumbnail.
+  ///
+  /// In en, this message translates to:
+  /// **'Snowy'**
+  String get backgroundSnowy;
+
+  /// Tooltip on a built-in background thumbnail.
+  ///
+  /// In en, this message translates to:
+  /// **'Mountains'**
+  String get backgroundMountains;
 
   /// Label on the background image opacity slider.
   ///

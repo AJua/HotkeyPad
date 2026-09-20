@@ -127,10 +127,34 @@ class AppLocalizationsJa extends AppLocalizations {
   String get chooseImageAction => '画像を選択…';
 
   @override
-  String get changeImageAction => '変更…';
+  String get noBackgroundOption => 'なし';
 
   @override
-  String get removeImageAction => '削除';
+  String get backgroundSpring => '春';
+
+  @override
+  String get backgroundSummer => '夏';
+
+  @override
+  String get backgroundAutumn => '秋';
+
+  @override
+  String get backgroundWinter => '冬';
+
+  @override
+  String get backgroundSunny => '晴れ';
+
+  @override
+  String get backgroundCloudy => '曇り';
+
+  @override
+  String get backgroundRainy => '雨';
+
+  @override
+  String get backgroundSnowy => '雪';
+
+  @override
+  String get backgroundMountains => '山';
 
   @override
   String get opacityLabel => '不透明度';

@@ -12,6 +12,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../l10n/app_localizations.dart';
 import 'app_launcher.dart';
 import 'background_image_store.dart';
+import 'builtin_background_store.dart';
 import 'client_trust_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
@@ -1141,9 +1142,10 @@ class _HostPageState extends State<HostPage> {
   }
 
   /// Renders an app's icon, reads back a user-picked custom icon, reads
-  /// back a custom background image, or renders an emoji or an action's
+  /// back a custom background image, renders a built-in background (see
+  /// [BuiltinBackgroundStore]), or renders an emoji or an action's
   /// built-in glyph (see [GlyphIconStore]) — every icon a deck button can
-  /// show is one of these four, so the client never draws one itself —
+  /// show is one of these five, so the client never draws one itself —
   /// and streams it as binary frames sized to the client's own frame-size
   /// limit either way. The transfer itself does not care which [id]
   /// names, which store it came from, or which transport [clientId] is on.
@@ -1159,6 +1161,7 @@ class _HostPageState extends State<HostPage> {
         ? await AppLauncher.icon(path, size: HotkeyPad.iconSize)
         : await CustomIconStore.read(id) ??
               await BackgroundImageStore.read(id) ??
+              await BuiltinBackgroundStore.render(id) ??
               await GlyphIconStore.render(id);
     if (png == null) {
       await _send(clientId, IconUnavailable(name: id));

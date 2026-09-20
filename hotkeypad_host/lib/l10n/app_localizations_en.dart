@@ -128,10 +128,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chooseImageAction => 'Choose image...';
 
   @override
-  String get changeImageAction => 'Change...';
+  String get noBackgroundOption => 'None';
 
   @override
-  String get removeImageAction => 'Remove';
+  String get backgroundSpring => 'Spring';
+
+  @override
+  String get backgroundSummer => 'Summer';
+
+  @override
+  String get backgroundAutumn => 'Autumn';
+
+  @override
+  String get backgroundWinter => 'Winter';
+
+  @override
+  String get backgroundSunny => 'Sunny';
+
+  @override
+  String get backgroundCloudy => 'Cloudy';
+
+  @override
+  String get backgroundRainy => 'Rainy';
+
+  @override
+  String get backgroundSnowy => 'Snowy';
+
+  @override
+  String get backgroundMountains => 'Mountains';
 
   @override
   String get opacityLabel => 'Opacity';

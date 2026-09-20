@@ -118,13 +118,37 @@
   "@backgroundImageSectionHeader": {"description": "Settings dialog section header."},
 
   "chooseImageAction": "Choose image...",
-  "@chooseImageAction": {"description": "Button that opens a file picker when no background image is set."},
+  "@chooseImageAction": {"description": "Tooltip on the background picker's tile that opens a file picker for a custom image."},
 
-  "changeImageAction": "Change...",
-  "@changeImageAction": {"description": "Button that opens a file picker when a background image is already set."},
+  "noBackgroundOption": "None",
+  "@noBackgroundOption": {"description": "Tooltip on the background picker's tile that clears the background image."},
 
-  "removeImageAction": "Remove",
-  "@removeImageAction": {"description": "Button that clears the background image."},
+  "backgroundSpring": "Spring",
+  "@backgroundSpring": {"description": "Tooltip on a built-in background thumbnail."},
+
+  "backgroundSummer": "Summer",
+  "@backgroundSummer": {"description": "Tooltip on a built-in background thumbnail."},
+
+  "backgroundAutumn": "Autumn",
+  "@backgroundAutumn": {"description": "Tooltip on a built-in background thumbnail."},
+
+  "backgroundWinter": "Winter",
+  "@backgroundWinter": {"description": "Tooltip on a built-in background thumbnail."},
+
+  "backgroundSunny": "Sunny",
+  "@backgroundSunny": {"description": "Tooltip on a built-in background thumbnail."},
+
+  "backgroundCloudy": "Cloudy",
+  "@backgroundCloudy": {"description": "Tooltip on a built-in background thumbnail."},
+
+  "backgroundRainy": "Rainy",
+  "@backgroundRainy": {"description": "Tooltip on a built-in background thumbnail."},
+
+  "backgroundSnowy": "Snowy",
+  "@backgroundSnowy": {"description": "Tooltip on a built-in background thumbnail."},
+
+  "backgroundMountains": "Mountains",
+  "@backgroundMountains": {"description": "Tooltip on a built-in background thumbnail."},
 
   "opacityLabel": "Opacity",
   "@opacityLabel": {"description": "Label on the background image opacity slider."},
