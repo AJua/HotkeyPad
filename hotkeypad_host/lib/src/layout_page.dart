@@ -149,6 +149,65 @@ String? currentButtonSummary(String? stored) {
   };
 }
 
+/// [item] with its icon override replaced by [emoji]/[customIconId], every
+/// other field carried over unchanged.
+///
+/// What the picker's Save button applies: changing the icon in
+/// [IconPicker] alone, with no action re-chosen underneath it, otherwise
+/// has nothing to attach the new icon to and is silently lost — see
+/// [_PickerDialogState._saveIconOnly]. A [WidgetItem] has no icon of its
+/// own ([DeckItem.emoji] is always null there) and is returned unchanged.
+DeckItem withIconOverride(
+  DeckItem item, {
+  required String? emoji,
+  required String? customIconId,
+}) => switch (item) {
+  AppItem(:final name) => AppItem(
+    name,
+    emoji: emoji,
+    customIconId: customIconId,
+  ),
+  ActionItem(:final action) => ActionItem(
+    action,
+    emoji: emoji,
+    customIconId: customIconId,
+  ),
+  ShellItem(:final command, :final label, :final shell) => ShellItem(
+    command: command,
+    label: label,
+    shell: shell,
+    emoji: emoji,
+    customIconId: customIconId,
+  ),
+  KeyComboItem(:final modifiers, :final key, :final special) => KeyComboItem(
+    modifiers: modifiers,
+    key: key,
+    special: special,
+    label: item.label,
+    emoji: emoji,
+    customIconId: customIconId,
+  ),
+  ShortcutItem(:final name) => ShortcutItem(
+    name: name,
+    label: item.label,
+    emoji: emoji,
+    customIconId: customIconId,
+  ),
+  OpenUrlItem(:final url) => OpenUrlItem(
+    url: url,
+    label: item.label,
+    emoji: emoji,
+    customIconId: customIconId,
+  ),
+  ComboItem(:final steps, :final label) => ComboItem(
+    steps: steps,
+    label: label,
+    emoji: emoji,
+    customIconId: customIconId,
+  ),
+  WidgetItem() => item,
+};
+
 /// The largest row/column span a widget anchored at [index] could have
 /// without running off [layout]'s own edge from that position — what
 /// [_PickerDialogState]'s own Rows/Columns steppers are bounded to, so
@@ -1375,6 +1434,20 @@ class _PickerDialogState extends State<_PickerDialog> {
   void _choose(DeckItem item) =>
       Navigator.of(context).pop(DeckItemChoice(item.stored));
 
+  /// Applies whatever [_emoji]/[_customIconId] is currently showing to the
+  /// slot's existing action, without the user having to re-pick that
+  /// action just to make an icon-only change stick — see
+  /// [withIconOverride]. Only reachable when [_existing] is non-null (see
+  /// the Save button in [build]): an icon has nothing to attach to on an
+  /// empty slot.
+  void _saveIconOnly() {
+    final existing = _existing;
+    if (existing == null) return;
+    _choose(
+      withIconOverride(existing, emoji: _emoji, customIconId: _customIconId),
+    );
+  }
+
   /// Which widget kind's rows/columns steppers [build] should show instead
   /// of the ordinary list — null means "showing the list". Swapped in in
   /// place, inside this same dialog, rather than opening a second `showDialog`
@@ -1684,6 +1757,11 @@ class _PickerDialogState extends State<_PickerDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
+        // Only for an already-occupied slot: an icon on its own has nothing
+        // to attach to on an empty one, and every other row below already
+        // saves by picking an action outright.
+        if (_existing != null)
+          FilledButton(onPressed: _saveIconOnly, child: const Text('Save')),
       ],
     );
   }

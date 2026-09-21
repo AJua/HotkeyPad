@@ -446,6 +446,58 @@ void main() {
     });
   });
 
+  group('withIconOverride', () {
+    test('replaces an app button\'s icon, keeping its name', () {
+      const item = AppItem('Safari', emoji: '🧭');
+
+      final updated = withIconOverride(item, emoji: null, customIconId: 'img_1');
+
+      expect(updated, isA<AppItem>());
+      expect((updated as AppItem).name, 'Safari');
+      expect(updated.emoji, isNull);
+      expect(updated.customIconId, 'img_1');
+    });
+
+    test('replaces a shell button\'s icon, keeping its command and shell', () {
+      const item = ShellItem(
+        command: 'say hi',
+        label: 'Hi',
+        shell: ShellKind.fish,
+      );
+
+      final updated =
+          withIconOverride(item, emoji: '👋', customIconId: null)
+              as ShellItem;
+
+      expect(updated.command, 'say hi');
+      expect(updated.label, 'Hi');
+      expect(updated.shell, ShellKind.fish);
+      expect(updated.emoji, '👋');
+    });
+
+    test('replaces a URL button\'s icon, keeping its address', () {
+      const item = OpenUrlItem(url: 'https://example.com', label: 'Example');
+
+      final updated =
+          withIconOverride(item, emoji: '🔗', customIconId: null)
+              as OpenUrlItem;
+
+      expect(updated.url, 'https://example.com');
+      expect(updated.label, 'Example');
+      expect(updated.emoji, '🔗');
+    });
+
+    test('leaves a widget button unchanged — it has no icon of its own', () {
+      const item = WidgetItem(
+        kind: DeckWidgetKind.clock,
+        rowSpan: 1,
+        columnSpan: 1,
+      );
+
+      expect(withIconOverride(item, emoji: '🕐', customIconId: null), item);
+    });
+  });
+
   group('displayEditToCanonical', () {
     test('does nothing when the display was not actually transposed', () {
       final layout = DeckLayout.empty().withSlot(3, 'app:X');
