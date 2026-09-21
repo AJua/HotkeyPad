@@ -421,7 +421,6 @@ class LayoutPage extends StatefulWidget {
     required this.onChanged,
     required this.onAppearanceChanged,
     required this.onShowService,
-    required this.lockedClientPortrait,
   });
 
   /// Called after every edit so the service can push the new layout to
@@ -435,14 +434,6 @@ class LayoutPage extends StatefulWidget {
   /// Opens the service view, which is reached from the settings dialog now
   /// that there are no tabs.
   final VoidCallback onShowService;
-
-  /// The locked client's own orientation, so the grid can be shown turned
-  /// the same way that phone is actually displaying it — see
-  /// [LayoutPageState._displayLayout]. Null whenever there is no single
-  /// locked device to match (nothing picked, or its own [SetOrientation]
-  /// has not arrived yet), in which case the canonical, un-turned shape is
-  /// shown, same as before this existed.
-  final bool? lockedClientPortrait;
 
   @override
   State<LayoutPage> createState() => LayoutPageState();
@@ -532,20 +523,16 @@ class LayoutPageState extends State<LayoutPage> {
     widget.onChanged(layout);
   }
 
-  /// [_layout] turned to match the locked client's own orientation, when
-  /// one is known — the grid, and only the grid, is shown and edited in
-  /// this shape so the geometry on screen matches what that phone is
-  /// actually displaying. Storage and broadcast are untouched: an edit
-  /// made through this view is turned back via [_toCanonical] before
-  /// [_apply] ever sees it.
-  /// A manual portrait/landscape preview, used only when no real device is
-  /// locked ([widget.lockedClientPortrait] is null) to say which shape to
-  /// show — see [toggleOrientationPreview]. Null means "whatever [_layout]
-  /// is already saved as", same as before this existed.
+  /// A manual portrait/landscape preview — see [toggleOrientationPreview].
+  /// Null means "nothing chosen yet", in which case [_layout]'s canonical,
+  /// un-turned shape is shown. [_displayLayout], and only [_displayLayout],
+  /// is shown and edited in this turned shape; storage and broadcast are
+  /// untouched — an edit made through this view is turned back via
+  /// [_toCanonical] before [_apply] ever sees it.
   bool? _previewPortrait;
 
   DeckLayout get _displayLayout {
-    final portrait = widget.lockedClientPortrait ?? _previewPortrait;
+    final portrait = _previewPortrait;
     return portrait == null ? _layout : _layout.orientedFor(portrait: portrait);
   }
 
@@ -559,11 +546,9 @@ class LayoutPageState extends State<LayoutPage> {
     return layout.rows > layout.columns;
   }
 
-  /// Flips the preview between portrait and landscape — only reachable
-  /// when nothing real is locked in, since a locked device's own
-  /// orientation should always win over a guess made here. Public: the
-  /// button that calls this now lives in the host's app bar, not this
-  /// widget — see [openSettings].
+  /// Flips the preview between portrait and landscape. Public: the button
+  /// that calls this lives in the host's app bar, not this widget — see
+  /// [openSettings].
   void toggleOrientationPreview() {
     setState(() => _previewPortrait = !_displayIsPortrait);
   }
@@ -935,7 +920,12 @@ class LayoutPageState extends State<LayoutPage> {
       ),
     );
     if (chosen == null || !mounted) return;
-    final item = DeckItem.parse(chosen.stored);
+    final stored = chosen.stored;
+    if (stored == null) {
+      await _apply(_toCanonical(_displayLayout.withSlot(index, null)));
+      return;
+    }
+    final item = DeckItem.parse(stored);
     if (item is WidgetItem) {
       if (_displayLayout.widgetPlacementBlocked(
         index,
@@ -953,7 +943,7 @@ class LayoutPageState extends State<LayoutPage> {
       await _apply(_toCanonical(_displayLayout.withWidget(index, item)));
       return;
     }
-    await _apply(_toCanonical(_displayLayout.withSlot(index, chosen.stored)));
+    await _apply(_toCanonical(_displayLayout.withSlot(index, stored)));
   }
 
   @override
@@ -1043,11 +1033,6 @@ class LayoutPageState extends State<LayoutPage> {
                               return _icons[key];
                             },
                             onPick: _pick,
-                            onClear: (index) => _apply(
-                              _toCanonical(
-                                _displayLayout.withSlot(index, null),
-                              ),
-                            ),
                             onMove: (from, to) => _apply(
                               _toCanonical(_displayLayout.moved(from, to)),
                             ),
@@ -1077,7 +1062,6 @@ class LayoutGrid extends StatelessWidget {
     required this.page,
     required this.iconFor,
     required this.onPick,
-    required this.onClear,
     required this.onMove,
   });
 
@@ -1085,7 +1069,6 @@ class LayoutGrid extends StatelessWidget {
   final int page;
   final Uint8List? Function(String key) iconFor;
   final ValueChanged<int> onPick;
-  final ValueChanged<int> onClear;
 
   /// Called with the source and destination slot indices.
   final void Function(int from, int to) onMove;
@@ -1125,7 +1108,6 @@ class LayoutGrid extends StatelessWidget {
               item: item,
               icon: iconKey == null ? null : iconFor(iconKey),
               onTap: () => onPick(index),
-              onClear: stored == null ? null : () => onClear(index),
               onMoved: (from) => onMove(from, index),
             );
           },
@@ -1141,7 +1123,6 @@ class _Cell extends StatelessWidget {
     required this.item,
     required this.icon,
     required this.onTap,
-    required this.onClear,
     required this.onMoved,
   });
 
@@ -1149,7 +1130,6 @@ class _Cell extends StatelessWidget {
   final DeckItem? item;
   final Uint8List? icon;
   final VoidCallback onTap;
-  final VoidCallback? onClear;
   final ValueChanged<int> onMoved;
 
   @override
@@ -1180,6 +1160,11 @@ class _Cell extends StatelessWidget {
 
   Widget _content(BuildContext context, bool highlighted) {
     final theme = Theme.of(context);
+    // Local copies, not the fields directly: only a local variable's type
+    // can be promoted after a null check, and the branches below rely on
+    // that promotion instead of re-asserting non-null with `!` everywhere.
+    final item = this.item;
+    final icon = this.icon;
     final filled = item != null;
     // A real icon brings its own colour, shape, and often its own padding —
     // a filled neutral square behind it just showed through that padding as
@@ -1229,12 +1214,14 @@ class _Cell extends StatelessWidget {
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  final iconSize = width * 0.72;
-                  final margin = (width - iconSize) / 2;
+                  // Fills the cell's full width, flush with the top, and the
+                  // label sits right under it — the same formula
+                  // hotkeypad_client's own _DeckButton uses, so a button
+                  // looks the same size relative to its cell here as it
+                  // will on the phone.
+                  final iconSize = constraints.maxWidth;
                   return Column(
                     children: [
-                      SizedBox(height: margin),
                       Container(
                         width: iconSize,
                         height: iconSize,
@@ -1250,13 +1237,13 @@ class _Cell extends StatelessWidget {
                         clipBehavior: showIconBackground
                             ? Clip.antiAlias
                             : Clip.none,
-                        child: item!.emoji != null
+                        child: item.emoji != null
                             // Sized explicitly: an emoji's advance box is
                             // wider than its glyph, so fitting the box
                             // leaves it small and off centre.
                             ? Center(
                                 child: Text(
-                                  item!.emoji!,
+                                  item.emoji!,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: iconSize * 0.82,
@@ -1265,26 +1252,27 @@ class _Cell extends StatelessWidget {
                                 ),
                               )
                             : icon != null
-                            ? Image.memory(icon!, fit: BoxFit.contain)
+                            ? Image.memory(icon, fit: BoxFit.contain)
                             : FittedBox(
                                 child: item is AppItem
                                     ? Text(
-                                        item!.label.characters.first
+                                        item.label.characters.first
                                             .toUpperCase(),
                                         style: theme.textTheme.headlineMedium,
                                       )
-                                    : Icon(deckFallbackIcon(item!)),
+                                    : Icon(deckFallbackIcon(item)),
                               ),
                       ),
-                      SizedBox(height: margin * 0.05),
+                      const SizedBox(height: 2),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
                         child: Text(
-                          item!.label,
+                          item.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
                           style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
                             height: 1.1,
                           ),
                         ),
@@ -1293,18 +1281,6 @@ class _Cell extends StatelessWidget {
                     ],
                   );
                 },
-              ),
-            if (onClear != null)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: IconButton(
-                  tooltip: 'Clear',
-                  iconSize: 16,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onClear,
-                  icon: const Icon(Icons.close),
-                ),
               ),
           ],
         ),
@@ -1362,10 +1338,17 @@ class _NumberStepper extends StatelessWidget {
   }
 }
 
-/// What the picker returns.
+/// What the picker returns. [stored] is null for [DeckItemChoice.clear] —
+/// every other choice carries the item it picked.
 class DeckItemChoice {
-  const DeckItemChoice(this.stored);
-  final String stored;
+  const DeckItemChoice(String this.stored);
+
+  /// The slot's own Delete button, inside the picker rather than a
+  /// separate control on the grid — one place to both change and remove
+  /// what a slot holds.
+  const DeckItemChoice.clear() : stored = null;
+
+  final String? stored;
 }
 
 class _PickerDialog extends StatefulWidget {
@@ -1457,6 +1440,11 @@ class _PickerDialogState extends State<_PickerDialog> {
       withIconOverride(existing, emoji: _emoji, customIconId: _customIconId),
     );
   }
+
+  /// Clears the slot instead of picking anything for it — the Delete
+  /// button in [build], only shown once there's actually something to
+  /// remove (same guard as the Save button above).
+  void _delete() => Navigator.of(context).pop(const DeckItemChoice.clear());
 
   /// Which widget kind's rows/columns steppers [build] should show instead
   /// of the ordinary list — null means "showing the list". Swapped in in
@@ -1763,6 +1751,20 @@ class _PickerDialogState extends State<_PickerDialog> {
         ),
       ),
       actions: [
+        // Only for an already-occupied slot — the same guard as Save
+        // below, and for the same reason: there's nothing to remove from
+        // an empty one. This is now the only way to clear a slot; it used
+        // to be a separate button on the grid cell itself, but living
+        // here means changing and removing a button's contents are both
+        // one tap into the same dialog instead of two different places.
+        if (_existing != null)
+          TextButton(
+            onPressed: _delete,
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
@@ -2675,8 +2677,12 @@ class _ComboDialogState extends State<ComboDialog> {
         allowCombo: false,
       ),
     );
-    if (chosen == null || !mounted) return;
-    final action = DeckItem.parse(chosen.stored);
+    // current: null above means the Delete button never shows, so
+    // chosen.stored is never actually null here — but the type doesn't
+    // know that.
+    final stored = chosen?.stored;
+    if (stored == null || !mounted) return;
+    final action = DeckItem.parse(stored);
     if (action == null) return;
     setState(() {
       // A first step defaults to firing immediately; later ones default to

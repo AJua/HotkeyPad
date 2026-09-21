@@ -175,9 +175,6 @@ class HotkeyPadSession extends ChangeNotifier {
   /// Names already asked for, so a rebuild does not re-request.
   final _requestedIcons = <String>{};
 
-  /// The orientation last sent to the host, so a rebuild does not resend
-  /// one it already knows — see [reportOrientation].
-  bool? _reportedPortrait;
   final _iconQueue = <String>[];
 
   /// The background image, held separately from [_iconQueue] rather than
@@ -453,7 +450,6 @@ class HotkeyPadSession extends ChangeNotifier {
           }
         }
       case Hello() ||
-          SetOrientation() ||
           ListApps() ||
           PressSlot() ||
           RequestIcon() ||
@@ -494,15 +490,6 @@ class HotkeyPadSession extends ChangeNotifier {
     _append('icon for ${frame.name} (${icon.length} bytes)', inbound: true);
     _finishIconFetch(frame.name);
     notifyListeners();
-  }
-
-  /// Tells the host this device's current orientation, so its own editor
-  /// can show the grid turned the same way — a no-op once the host already
-  /// knows it, so this is cheap to call from every build.
-  Future<void> reportOrientation(bool portrait) async {
-    if (_reportedPortrait == portrait) return;
-    _reportedPortrait = portrait;
-    await _send(SetOrientation(portrait: portrait));
   }
 
   /// Fetches [appName]'s icon if it is not already known, preferring the disk
@@ -688,10 +675,6 @@ class HotkeyPadSession extends ChangeNotifier {
     _unresolvableHostError = false;
     // A drop mid-catalogue leaves this set; clear it so the retry can ask.
     _loadingApps = false;
-    // A fresh link is a host that knows nothing about this device yet,
-    // even if the last one was told — reportOrientation's own "already
-    // sent" guard must not skip announcing it again on the new link.
-    _reportedPortrait = null;
     notifyListeners();
     try {
       switch (target) {

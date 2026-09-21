@@ -9,14 +9,12 @@ void main() {
     ({
       List<(int, int)> moves,
       List<int> picks,
-      List<int> clears,
       void Function(DeckLayout) update,
     })
   >
   pumpGrid(WidgetTester tester, DeckLayout initial, {int page = 0}) async {
     final moves = <(int, int)>[];
     final picks = <int>[];
-    final clears = <int>[];
     late void Function(DeckLayout) update;
 
     await tester.pumpWidget(
@@ -31,7 +29,6 @@ void main() {
                 page: page,
                 iconFor: (_) => null,
                 onPick: picks.add,
-                onClear: clears.add,
                 onMove: (from, to) => moves.add((from, to)),
               );
             },
@@ -40,7 +37,7 @@ void main() {
       ),
     );
 
-    return (moves: moves, picks: picks, clears: clears, update: update);
+    return (moves: moves, picks: picks, update: update);
   }
 
   Finder cell(int index) => find.byKey(ValueKey('cell-$index'));
@@ -103,22 +100,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(recorded.picks, [4]);
-  });
-
-  testWidgets('a filled cell offers a clear button, an empty one does not', (
-    tester,
-  ) async {
-    final recorded = await pumpGrid(
-      tester,
-      DeckLayout.empty().withSlot(1, 'act:mute'),
-    );
-
-    expect(find.byIcon(Icons.close), findsOneWidget);
-
-    await tester.tap(find.byIcon(Icons.close));
-    await tester.pumpAndSettle();
-
-    expect(recorded.clears, [1]);
   });
 
   testWidgets('only the requested page is shown', (tester) async {
@@ -402,6 +383,18 @@ void main() {
     test('shows the actual command for a shell button', () {
       const item = ShellItem(command: 'say hello', label: 'Greet');
       expect(currentButtonSummary(item.stored), 'Runs: say hello');
+    });
+
+    test('names the interpreter for a non-default shell button', () {
+      const item = ShellItem(
+        command: r'echo $fish_greeting',
+        label: 'Greet',
+        shell: ShellKind.fish,
+      );
+      expect(
+        currentButtonSummary(item.stored),
+        r'Runs (fish): echo $fish_greeting',
+      );
     });
 
     test('shows the key combination even when a custom label is set', () {

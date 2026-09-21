@@ -1110,10 +1110,6 @@ class _DeckPageState extends State<DeckPage> {
     // The host edits one shape; the deck turns it to fit the screen it is
     // actually on, so a 5x3 landscape grid becomes 3x5 upright.
     final layout = stored?.orientedFor(portrait: portrait);
-    // So the host's own editor can show the same turned shape while this
-    // is the locked device — a no-op once it already knows, so calling it
-    // on every build is fine (see ensureIcon, called the same way above).
-    unawaited(session.reportOrientation(portrait));
 
     if (layout == null) {
       return Center(

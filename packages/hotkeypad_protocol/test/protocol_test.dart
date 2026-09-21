@@ -109,8 +109,6 @@ void main() {
     test('round-trips every message shape', () {
       const messages = <HotkeyPadMessage>[
         Hello(name: 'Pixel 7', clientId: 'client_abc123'),
-        SetOrientation(portrait: true),
-        SetOrientation(portrait: false),
         RequestPin(),
         SubmitPin(pin: '482913'),
         PinResult(ok: true),

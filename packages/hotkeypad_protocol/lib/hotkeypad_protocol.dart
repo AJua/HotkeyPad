@@ -84,7 +84,6 @@ sealed class HotkeyPadMessage {
           name: json['n'] as String? ?? '',
           clientId: json['c'] as String? ?? '',
         ),
-        'ori' => SetOrientation(portrait: json['p'] as bool? ?? false),
         'pin?' => const RequestPin(),
         'pin' => SubmitPin(pin: json['v'] as String? ?? ''),
         'pin!' => PinResult(ok: json['ok'] as bool? ?? false),
@@ -157,19 +156,6 @@ final class Hello extends HotkeyPadMessage {
 
   @override
   Map<String, Object?> toJson() => {'t': 'hi', 'n': name, 'c': clientId};
-}
-
-/// Client -> host: sent at connect and again whenever it changes, so the
-/// host's own editor can show the grid turned the same way this device is
-/// currently showing it — see the host's device lock, which is what makes
-/// "this device" unambiguous in the first place.
-final class SetOrientation extends HotkeyPadMessage {
-  const SetOrientation({required this.portrait});
-
-  final bool portrait;
-
-  @override
-  Map<String, Object?> toJson() => {'t': 'ori', 'p': portrait};
 }
 
 /// Host -> client: this is the first time the host has seen this
