@@ -18,6 +18,9 @@ abstract final class LayoutStore {
   static DeckLayout get _defaultLayout =>
       !kIsWeb && Platform.isWindows ? _defaultLayoutWindows : _defaultLayoutMac;
 
+  // Authored landscape (how it reads naturally: rows of related apps) and
+  // then turned upright — see DeckLayout.transposed — since the shipped
+  // default is shown on a phone, which is portrait.
   static final _defaultLayoutMac =
       DeckLayout.fromJson({
         'columns': 6,
@@ -61,7 +64,7 @@ abstract final class LayoutStore {
           null,
           null,
         ],
-      })!;
+      })!.transposed();
 
   static final _defaultLayoutWindows =
       DeckLayout.fromJson({

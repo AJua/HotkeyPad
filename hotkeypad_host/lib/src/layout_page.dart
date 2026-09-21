@@ -540,7 +540,7 @@ class LayoutPageState extends State<LayoutPage> {
   /// [_apply] ever sees it.
   /// A manual portrait/landscape preview, used only when no real device is
   /// locked ([widget.lockedClientPortrait] is null) to say which shape to
-  /// show — see [_toggleOrientationPreview]. Null means "whatever [_layout]
+  /// show — see [toggleOrientationPreview]. Null means "whatever [_layout]
   /// is already saved as", same as before this existed.
   bool? _previewPortrait;
 
@@ -561,8 +561,10 @@ class LayoutPageState extends State<LayoutPage> {
 
   /// Flips the preview between portrait and landscape — only reachable
   /// when nothing real is locked in, since a locked device's own
-  /// orientation should always win over a guess made here.
-  void _toggleOrientationPreview() {
+  /// orientation should always win over a guess made here. Public: the
+  /// button that calls this now lives in the host's app bar, not this
+  /// widget — see [openSettings].
+  void toggleOrientationPreview() {
     setState(() => _previewPortrait = !_displayIsPortrait);
   }
 
@@ -966,24 +968,9 @@ class LayoutPageState extends State<LayoutPage> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.deckLayoutHint,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-              // Hidden once a real device is locked in: its own actual
-              // orientation always wins over a guess made here — see
-              // _toggleOrientationPreview.
-              if (widget.lockedClientPortrait == null)
-                IconButton(
-                  tooltip: l10n.previewOrientationTooltip,
-                  onPressed: _toggleOrientationPreview,
-                  icon: const Icon(Icons.screen_rotation_outlined),
-                ),
-            ],
+          child: Text(
+            l10n.deckLayoutHint,
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
         if (_layout.pages > 1)
@@ -1020,34 +1007,57 @@ class LayoutPageState extends State<LayoutPage> {
             // A phone's own screen ratio, not just a generic frame — this
             // is meant to preview roughly how much of the deck a real
             // phone actually shows, not merely to decorate it.
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: _displayIsPortrait ? 9 / 19.5 : 19.5 / 9,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outline,
-                      width: 2,
+            //
+            // Bounded by a square (the smaller of the available
+            // width/height) rather than letting AspectRatio fit each
+            // orientation independently against the raw constraints —
+            // otherwise portrait ends up height-bound and landscape
+            // width-bound, so the two show the phone at two different
+            // physical sizes instead of the same phone rotated 90°.
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final side = constraints.maxWidth < constraints.maxHeight
+                    ? constraints.maxWidth
+                    : constraints.maxHeight;
+                return Center(
+                  child: SizedBox(
+                    width: side,
+                    height: side,
+                    child: Center(
+                      child: AspectRatio(
+                        aspectRatio: _displayIsPortrait ? 9 / 19.5 : 19.5 / 9,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline,
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(36),
+                          ),
+                          child: LayoutGrid(
+                            layout: _displayLayout,
+                            page: _page,
+                            iconFor: (key) {
+                              unawaited(_ensureIcon(key));
+                              return _icons[key];
+                            },
+                            onPick: _pick,
+                            onClear: (index) => _apply(
+                              _toCanonical(
+                                _displayLayout.withSlot(index, null),
+                              ),
+                            ),
+                            onMove: (from, to) => _apply(
+                              _toCanonical(_displayLayout.moved(from, to)),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(36),
                   ),
-                  child: LayoutGrid(
-                    layout: _displayLayout,
-                    page: _page,
-                    iconFor: (key) {
-                      unawaited(_ensureIcon(key));
-                      return _icons[key];
-                    },
-                    onPick: _pick,
-                    onClear: (index) => _apply(
-                      _toCanonical(_displayLayout.withSlot(index, null)),
-                    ),
-                    onMove: (from, to) =>
-                        _apply(_toCanonical(_displayLayout.moved(from, to))),
-                  ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),

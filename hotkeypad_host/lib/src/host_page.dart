@@ -1476,6 +1476,11 @@ class _HostPageState extends State<HostPage> {
     final lockPickerClients = [
       for (final client in clients) (id: client.id, label: _labelFor(client)),
     ];
+    // Only meaningful once a lock names one unambiguous device to match —
+    // see LayoutPage's own doc comment on this field.
+    final lockedPortrait = _lockedClientId == null
+        ? null
+        : _clients[_lockedClientId]?.portrait;
     return Scaffold(
       appBar: AppBar(
         // A step up from the plain surface color the bar used to share
@@ -1513,6 +1518,16 @@ class _HostPageState extends State<HostPage> {
               ),
               icon: const Icon(Icons.qr_code_2),
             ),
+          // Hidden once a real device is locked in: its own actual
+          // orientation always wins over a guess made here — see
+          // LayoutPageState.toggleOrientationPreview.
+          if (lockedPortrait == null)
+            IconButton(
+              tooltip: l10n.previewOrientationTooltip,
+              onPressed: () =>
+                  _layoutPageKey.currentState?.toggleOrientationPreview(),
+              icon: const Icon(Icons.screen_rotation_outlined),
+            ),
           IconButton(
             tooltip: l10n.language,
             onPressed: () => _showLanguagePicker(context),
@@ -1538,11 +1553,7 @@ class _HostPageState extends State<HostPage> {
                 _broadcastAppearance();
               },
               onShowService: () => setState(() => _showingService = true),
-              // Only meaningful once a lock names one unambiguous device to
-              // match — see LayoutPage's own doc comment on this field.
-              lockedClientPortrait: _lockedClientId == null
-                  ? null
-                  : _clients[_lockedClientId]?.portrait,
+              lockedClientPortrait: lockedPortrait,
             ),
           ),
         ],
