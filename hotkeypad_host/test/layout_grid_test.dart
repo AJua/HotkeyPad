@@ -12,7 +12,12 @@ void main() {
       void Function(DeckLayout) update,
     })
   >
-  pumpGrid(WidgetTester tester, DeckLayout initial, {int page = 0}) async {
+  pumpGrid(
+    WidgetTester tester,
+    DeckLayout initial, {
+    int page = 0,
+    bool showLabels = true,
+  }) async {
     final moves = <(int, int)>[];
     final picks = <int>[];
     late void Function(DeckLayout) update;
@@ -27,6 +32,7 @@ void main() {
               return LayoutGrid(
                 layout: layout,
                 page: page,
+                showLabels: showLabels,
                 iconFor: (_) => null,
                 onPick: picks.add,
                 onMove: (from, to) => moves.add((from, to)),
@@ -114,6 +120,22 @@ void main() {
     // Indices stay global, so the second page starts at 15.
     expect(cell(15), findsOneWidget);
     expect(cell(0), findsNothing);
+  });
+
+  testWidgets('showLabels false hides button labels', (tester) async {
+    final layout = DeckLayout.empty().withSlot(0, 'app:Safari');
+
+    await pumpGrid(tester, layout, showLabels: false);
+
+    expect(find.text('Safari'), findsNothing);
+  });
+
+  testWidgets('showLabels true shows button labels', (tester) async {
+    final layout = DeckLayout.empty().withSlot(0, 'app:Safari');
+
+    await pumpGrid(tester, layout, showLabels: true);
+
+    expect(find.text('Safari'), findsOneWidget);
   });
 
   testWidgets(

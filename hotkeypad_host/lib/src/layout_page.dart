@@ -1028,6 +1028,7 @@ class LayoutPageState extends State<LayoutPage> {
                           child: LayoutGrid(
                             layout: _displayLayout,
                             page: _page,
+                            showLabels: _showLabels,
                             iconFor: (key) {
                               unawaited(_ensureIcon(key));
                               return _icons[key];
@@ -1060,6 +1061,7 @@ class LayoutGrid extends StatelessWidget {
     super.key,
     required this.layout,
     required this.page,
+    required this.showLabels,
     required this.iconFor,
     required this.onPick,
     required this.onMove,
@@ -1067,6 +1069,7 @@ class LayoutGrid extends StatelessWidget {
 
   final DeckLayout layout;
   final int page;
+  final bool showLabels;
   final Uint8List? Function(String key) iconFor;
   final ValueChanged<int> onPick;
 
@@ -1082,7 +1085,7 @@ class LayoutGrid extends StatelessWidget {
         // rather than approximates. Shared with the client via
         // hotkeypad_protocol instead of each computing its own slightly
         // different answer to the same question.
-        const cellRatio = 0.86;
+        final cellRatio = showLabels ? 0.86 : 1.0;
         const spacing = kDeckGridSpacing;
         final metrics = deckGridMetrics(
           maxWidth: constraints.maxWidth,
@@ -1107,6 +1110,7 @@ class LayoutGrid extends StatelessWidget {
               index: index,
               item: item,
               icon: iconKey == null ? null : iconFor(iconKey),
+              showLabel: showLabels,
               onTap: () => onPick(index),
               onMoved: (from) => onMove(from, index),
             );
@@ -1122,6 +1126,7 @@ class _Cell extends StatelessWidget {
     required this.index,
     required this.item,
     required this.icon,
+    required this.showLabel,
     required this.onTap,
     required this.onMoved,
   });
@@ -1129,6 +1134,7 @@ class _Cell extends StatelessWidget {
   final int index;
   final DeckItem? item;
   final Uint8List? icon;
+  final bool showLabel;
   final VoidCallback onTap;
   final ValueChanged<int> onMoved;
 
@@ -1263,21 +1269,23 @@ class _Cell extends StatelessWidget {
                                     : Icon(deckFallbackIcon(item)),
                               ),
                       ),
-                      const SizedBox(height: 2),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: Text(
-                          item.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            height: 1.1,
+                      if (showLabel) ...[
+                        const SizedBox(height: 2),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(
+                            item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              height: 1.1,
+                            ),
                           ),
                         ),
-                      ),
-                      const Spacer(),
+                        const Spacer(),
+                      ],
                     ],
                   );
                 },
