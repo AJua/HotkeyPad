@@ -303,6 +303,7 @@ sealed class DeckItem {
         'sh' => ShellItem(
           command: json['c'] as String,
           label: json['l'] as String,
+          shell: ShellKind.fromWire(json['sk'] as String?),
           emoji: emoji,
           customIconId: customIconId,
         ),
@@ -319,6 +320,12 @@ sealed class DeckItem {
         ),
         'sc' => ShortcutItem(
           name: json['n'] as String,
+          label: json['l'] as String?,
+          emoji: emoji,
+          customIconId: customIconId,
+        ),
+        'url' => OpenUrlItem(
+          url: json['u'] as String,
           label: json['l'] as String?,
           emoji: emoji,
           customIconId: customIconId,
@@ -410,11 +417,16 @@ final class ShellItem extends DeckItem {
   const ShellItem({
     required this.command,
     required this.label,
+    this.shell = ShellKind.sh,
     this.emoji,
     this.customIconId,
   });
 
   final String command;
+
+  /// Which interpreter runs [command]. Defaults to `sh` so a layout written
+  /// before this field existed still runs the way it always did.
+  final ShellKind shell;
 
   @override
   final String label;
@@ -430,9 +442,35 @@ final class ShellItem extends DeckItem {
     't': 'sh',
     'c': command,
     'l': label,
+    if (shell != ShellKind.sh) 'sk': shell.wire,
     if (emoji != null) 'e': emoji,
     if (customIconId != null) 'ci': customIconId,
   });
+}
+
+/// The interpreter a [ShellItem] runs its command through.
+enum ShellKind {
+  sh('sh', 'sh'),
+  bash('bash', 'bash'),
+  zsh('zsh', 'zsh'),
+  fish('fish', 'fish');
+
+  const ShellKind(this.wire, this.label);
+
+  final String wire;
+
+  /// Shown in the shell picker.
+  final String label;
+
+  /// Falls back to [sh] for a missing or unrecognised wire value, rather
+  /// than dropping the button, so a layout from a newer build that picked a
+  /// shell this build does not know still runs the command somehow.
+  static ShellKind fromWire(String? wire) {
+    for (final kind in values) {
+      if (kind.wire == wire) return kind;
+    }
+    return ShellKind.sh;
+  }
 }
 
 /// A modifier key in a combination.
@@ -576,6 +614,38 @@ final class ShortcutItem extends DeckItem {
   String get stored => jsonEncode({
     't': 'sc',
     'n': name,
+    if (_label != null) 'l': _label,
+    if (emoji != null) 'e': emoji,
+    if (customIconId != null) 'ci': customIconId,
+  });
+}
+
+/// Opens a URL in Chrome on the host, focusing a tab already showing it
+/// instead of opening a duplicate — see [CommandRunner.openUrl] for how.
+final class OpenUrlItem extends DeckItem {
+  const OpenUrlItem({
+    required this.url,
+    String? label,
+    this.emoji,
+    this.customIconId,
+  }) : _label = label;
+
+  final String url;
+  final String? _label;
+
+  @override
+  String get label => _label?.isNotEmpty == true ? _label! : url;
+
+  @override
+  final String? emoji;
+
+  @override
+  final String? customIconId;
+
+  @override
+  String get stored => jsonEncode({
+    't': 'url',
+    'u': url,
     if (_label != null) 'l': _label,
     if (emoji != null) 'e': emoji,
     if (customIconId != null) 'ci': customIconId,

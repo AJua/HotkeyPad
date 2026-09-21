@@ -17,12 +17,20 @@ abstract final class CommandRunner {
   /// A command that hangs would wedge the transfer queue behind it.
   static const _timeout = Duration(seconds: 10);
 
-  static Future<({bool ok, String message})> shell(String command) async {
+  static Future<({bool ok, String message})> shell(
+    String command, {
+    ShellKind shell = ShellKind.sh,
+  }) async {
     if (!supported) {
       return (ok: false, message: 'Commands are only supported on macOS');
     }
     try {
-      final result = await Process.run('/bin/sh', [
+      // Resolved through env rather than a fixed path: sh/bash/zsh all live
+      // at a stable /bin path on macOS, but fish is user-installed (Homebrew
+      // puts it somewhere different on Intel and Apple Silicon), so only a
+      // PATH lookup finds it on every machine.
+      final result = await Process.run('/usr/bin/env', [
+        shell.wire,
         '-c',
         command,
       ]).timeout(_timeout);
@@ -170,6 +178,65 @@ abstract final class CommandRunner {
       return (ok: false, message: '$error');
     }
   }
+
+  /// Opens [url] in Chrome, focusing a tab already showing it instead of
+  /// opening a duplicate.
+  ///
+  /// Chrome's AppleScript dictionary has no "open or focus" verb, so this
+  /// walks every window's tabs looking for one whose URL already contains
+  /// [url] before falling back to a new tab in the frontmost window (or a
+  /// new window, if Chrome has none open). [url] travels as an `osascript`
+  /// argument (`item 1 of argv`), never spliced into the script text, so
+  /// nothing in it can break out into other AppleScript.
+  static Future<({bool ok, String message})> openUrl(String url) async {
+    if (!supported) {
+      return (ok: false, message: 'Opening a URL is only supported on macOS');
+    }
+    if (url.isEmpty) {
+      return (ok: false, message: 'No URL to open');
+    }
+    try {
+      final result = await Process.run('osascript', [
+        '-e',
+        _openUrlScript,
+        url,
+      ]).timeout(_timeout);
+      if (result.exitCode == 0) return (ok: true, message: 'Opened $url');
+      final error = '${result.stderr}'.trim();
+      return (
+        ok: false,
+        message: error.isEmpty ? 'Could not open $url' : _firstLine(error),
+      );
+    } catch (error) {
+      return (ok: false, message: '$error');
+    }
+  }
+
+  static const _openUrlScript = '''
+on run argv
+  set target to item 1 of argv
+  tell application "Google Chrome"
+    activate
+    if (count of windows) is 0 then
+      make new window
+      set URL of active tab of window 1 to target
+      return
+    end if
+    repeat with w in windows
+      set tabIndex to 1
+      repeat with t in tabs of w
+        if URL of t contains target then
+          set active tab index of w to tabIndex
+          set index of w to 1
+          return
+        end if
+        set tabIndex to tabIndex + 1
+      end repeat
+    end repeat
+    tell window 1 to make new tab with properties {URL:target}
+  end tell
+end run
+''';
 
   /// Output is shown on a button-sized ack, so only the first line is useful.
   static String _firstLine(String text) {

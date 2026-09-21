@@ -1047,8 +1047,12 @@ class _HostPageState extends State<HostPage> {
   Future<ActionResult> _runItem(DeckItem item) => switch (item) {
     AppItem(:final name) => AppLauncher.open(name),
     ActionItem(:final action) => MediaControl.run(action),
-    ShellItem(:final command) => CommandRunner.shell(command),
+    ShellItem(:final command, :final shell) => CommandRunner.shell(
+      command,
+      shell: shell,
+    ),
     ShortcutItem(:final name) => CommandRunner.shortcut(name),
+    OpenUrlItem(:final url) => CommandRunner.openUrl(url),
     KeyComboItem() => CommandRunner.keyCombo(
       modifiers: item.modifiers,
       key: item.key,

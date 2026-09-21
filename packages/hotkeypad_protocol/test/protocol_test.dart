@@ -182,6 +182,32 @@ void main() {
       expect(parsed!.command, 'say hello');
       expect(parsed.label, 'Greet');
       expect(parsed.emoji, '👋');
+      expect(parsed.shell, ShellKind.sh);
+    });
+
+    test('round-trips a non-default shell', () {
+      const item = ShellItem(
+        command: 'echo hi',
+        label: 'Greet',
+        shell: ShellKind.fish,
+      );
+
+      expect((DeckItem.parse(item.stored) as ShellItem).shell, ShellKind.fish);
+    });
+
+    test('a shell command with no stored shell kind defaults to sh', () {
+      // What a layout written before ShellKind existed looks like on disk.
+      const stored = '{"t":"sh","c":"say hi","l":"Hi"}';
+
+      expect((DeckItem.parse(stored) as ShellItem).shell, ShellKind.sh);
+    });
+
+    test('an unrecognised stored shell kind falls back to sh', () {
+      // What a layout written by a future build with a shell this one does
+      // not know about would look like.
+      const stored = '{"t":"sh","c":"say hi","l":"Hi","sk":"nu"}';
+
+      expect((DeckItem.parse(stored) as ShellItem).shell, ShellKind.sh);
     });
 
     test('a command containing punctuation survives', () {
@@ -200,6 +226,21 @@ void main() {
       expect(
         (DeckItem.parse(bare.stored) as ShortcutItem).label,
         'Start focus',
+      );
+    });
+
+    test('round-trips a URL, falling back to it as the label', () {
+      const named = OpenUrlItem(url: 'https://example.com', label: 'Example');
+      const bare = OpenUrlItem(url: 'https://example.com');
+
+      expect((DeckItem.parse(named.stored) as OpenUrlItem).label, 'Example');
+      expect(
+        (DeckItem.parse(bare.stored) as OpenUrlItem).label,
+        'https://example.com',
+      );
+      expect(
+        (DeckItem.parse(bare.stored) as OpenUrlItem).url,
+        'https://example.com',
       );
     });
 
@@ -223,6 +264,7 @@ void main() {
         ActionItem(DeckAction.mute, customIconId: 'img_2'),
         ShellItem(command: 'say hi', label: 'Hi', customIconId: 'img_3'),
         ShortcutItem(name: 'Start focus', customIconId: 'img_4'),
+        OpenUrlItem(url: 'https://example.com', customIconId: 'img_6'),
         KeyComboItem(
           modifiers: [],
           key: '4',

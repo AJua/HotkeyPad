@@ -137,9 +137,12 @@ String? currentButtonSummary(String? stored) {
     null => null,
     AppItem(:final name) => 'Opens $name',
     ActionItem(:final action) => 'Action: ${action.label}',
-    ShellItem(:final command) => 'Runs: $command',
+    ShellItem(:final command, :final shell) => shell == ShellKind.sh
+        ? 'Runs: $command'
+        : 'Runs (${shell.label}): $command',
     KeyComboItem(:final combination) => 'Sends $combination',
     ShortcutItem(:final name) => 'Runs the "$name" Shortcut',
+    OpenUrlItem(:final url) => 'Opens $url in Chrome',
     ComboItem(:final steps) => 'Runs ${steps.length} steps',
     WidgetItem(:final kind, :final rowSpan, :final columnSpan) =>
       '${kind.label} widget (${rowSpan}x$columnSpan)',
@@ -1410,6 +1413,20 @@ class _PickerDialogState extends State<_PickerDialog> {
     _choose(item);
   }
 
+  Future<void> _composeUrl() async {
+    final existing = _existing;
+    final item = await showDialog<OpenUrlItem>(
+      context: context,
+      builder: (context) => _UrlDialog(
+        existing: existing is OpenUrlItem ? existing : null,
+        emoji: _emoji,
+        customIconId: _customIconId,
+      ),
+    );
+    if (item == null || !mounted) return;
+    _choose(item);
+  }
+
   Future<void> _composeCombo() async {
     final existing = _existing;
     final item = await showDialog<ComboItem>(
@@ -1567,6 +1584,12 @@ class _PickerDialogState extends State<_PickerDialog> {
                       title: const Text('Key combination...'),
                       subtitle: const Text('Sent to whatever is frontmost'),
                       onTap: _composeKeyCombo,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.open_in_browser),
+                      title: const Text('Open URL...'),
+                      subtitle: const Text('Opens in Chrome on this Mac'),
+                      onTap: _composeUrl,
                     ),
                     if (widget.allowCombo)
                       ListTile(
@@ -2111,6 +2134,7 @@ class _ShellDialogState extends State<_ShellDialog> {
     text: widget.existing?.command ?? '',
   );
   late final _label = TextEditingController(text: widget.existing?.label ?? '');
+  late ShellKind _shell = widget.existing?.shell ?? ShellKind.sh;
 
   @override
   void dispose() {
@@ -2129,6 +2153,7 @@ class _ShellDialogState extends State<_ShellDialog> {
         // Falling back to the command keeps the button identifiable when
         // the user cannot think of a name.
         label: label.isEmpty ? command : label,
+        shell: _shell,
         emoji: widget.emoji ?? widget.existing?.emoji,
         customIconId: widget.customIconId ?? widget.existing?.customIconId,
       ),
@@ -2157,6 +2182,22 @@ class _ShellDialogState extends State<_ShellDialog> {
               ),
             ),
             const SizedBox(height: 12),
+            DropdownButtonFormField<ShellKind>(
+              initialValue: _shell,
+              decoration: const InputDecoration(
+                labelText: 'Shell',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                for (final kind in ShellKind.values)
+                  DropdownMenuItem(value: kind, child: Text(kind.label)),
+              ],
+              onChanged: (kind) {
+                if (kind != null) setState(() => _shell = kind);
+              },
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _label,
               onSubmitted: (_) => _save(),
@@ -2168,8 +2209,101 @@ class _ShellDialogState extends State<_ShellDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Runs with /bin/sh on this Mac. Phones can only press the '
-              'button, never send a command.',
+              'Runs on this Mac. Phones can only press the button, never '
+              'send a command.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Add')),
+      ],
+    );
+  }
+}
+
+/// Composes an "open URL" button: the address, what to call it, and an
+/// optional emoji or custom image carried over from the picker.
+class _UrlDialog extends StatefulWidget {
+  const _UrlDialog({
+    required this.existing,
+    required this.emoji,
+    required this.customIconId,
+  });
+
+  final OpenUrlItem? existing;
+  final String? emoji;
+  final String? customIconId;
+
+  @override
+  State<_UrlDialog> createState() => _UrlDialogState();
+}
+
+class _UrlDialogState extends State<_UrlDialog> {
+  late final _url = TextEditingController(text: widget.existing?.url ?? '');
+  late final _label = TextEditingController(text: widget.existing?.label ?? '');
+
+  @override
+  void dispose() {
+    _url.dispose();
+    _label.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final url = _url.text.trim();
+    if (url.isEmpty) return;
+    final label = _label.text.trim();
+    Navigator.of(context).pop(
+      OpenUrlItem(
+        url: url,
+        // Falling back to the URL keeps the button identifiable when the
+        // user cannot think of a name.
+        label: label.isEmpty ? url : label,
+        emoji: widget.emoji ?? widget.existing?.emoji,
+        customIconId: widget.customIconId ?? widget.existing?.customIconId,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Open URL'),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _url,
+              autofocus: true,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'URL',
+                hintText: 'https://www.google.com',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _label,
+              onSubmitted: (_) => _save(),
+              decoration: const InputDecoration(
+                labelText: 'Button label',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Opens in Chrome on this Mac, focusing an existing tab already '
+              'showing it rather than a duplicate.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
