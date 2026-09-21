@@ -459,6 +459,59 @@ class _HostPageState extends State<HostPage> {
     if (result != null && result.picked) widget.onLocale(result.locale);
   }
 
+  /// Shows a QR code a phone can scan instead of typing this host's
+  /// address in — see [WifiPairingQr]. Scanning still goes through the
+  /// exact same `Hello`/trust-on-first-use PIN challenge any other
+  /// connection does, WiFi or BLE (see `_onHello`) — this only replaces
+  /// typing the IP in, nothing about how the connection is authorized.
+  void _showQr(BuildContext context, WifiPairingQr payload) {
+    final l10n = AppLocalizations.of(context)!;
+    final link = payload.encode().toString();
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.scanToConnect),
+        content: SizedBox(
+          width: 240,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 240,
+                height: 240,
+                child: QrImageView(
+                  data: link,
+                  version: QrVersions.auto,
+                  backgroundColor: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Selectable, like the service screen's own address row,
+              // so either line can be copied by hand if scanning fails.
+              SelectableText(
+                '${payload.address}:${payload.port}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              SelectableText(
+                link,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.done),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _refreshAccessibility() async {
     final trusted = await MediaControl.trusted;
     if (mounted && trusted != _accessibility) {
@@ -1440,6 +1493,26 @@ class _HostPageState extends State<HostPage> {
               lockedClientId: _lockedClientId,
               onChanged: (value) => setState(() => _lockedClientId = value),
             ),
+          // Scanning still goes through the exact same `Hello`/trust-on
+          // -first-use PIN challenge any other connection does, WiFi or
+          // BLE (see `_onHello`) — this only replaces typing the IP in,
+          // nothing about how the connection is authorized.
+          if (_wifiServer.running &&
+              _localAddresses.isNotEmpty &&
+              _hostId != null)
+            IconButton(
+              tooltip: l10n.pairViaQr,
+              onPressed: () => _showQr(
+                context,
+                WifiPairingQr(
+                  hostId: _hostId!,
+                  name: Platform.localHostname,
+                  address: _localAddresses.first,
+                  port: WifiLink.tcpPort,
+                ),
+              ),
+              icon: const Icon(Icons.qr_code_2),
+            ),
           IconButton(
             tooltip: l10n.language,
             onPressed: () => _showLanguagePicker(context),
@@ -1633,19 +1706,6 @@ class _HostPageState extends State<HostPage> {
           wifiError: _wifiError,
           localAddresses: _localAddresses,
         ),
-        if (_wifiServer.running &&
-            _localAddresses.isNotEmpty &&
-            _hostId != null) ...[
-          const SizedBox(height: 12),
-          _QrPairingCard(
-            payload: WifiPairingQr(
-              hostId: _hostId!,
-              name: Platform.localHostname,
-              address: _localAddresses.first,
-              port: WifiLink.tcpPort,
-            ),
-          ),
-        ],
         const SizedBox(height: 24),
         Text(
           l10n.connectedClients(clients.length),
@@ -1719,63 +1779,6 @@ class _HostPageState extends State<HostPage> {
             ),
           ),
       ],
-    );
-  }
-}
-
-/// A button revealing a QR code a phone can scan instead of typing this
-/// host's address in — see [WifiPairingQr]. Behind a tap rather than
-/// shown outright mainly for a tidier status screen: it carries no more
-/// than the plaintext address already visible above it, and scanning it
-/// still goes through the exact same `Hello`/trust-on-first-use PIN
-/// challenge any other connection does, WiFi or BLE (see `_onHello`) —
-/// this only replaces typing the IP in, nothing about how the connection
-/// is authorized.
-class _QrPairingCard extends StatelessWidget {
-  const _QrPairingCard({required this.payload});
-
-  final WifiPairingQr payload;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.qr_code_2_outlined),
-        title: Text(l10n.pairViaQr),
-        subtitle: Text(l10n.pairViaQrSubtitle),
-        trailing: FilledButton.tonalIcon(
-          onPressed: () => _showQr(context),
-          icon: const Icon(Icons.qr_code_2),
-          label: Text(l10n.show),
-        ),
-        onTap: () => _showQr(context),
-      ),
-    );
-  }
-
-  void _showQr(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.scanToConnect),
-        content: SizedBox(
-          width: 240,
-          height: 240,
-          child: QrImageView(
-            data: payload.encode().toString(),
-            version: QrVersions.auto,
-            backgroundColor: Colors.white,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.done),
-          ),
-        ],
-      ),
     );
   }
 }
