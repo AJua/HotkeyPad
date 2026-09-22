@@ -4,6 +4,7 @@
 # those here.
 
 app_identifier("com.chienhunglin.hotkeypad")
+default_locale("en-US")
 
 # https://developer.apple.com/app-store/categories/
 primary_category("UTILITIES")
@@ -23,10 +24,6 @@ primary_category("UTILITIES")
 # for the account, and this is personal contact information that
 # shouldn't live in a checked-in file anyway.
 app_review_information(
-  first_name: ENV["FASTLANE_APP_REVIEW_FIRST_NAME"],
-  last_name: ENV["FASTLANE_APP_REVIEW_LAST_NAME"],
-  email_address: ENV["FASTLANE_APP_REVIEW_EMAIL"],
-  phone_number: ENV["FASTLANE_APP_REVIEW_PHONE"],
   notes: <<~NOTES.strip
     Two Bluetooth permissions and one local-network permission, all for
     the same purpose: finding and talking to this app's own companion
