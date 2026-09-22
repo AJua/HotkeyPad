@@ -8,6 +8,8 @@
 # the app in the first place. fastlane's job here starts once that .ipa
 # exists: uploading it and the store listing.
 
+require "json"
+
 opt_out_usage
 default_platform(:ios)
 
@@ -22,7 +24,13 @@ IPA_DIR = File.join(CLIENT_DIR, "build", "ios", "ipa")
 def api_key
   path = ENV["APP_STORE_CONNECT_API_KEY_PATH"] || File.join(__dir__, "api_key.json")
   return nil unless File.exist?(path)
-  app_store_connect_api_key(json_key_path: path)
+  data = JSON.parse(File.read(path))
+  app_store_connect_api_key(
+    key_id: data["key_id"],
+    issuer_id: data["issuer_id"],
+    key_content: data["key"],
+    in_house: data["in_house"] || false,
+  )
 end
 
 platform :ios do

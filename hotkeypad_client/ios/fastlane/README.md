@@ -1,92 +1,60 @@
-# fastlane for HotkeyPad (iOS / App Store)
+fastlane documentation
+----
 
-Automates pushing HotkeyPad's App Store Connect listing (description,
-keywords, screenshots) and binary — no manual clicking through the App
-Store Connect web UI.
+# Installation
 
-## One-time setup
+Make sure you have the latest version of the Xcode command line tools installed:
 
-1. **Install fastlane** (already vendored — see `../Gemfile`):
+```sh
+xcode-select --install
+```
 
-   ```
-   cd hotkeypad_client/ios
-   bundle install
-   ```
+For _fastlane_ installation instructions, see [Installing _fastlane_](https://docs.fastlane.tools/#installing-fastlane)
 
-2. **Fill in `fastlane/Appfile`**: replace the two `TODO_...` placeholders
-   with your Apple ID email and Team ID (Apple Developer → Membership),
-   or set them as environment variables instead so nothing account-
-   specific has to live in a checked-in file:
+# Available Actions
 
-   ```
-   export FASTLANE_APPLE_ID="you@example.com"
-   export FASTLANE_TEAM_ID="ABCDE12345"
-   ```
+## iOS
 
-3. **Set up an App Store Connect API key** (recommended over Apple ID
-   login — no 2FA prompt, works the same in CI):
+### ios build
 
-   - App Store Connect → Users and Access → Integrations → App Store
-     Connect API → generate a key with the "App Manager" role.
-   - Download the `.p8` file once (Apple only lets you download it
-     once) and note the Key ID and Issuer ID.
-   - Convert it into the JSON shape fastlane's `app_store_connect_api_key`
-     action expects and save it as `fastlane/api_key.json` (already
-     gitignored — never commit this file):
+```sh
+[bundle exec] fastlane ios build
+```
 
-     ```json
-     {
-       "key_id": "ABC123DEFG",
-       "issuer_id": "12345678-1234-1234-1234-123456789012",
-       "key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
-       "in_house": false
-     }
-     ```
+Build the release .ipa with Flutter (flutter build ipa)
 
-   Without this file, lanes fall back to interactive Apple ID login
-   using the Appfile's `apple_id` (will prompt for a 2FA code).
+### ios metadata
 
-4. **Create the app in App Store Connect** first, if it doesn't exist yet
-   (My Apps → + → New App), using bundle ID `com.chienhunglin.hotkeypad`.
-   fastlane pushes an existing app's listing/binary — it doesn't create
-   the app record itself.
+```sh
+[bundle exec] fastlane ios metadata
+```
 
-## What's still a TODO in this checked-in scaffold
+Push store listing text/screenshots only — no binary, no build
 
-- `fastlane/Appfile` — Apple ID / Team ID placeholders (step 2 above).
-- `fastlane/api_key.json` — not checked in at all; create it yourself
-  (step 3).
-- `fastlane/metadata/*/privacy_url.txt` — done: points at
-  https://ajua.github.io/HotkeyPad/privacy-policy.html, the hosted
-  policy already published from `docs/privacy-policy.html`.
-- `fastlane/metadata/*/support_url.txt` / `marketing_url.txt` — done:
-  support points at the GitHub Issues tracker, marketing at the
-  GitHub Pages site (https://ajua.github.io/HotkeyPad/). Swap in a
-  dedicated support contact later if one exists.
-- App Store Connect's **Age Rating questionnaire** — has to be answered
-  once in the web UI (App Information → Age Rating) before any version
-  can be submitted; fastlane has no action for first-time completion of
-  this.
-- `fastlane/screenshots/` — empty. Add per-locale, per-device-size PNGs
-  (e.g. `screenshots/en-US/iPhone 6.9/01.png`) before running a lane that
-  uploads screenshots, or pass `skip_screenshots: true`.
-- The description/keywords/subtitle drafts in `fastlane/metadata/` are a
-  starting point — read them over and adjust the voice/wording to taste
-  before the first real submission.
+Useful for getting metadata approved/updated ahead of a release, or fixing a typo without a new build.
 
-## Lanes
+### ios beta
 
-Run from `hotkeypad_client/ios/`:
+```sh
+[bundle exec] fastlane ios beta
+```
 
-- `bundle exec fastlane ios build` — `flutter build ipa --release` only.
-- `bundle exec fastlane ios metadata` — push text + screenshots, no
-  binary. Good for fixing a typo or updating the listing without a new
-  build.
-- `bundle exec fastlane ios beta` — build, then upload to TestFlight.
-- `bundle exec fastlane ios release` — build, then upload binary + full
-  listing to App Store Connect. Add `submit:true` to also submit the new
-  version for review:
+Build and upload the latest build to TestFlight
 
-  ```
-  bundle exec fastlane ios release submit:true
-  ```
+### ios release
+
+```sh
+[bundle exec] fastlane ios release
+```
+
+Build, then upload binary + full store listing to App Store Connect
+
+Pass submit: true to also submit the new version for review.
+
+----
+
+This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.
+
+More information about _fastlane_ can be found on [fastlane.tools](https://fastlane.tools).
+
+The documentation of _fastlane_ can be found on [docs.fastlane.tools](https://docs.fastlane.tools).
