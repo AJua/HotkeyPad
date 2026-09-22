@@ -42,12 +42,50 @@ jobs:
         working-directory: hotkeypad_host
         run: flutter pub get
 
-      # Ad-hoc signed (CODE_SIGN_IDENTITY = "-" in the Xcode project), so
-      # this needs no Apple Developer certificate/secrets on the runner —
-      # same as building it locally. Builds and packages in one step; see
+      # The Xcode project's Release config always signs with the
+      # "Developer ID Application" identity (see SKILL.md's "Code
+      # signing" section) — the build fails outright without a matching
+      # certificate/key in the keychain, so import one into a throwaway
+      # keychain before building. This is a certificate issued separately
+      # for CI, not a developer's local one, so a leaked secret here only
+      # means revoking this one cert.
+      - name: Import signing certificate
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_CI_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_CI_KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN=ci-signing.keychain-db
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > certificate.p12
+          security create-keychain -p "$MACOS_CI_KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$MACOS_CI_KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import certificate.p12 -k "$KEYCHAIN" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CI_KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/"//g')
+          rm -f certificate.p12
+
+      - name: Write App Store Connect API key
+        env:
+          NOTARY_API_KEY_P8: ${{ secrets.NOTARY_API_KEY_P8 }}
+        run: |
+          mkdir -p private_keys
+          echo "$NOTARY_API_KEY_P8" | base64 --decode > private_keys/AuthKey.p8
+          echo "NOTARY_API_KEY_PATH=$PWD/private_keys/AuthKey.p8" >> "$GITHUB_ENV"
+
+      # Builds, packages, notarizes and staples in one step; see
       # .claude/skills/release-macos/SKILL.md for what the script does.
-      - name: Build & package .dmg
+      - name: Build, sign & notarize .dmg
+        env:
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
         run: .claude/skills/release-macos/scripts/package_macos_dmg.sh
+
+      - name: Clean up signing keychain and API key
+        if: always()
+        run: |
+          security delete-keychain ci-signing.keychain-db || true
+          rm -f private_keys/AuthKey.p8 || true
 
       - uses: actions/upload-artifact@v6
         with:

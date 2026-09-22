@@ -42,12 +42,38 @@ MB)` line. Output lands at `hotkeypad_host/dist/<AppName>-<version>.dmg`
 4. If `create-dmg`'s own final compression step fails (see "Known
    machine-specific issue" below), recovers the styled intermediate image
    it already produced and finishes the compression itself.
-5. Sanity-checks the result (size relative to the source `.app`) and
-   verifies the final `.dmg` mounts and contains a correctly-signed app,
-   printing `codesign -dv` output.
+5. Sanity-checks the result (size relative to the source `.app`).
+6. Notarizes and staples the `.dmg` via `notarytool`/`stapler`, if
+   `NOTARY_API_KEY_PATH`/`NOTARY_API_KEY_ID`/`NOTARY_API_ISSUER_ID` are set
+   in the environment — silently skipped otherwise, so a plain local run
+   without Apple credentials on hand still works. CI sets these from
+   secrets (see `release-host.yml`); for a local notarized build, export
+   them yourself, pointing `NOTARY_API_KEY_PATH` at a downloaded
+   App Store Connect API key `.p8` file.
+7. Verifies the final `.dmg` mounts and contains a correctly-signed app,
+   printing `codesign -dv` and `spctl` output.
 
 Every step is idempotent — safe to just re-run the script if anything
 above fails partway.
+
+## Code signing
+
+The Xcode project's Release configuration is set to sign with the
+`Developer ID Application: Chienhung Lin (LK32GKMVJ6)` identity
+(`DEVELOPMENT_TEAM = LK32GKMVJ6`, `CODE_SIGN_STYLE = Manual` in
+`project.pbxproj`) rather than ad hoc — this is required for a build
+handed to someone else to avoid a Gatekeeper "unidentified developer"
+block, and now required for *any* Release build (including local ones)
+since the project always requests that identity: the signing keychain
+must contain a matching "Developer ID Application" certificate + private
+key, or the build fails outright rather than falling back to ad hoc.
+
+CI uses a *separate* Developer ID Application certificate from the one on
+any developer's local machine (issued from its own CSR, exported from its
+own throwaway keychain containing nothing else) — so leaking the CI
+secret only means revoking that one cert, never a local dev machine's
+identity. Debug/Profile configurations are untouched (still automatic
+signing) since they're for local development only.
 
 ## Known machine-specific issue: `hdiutil convert failed`
 

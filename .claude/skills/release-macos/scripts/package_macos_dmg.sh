@@ -103,6 +103,27 @@ retry() {
   done
 }
 
+# Notarizes and staples $FINAL_DMG using an App Store Connect API key, so a
+# fresh install of the app doesn't trip Gatekeeper's "unidentified developer"
+# warning. Needs NOTARY_API_KEY_PATH/NOTARY_API_KEY_ID/NOTARY_API_ISSUER_ID
+# in the environment (set by CI from secrets, or export them yourself for a
+# local run) — silently skipped without them, so a plain local iteration
+# build still works without Apple credentials on hand.
+notarize_dmg() {
+  if [ -z "${NOTARY_API_KEY_PATH:-}" ] || [ -z "${NOTARY_API_KEY_ID:-}" ] || [ -z "${NOTARY_API_ISSUER_ID:-}" ]; then
+    log "NOTARY_API_KEY_PATH/NOTARY_API_KEY_ID/NOTARY_API_ISSUER_ID not set — skipping notarization."
+    return 0
+  fi
+  log "submitting $FINAL_DMG for notarization (this can take a few minutes)..."
+  xcrun notarytool submit "$FINAL_DMG" \
+    --key "$NOTARY_API_KEY_PATH" \
+    --key-id "$NOTARY_API_KEY_ID" \
+    --issuer "$NOTARY_API_ISSUER_ID" \
+    --wait
+  log "stapling notarization ticket..."
+  xcrun stapler staple "$FINAL_DMG"
+}
+
 main() {
   mkdir -p "$DIST_DIR"
   cleanup_stale_mounts
@@ -200,6 +221,8 @@ main() {
     exit 1
   fi
 
+  notarize_dmg
+
   log "verifying the final image..."
   local verify_mount="$work/verify"
   mkdir -p "$verify_mount"
@@ -209,8 +232,20 @@ main() {
     exit 1
   }
   codesign -dv "$verify_mount/$APP_BUNDLE" 2>&1 | sed 's/^/[codesign] /'
-  hdiutil detach "$verify_mount" -quiet
 
+  # Ask spctl the same question Gatekeeper asks at first launch. This is
+  # checked against a copy of the *app*, not the create-dmg container
+  # itself — a plain disk image is never code-signed on its own, only
+  # notarized/stapled, so running this same check against $FINAL_DMG
+  # reports "rejected: no usable signature" even for a fully notarized
+  # app (confirmed this session) — a false alarm, not a real one.
+  local spctl_check="$work/spctl_check"
+  cp -R "$verify_mount/$APP_BUNDLE" "$spctl_check"
+  hdiutil detach "$verify_mount" -quiet
+  spctl -a -t exec -vv "$spctl_check" 2>&1 | sed 's/^/[spctl] /' || true
+
+  # Re-measure: stapling appends a ticket to the dmg, growing it slightly.
+  dmg_bytes="$(stat -f%z "$FINAL_DMG")"
   log "done: $FINAL_DMG ($((dmg_bytes / 1024 / 1024)) MB)"
 }
 
