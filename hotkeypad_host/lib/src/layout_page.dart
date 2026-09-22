@@ -1111,6 +1111,7 @@ class LayoutGrid extends StatelessWidget {
               item: item,
               icon: iconKey == null ? null : iconFor(iconKey),
               showLabel: showLabels,
+              cellRatio: cellRatio,
               onTap: () => onPick(index),
               onMoved: (from) => onMove(from, index),
             );
@@ -1127,6 +1128,7 @@ class _Cell extends StatelessWidget {
     required this.item,
     required this.icon,
     required this.showLabel,
+    required this.cellRatio,
     required this.onTap,
     required this.onMoved,
   });
@@ -1135,6 +1137,7 @@ class _Cell extends StatelessWidget {
   final DeckItem? item;
   final Uint8List? icon;
   final bool showLabel;
+  final double cellRatio;
   final VoidCallback onTap;
   final ValueChanged<int> onMoved;
 
@@ -1154,7 +1157,14 @@ class _Cell extends StatelessWidget {
             color: Colors.transparent,
             child: Opacity(
               opacity: 0.85,
-              child: SizedBox(width: 110, height: 120, child: content),
+              // Same width-to-height formula deckGridMetrics uses for a
+              // real cell, so the label (when shown) has the room it needs
+              // instead of overflowing this preview.
+              child: SizedBox(
+                width: 110,
+                height: 110 / cellRatio,
+                child: content,
+              ),
             ),
           ),
           childWhenDragging: Opacity(opacity: 0.25, child: content),
