@@ -54,12 +54,13 @@ Console web UI.
   form** — first-time-only forms filled in on the Play Console web UI,
   same as the age rating step on the iOS side; `supply` doesn't have an
   action for either.
-- `fastlane/metadata/android/*/images/` — no feature graphic, icon, or
+- `fastlane/metadata/android/*/images/` (at the repo root, shared with
+  F-Droid) — no feature graphic, icon, or
   screenshots yet. Play requires at minimum a feature graphic
   (1024×500) and 2 phone screenshots before a listing can go live. See
   https://docs.fastlane.tools/actions/supply/#images-and-screenshots for
   the exact folder names `supply` expects.
-- The description drafts in `fastlane/metadata/android/*/` are a
+- The description drafts in the repo-root `fastlane/metadata/android/*/` are a
   starting point — read them over before the first real submission.
 
 ## Lanes

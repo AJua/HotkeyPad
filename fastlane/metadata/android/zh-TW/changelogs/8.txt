@@ -1,0 +1,1 @@
+WiFi 配對用的 QR code 掃描器改用開源的 ZXing，取代 Google ML Kit。

@@ -1,0 +1,1 @@
+The QR code scanner used for WiFi pairing is now built on the open-source ZXing library, replacing Google ML Kit.

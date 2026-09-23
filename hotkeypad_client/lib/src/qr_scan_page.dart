@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:flutter_zxing/flutter_zxing.dart';
 
 import '../l10n/app_localizations.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
@@ -15,39 +15,34 @@ class QrScanPage extends StatefulWidget {
 }
 
 class _QrScanPageState extends State<QrScanPage> {
-  final _controller = MobileScannerController();
-
-  /// Guards against `onDetect` firing again — for another frame, or for a
-  /// second code still in view — after this screen has already started
-  /// popping with a result.
+  /// Guards against `onScan` firing again — for the next frame, while this
+  /// screen has already started popping with a result.
   bool _handled = false;
+
+  bool _cameraFailed = false;
 
   String? _notAHostMessage;
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onDetect(BarcodeCapture capture) {
+  void _onScan(Code code) {
     if (_handled) return;
-    for (final barcode in capture.barcodes) {
-      final raw = barcode.rawValue;
-      if (raw == null) continue;
-      final parsed = WifiPairingQr.tryParse(raw);
-      if (parsed == null) continue;
+    final raw = code.text;
+    final parsed = raw == null ? null : WifiPairingQr.tryParse(raw);
+    if (parsed != null) {
       _handled = true;
       Navigator.of(context).pop(parsed);
       return;
     }
     // Something was decoded — a real QR code, just not this app's — worth
     // a word rather than silently doing nothing forever.
-    if (capture.barcodes.isNotEmpty && mounted) {
+    if (mounted) {
       setState(
         () => _notAHostMessage = AppLocalizations.of(context)!.invalidHostQr,
       );
     }
+  }
+
+  void _onControllerCreated(Object? controller, Exception? error) {
+    if (error != null && mounted) setState(() => _cameraFailed = true);
   }
 
   @override
@@ -58,10 +53,8 @@ class _QrScanPageState extends State<QrScanPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          MobileScanner(
-            controller: _controller,
-            onDetect: _onDetect,
-            errorBuilder: (context, error) => Center(
+          if (_cameraFailed)
+            Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
@@ -69,8 +62,16 @@ class _QrScanPageState extends State<QrScanPage> {
                   textAlign: TextAlign.center,
                 ),
               ),
+            )
+          else
+            ReaderWidget(
+              onScan: _onScan,
+              onControllerCreated: _onControllerCreated,
+              codeFormat: Format.qrCode,
+              showFlashlight: false,
+              showGallery: false,
+              showToggleCamera: false,
             ),
-          ),
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
