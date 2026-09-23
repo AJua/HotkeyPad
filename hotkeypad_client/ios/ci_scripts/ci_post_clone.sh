@@ -8,11 +8,13 @@
 # generate them with. Without this script the build dies at "Resolve
 # package dependencies" / "Failed to catalog app correctly".
 #
-# Keep FLUTTER_VERSION in step with the SDK used locally (flutter --version).
+# Keep FLUTTER_VERSION in step with the SDK used locally (flutter --version),
+# and no older than what the dependencies require (flutter_zxing needs
+# Flutter >= 3.41 / Dart >= 3.11).
 
 set -e
 
-FLUTTER_VERSION=3.38.5
+FLUTTER_VERSION=3.47.2
 CLIENT_DIR="$CI_PRIMARY_REPOSITORY_PATH/hotkeypad_client"
 
 echo "--- Installing Flutter $FLUTTER_VERSION"
@@ -34,8 +36,8 @@ cd "$CLIENT_DIR"
 flutter pub get
 flutter build ios --config-only --release --no-codesign
 
-# Belt and braces: every plugin this app uses resolves through CocoaPods
-# (the generated Swift package has no dependencies), so Pods/ has to exist
-# before Xcode opens the workspace.
+# Belt and braces: plugins now resolve through the generated Swift package,
+# but the Runner project still includes the Pods xcconfigs, so Pods/ has to
+# exist before Xcode opens the workspace.
 cd "$CLIENT_DIR/ios"
 pod install
