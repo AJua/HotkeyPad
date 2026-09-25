@@ -1,0 +1,1 @@
+App icons from a macOS host now fill their buttons: cached icons are refreshed once to pick up the host's new, larger rendering.
