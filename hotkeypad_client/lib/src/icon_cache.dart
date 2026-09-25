@@ -40,8 +40,21 @@ abstract final class IconCache {
       .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
       .join();
 
+  /// Bumped whenever the host changes how it renders an icon, so the phone
+  /// refetches instead of showing a stale copy forever — the cache is keyed
+  /// by app name alone, with no way to tell the old bytes are outdated.
+  /// v2: the host trims macOS icons' transparent margin (see the host's
+  /// IconTrim), so they fill the button.
+  static const _renderVersion = 2;
+
   static String _fileName(String appName) =>
-      '${_safe(appName)}@${HotkeyPad.iconSize}';
+      '${_safe(appName)}@${HotkeyPad.iconSize}v$_renderVersion';
+
+  /// Names earlier render versions used for [appName], discarded on a miss
+  /// the same way [_discardLegacyEntry] drops the older prefs copies.
+  static List<String> _staleFileNames(String appName) => [
+    '${_safe(appName)}@${HotkeyPad.iconSize}',
+  ];
 
   static Future<Uint8List?> read(String hostId, String appName) async {
     final directory = await _directory(hostId);
@@ -53,6 +66,7 @@ abstract final class IconCache {
       return null;
     }
     await _discardLegacyEntry(hostId, appName);
+    await _discardStaleFiles(directory, appName);
     return null;
   }
 
@@ -63,6 +77,20 @@ abstract final class IconCache {
     final key = 'icon:$hostId:$appName';
     final prefs = await SharedPreferences.getInstance();
     if (prefs.containsKey(key)) await prefs.remove(key);
+  }
+
+  static Future<void> _discardStaleFiles(
+    Directory directory,
+    String appName,
+  ) async {
+    for (final name in _staleFileNames(appName)) {
+      try {
+        final file = File('${directory.path}/$name');
+        if (file.existsSync()) await file.delete();
+      } on FileSystemException {
+        // Left behind, it only costs a few KB.
+      }
+    }
   }
 
   static Future<void> write(
