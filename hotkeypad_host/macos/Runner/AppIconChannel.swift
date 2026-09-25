@@ -133,25 +133,12 @@ enum AppIconChannel {
         }
     }
 
-    /// macOS's own Big Sur-style app icons bake in a transparent margin
-    /// around the actual glyph (roughly 9% of the icon's edge, measured
-    /// against a real one) so the rounded-square shape and its
-    /// shadow/highlight line up across every app — nothing to do with
-    /// this app's own rendering. Left alone, that margin makes every icon
-    /// on a deck button read as smaller than it needs to, on both host
-    /// and client since they display the exact same PNG bytes. Rendering
-    /// oversized by this much on every side and cropping back down to the
-    /// requested size trims that margin away instead of the glyph, for
-    /// any app's icon.
-    private static let transparentMarginCrop = 11
-
     private static func pngIcon(forApp path: String, size: Int) -> Data? {
         let image = NSWorkspace.shared.icon(forFile: path)
-        let renderSize = size + transparentMarginCrop * 2
         guard let representation = NSBitmapImageRep(
             bitmapDataPlanes: nil,
-            pixelsWide: renderSize,
-            pixelsHigh: renderSize,
+            pixelsWide: size,
+            pixelsHigh: size,
             bitsPerSample: 8,
             samplesPerPixel: 4,
             hasAlpha: true,
@@ -165,29 +152,9 @@ enum AppIconChannel {
         NSGraphicsContext.current = NSGraphicsContext(
             bitmapImageRep: representation
         )
-        image.draw(in: NSRect(x: 0, y: 0, width: renderSize, height: renderSize))
+        image.draw(in: NSRect(x: 0, y: 0, width: size, height: size))
         NSGraphicsContext.restoreGraphicsState()
 
-        // Only every call site today (HotkeyPad.iconSize, 128) leaves room
-        // for this crop; falling back to the uncropped render for a
-        // hypothetical smaller request is safer than cropping to nothing
-        // or a negative rect.
-        guard
-            size > 0,
-            let cgImage = representation.cgImage,
-            let cropped = cgImage.cropping(
-                to: CGRect(
-                    x: transparentMarginCrop,
-                    y: transparentMarginCrop,
-                    width: size,
-                    height: size
-                )
-            )
-        else {
-            return representation.representation(using: .png, properties: [:])
-        }
-
-        return NSBitmapImageRep(cgImage: cropped)
-            .representation(using: .png, properties: [:])
+        return representation.representation(using: .png, properties: [:])
     }
 }

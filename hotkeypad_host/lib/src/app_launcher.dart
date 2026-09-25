@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'icon_trim.dart';
 import 'win32_app_launcher.dart'
     if (dart.library.js_interop) 'win32_app_launcher_stub.dart'
     as windows_launcher;
@@ -118,10 +119,14 @@ abstract final class AppLauncher {
     if (!supported) return null;
     if (Platform.isWindows) return windows_launcher.iconWindows(path, size);
     try {
-      return await _channel.invokeMethod<Uint8List>('icon', {
+      // Rendered at twice the size and trimmed back down (see IconTrim):
+      // macOS icons carry a transparent margin around their plate, and
+      // cropping it away from a larger render keeps the result sharp.
+      final png = await _channel.invokeMethod<Uint8List>('icon', {
         'path': path,
-        'size': size,
+        'size': size * 2,
       });
+      return png == null ? null : await IconTrim.trimPng(png, size);
     } on PlatformException {
       return null;
     } on MissingPluginException {
