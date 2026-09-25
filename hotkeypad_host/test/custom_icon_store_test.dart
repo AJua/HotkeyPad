@@ -240,11 +240,11 @@ void main() {
 
         final plated = await CustomIconStore.cropToSquarePng(png);
 
-        // Trimmed down to the plate and its shadow, the plate nearly fills
-        // the box; its top and bottom edges sit within a few percent of the
-        // canvas edges, so the outermost rows are shadow or nothing.
-        final below = await _alphaAt(plated!, 0.5, 0.99);
-        final above = await _alphaAt(plated, 0.5, 0.01);
+        // Trimmed down to the plate and its shadow, then inset a little,
+        // the plate's top and bottom edges sit several percent in from the
+        // canvas edges; just outside them is shadow or nothing.
+        final below = await _alphaAt(plated!, 0.5, 0.97);
+        final above = await _alphaAt(plated, 0.5, 0.03);
         expect(below, greaterThan(0));
         expect(below, greaterThan(above));
       });

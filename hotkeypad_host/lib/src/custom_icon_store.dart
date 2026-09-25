@@ -111,7 +111,11 @@ abstract final class CustomIconStore {
         final output = await picture.toImage(canvasSize, canvasSize);
         try {
           if (logoBounds != null) {
-            return await IconTrim.trimImage(output, size);
+            return await IconTrim.trimImage(
+              output,
+              size,
+              inset: _plateTrimInset,
+            );
           }
           final data = await output.toByteData(format: ImageByteFormat.png);
           return data?.buffer.asUint8List();
@@ -166,6 +170,13 @@ abstract final class CustomIconStore {
   static const _plateRadius = 185.4 / 1024;
   static const _shadowOffset = 10 / 1024;
   static const _shadowBlur = 10 / 1024;
+
+  /// Extra margin, in output pixels per side, after trimming. This plate's
+  /// shadow is shorter than the one baked into real macOS icons, so trimming
+  /// it leaves a narrower margin and the plate came out wider than Chrome's
+  /// (~119px at 128). Tuned by eye on a real deck, to a 118px plate — a
+  /// touch smaller than Chrome's, which read as right next to it.
+  static const _plateTrimInset = 1.5;
 
   /// How much of the plate the logo's longer side may take. A real icon's
   /// artwork stops short of the plate's edge too (Chrome's circle does);

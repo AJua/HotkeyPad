@@ -28,7 +28,13 @@ abstract final class IconTrim {
   }
 
   /// [trimPng] for an already-decoded [source]; does not dispose it.
-  static Future<Uint8List?> trimImage(Image source, int size) async {
+  /// [inset] shrinks the trimmed result by that many pixels on every side,
+  /// leaving the margin transparent.
+  static Future<Uint8List?> trimImage(
+    Image source,
+    int size, {
+    double inset = 0,
+  }) async {
     final rgba = (await source.toByteData(
       format: ImageByteFormat.rawRgba,
     ))?.buffer.asUint8List();
@@ -41,7 +47,7 @@ abstract final class IconTrim {
     Canvas(recorder).drawImageRect(
       source,
       crop,
-      Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
+      Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()).deflate(inset),
       Paint()..filterQuality = FilterQuality.high,
     );
     final picture = recorder.endRecording();
