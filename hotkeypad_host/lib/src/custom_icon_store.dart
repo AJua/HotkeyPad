@@ -64,17 +64,18 @@ abstract final class CustomIconStore {
   }
 
   /// Decodes [bytes] — a raster image, or SVG source (see [ImageDecode]) —
-  /// and re-encodes it as a square PNG at [HotkeyPad.iconSize], in one of two
-  /// ways depending on what it is:
+  /// and re-encodes it as a square PNG at [HotkeyPad.iconSize], styled as a
+  /// Big Sur app icon — a rounded plate with a soft drop shadow — so it sits
+  /// next to a real macOS app icon (Chrome's, say) as one of them. What goes
+  /// on the plate depends on the source:
   ///
-  /// * An opaque picture (a photo, a screenshot) has its centred square
-  ///   cropped out and fills the whole box — a plain resize would squash a
-  ///   non-square source rather than crop it, and deck buttons are square.
   /// * A logo on a transparent background (see
-  ///   [AlphaBounds.hasTransparentBackground]) is set on a white rounded
-  ///   plate with a soft drop shadow instead, so it sits next to a real
-  ///   macOS app icon (Chrome's, say) as one of them rather than as a bare
-  ///   cut-out — see [_drawOnPlate].
+  ///   [AlphaBounds.hasTransparentBackground]) is placed whole on a white
+  ///   plate — see [_drawLogoOnPlate].
+  /// * An opaque picture (a photo, a site's apple-touch-icon) becomes the
+  ///   plate itself: its centred square is cropped out and clipped to the
+  ///   plate's shape — see [_drawPictureAsPlate]. A plain resize would
+  ///   squash a non-square source rather than crop it.
   ///
   /// Public, not an implementation detail of [pickAndProcess], so it can be
   /// tested directly against synthetic images without a real file picker.
@@ -93,32 +94,24 @@ abstract final class CustomIconStore {
           rgba != null && AlphaBounds.hasTransparentBackground(rgba)
           ? AlphaBounds.opaqueBounds(rgba, source.width, source.height)
           : null;
+      // Drawn on the full Big Sur template at twice the size, then trimmed
+      // the same way a system app icon is (see AppLauncher.icon) — so the
+      // two end up with the same plate size and shadow margin, rather than
+      // this having its own copy of the numbers.
       const size = HotkeyPad.iconSize;
-      // A plated logo is drawn on the full Big Sur template at twice the
-      // size, then trimmed the same way a system app icon is (see
-      // AppLauncher.icon) — so the two end up with the same plate size and
-      // shadow margin, rather than this having its own copy of the numbers.
-      final canvasSize = logoBounds != null ? size * 2 : size;
+      const canvasSize = size * 2;
       final recorder = PictureRecorder();
       final canvas = Canvas(recorder);
       if (logoBounds != null) {
-        _drawOnPlate(canvas, source, logoBounds, canvasSize.toDouble());
+        _drawLogoOnPlate(canvas, source, logoBounds, canvasSize.toDouble());
       } else {
-        _drawFilled(canvas, source);
+        _drawPictureAsPlate(canvas, source, canvasSize.toDouble());
       }
       final picture = recorder.endRecording();
       try {
         final output = await picture.toImage(canvasSize, canvasSize);
         try {
-          if (logoBounds != null) {
-            return await IconTrim.trimImage(
-              output,
-              size,
-              inset: _plateTrimInset,
-            );
-          }
-          final data = await output.toByteData(format: ImageByteFormat.png);
-          return data?.buffer.asUint8List();
+          return await IconTrim.trimImage(output, size, inset: _plateTrimInset);
         } finally {
           output.dispose();
         }
@@ -130,42 +123,12 @@ abstract final class CustomIconStore {
     }
   }
 
-  static void _drawFilled(Canvas canvas, Image source) {
-    final side = source.width < source.height ? source.width : source.height;
-    final srcRect = Rect.fromLTWH(
-      (source.width - side) / 2,
-      (source.height - side) / 2,
-      side.toDouble(),
-      side.toDouble(),
-    );
-    // No inset: the button already leaves its own margin around the icon
-    // box (the grid's cell spacing, plus each app icon's own art), so
-    // shrinking the image further on top of that just made a custom icon
-    // read as smaller than the built-in ones next to it — the goal is to
-    // fill the same box they do, not sit inside it with room to spare.
-    const content = HotkeyPad.iconSize * 1.0;
-    // Real app icons are drawn as a rounded square, not a sharp one —
-    // without this a custom icon's straight corners stood out (and read as
-    // bigger) next to the curved ones either side of it.
-    const cornerRadius = content * 0.18;
-    const destRect = Rect.fromLTWH(0, 0, content, content);
-    canvas.clipRRect(
-      RRect.fromRectAndRadius(destRect, const Radius.circular(cornerRadius)),
-    );
-    canvas.drawImageRect(
-      source,
-      srcRect,
-      destRect,
-      Paint()..filterQuality = FilterQuality.high,
-    );
-  }
-
   /// Geometry of Apple's Big Sur app icon template, as fractions of its
   /// 1024-point canvas: an 824-point plate inset 100 on every side, with a
   /// 185.4-point corner radius and a black 30% shadow dropped 10 points
   /// down with a 10-point blur. `NSWorkspace.icon(forFile:)` hands back
   /// real app icons drawn on exactly this grid, so matching it is what makes
-  /// a plated logo line up with them edge for edge.
+  /// a custom icon line up with them edge for edge.
   static const _plateInset = 100 / 1024;
   static const _plateRadius = 185.4 / 1024;
   static const _shadowOffset = 10 / 1024;
@@ -184,29 +147,20 @@ abstract final class CustomIconStore {
   /// rounded corners.
   static const _logoFraction = 0.72;
 
-  /// Draws a white Big Sur-style plate with its drop shadow, then [source]'s
-  /// [logoBounds] — the logo with its own transparent margin trimmed off —
-  /// scaled to fit inside it without cropping, centred. A wide logo like
-  /// Gmail's envelope keeps both of its sides this way, where the opaque
-  /// path's centred square would cut them off.
-  static void _drawOnPlate(
-    Canvas canvas,
-    Image source,
-    Rect logoBounds,
-    double size,
-  ) {
-    final plate = Rect.fromLTWH(
+  /// The rounded plate of the Big Sur template on a [size]-point canvas.
+  static RRect _plateShape(double size) => RRect.fromRectAndRadius(
+    Rect.fromLTWH(
       size * _plateInset,
       size * _plateInset,
       size * (1 - _plateInset * 2),
       size * (1 - _plateInset * 2),
-    );
-    final plateShape = RRect.fromRectAndRadius(
-      plate,
-      Radius.circular(size * _plateRadius),
-    );
+    ),
+    Radius.circular(size * _plateRadius),
+  );
+
+  static void _drawPlateShadow(Canvas canvas, RRect plate, double size) {
     canvas.drawRRect(
-      plateShape.shift(Offset(0, size * _shadowOffset)),
+      plate.shift(Offset(0, size * _shadowOffset)),
       Paint()
         ..color = const Color(0x4D000000)
         ..maskFilter = MaskFilter.blur(
@@ -216,6 +170,22 @@ abstract final class CustomIconStore {
           size * _shadowBlur * 0.57735 + 0.5,
         ),
     );
+  }
+
+  /// Draws a white Big Sur-style plate with its drop shadow, then [source]'s
+  /// [logoBounds] — the logo with its own transparent margin trimmed off —
+  /// scaled to fit inside it without cropping, centred. A wide logo like
+  /// Gmail's envelope keeps both of its sides this way, where
+  /// [_drawPictureAsPlate]'s centred square would cut them off.
+  static void _drawLogoOnPlate(
+    Canvas canvas,
+    Image source,
+    Rect logoBounds,
+    double size,
+  ) {
+    final plateShape = _plateShape(size);
+    final plate = plateShape.outerRect;
+    _drawPlateShadow(canvas, plateShape, size);
     canvas.drawRRect(plateShape, Paint()..color = const Color(0xFFFFFFFF));
 
     final maxSide = plate.width * _logoFraction;
@@ -233,6 +203,30 @@ abstract final class CustomIconStore {
       dest,
       Paint()..filterQuality = FilterQuality.high,
     );
+  }
+
+  /// Draws the plate's drop shadow, then [source]'s centred square clipped
+  /// to the plate's shape — the picture is the plate, the way an app icon's
+  /// artwork is.
+  static void _drawPictureAsPlate(Canvas canvas, Image source, double size) {
+    final side = source.width < source.height ? source.width : source.height;
+    final srcRect = Rect.fromLTWH(
+      (source.width - side) / 2,
+      (source.height - side) / 2,
+      side.toDouble(),
+      side.toDouble(),
+    );
+    final plateShape = _plateShape(size);
+    _drawPlateShadow(canvas, plateShape, size);
+    canvas.save();
+    canvas.clipRRect(plateShape);
+    canvas.drawImageRect(
+      source,
+      srcRect,
+      plateShape.outerRect,
+      Paint()..filterQuality = FilterQuality.high,
+    );
+    canvas.restore();
   }
 
   /// Saves [png] under a freshly generated id and returns it, or null if it

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:hotkeypad_host/src/alpha_bounds.dart';
 import 'package:hotkeypad_host/src/custom_icon_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'package:flutter/material.dart' show Colors;
@@ -125,6 +126,25 @@ Future<Uint8List> _logoPng(int width, int height, ui.Rect logo) async {
   }
 }
 
+/// Where the solid plate sits in the decoded image — its pixels at or above
+/// half alpha, which leaves the soft shadow outside.
+Future<ui.Rect?> _plateBounds(Uint8List bytes) async {
+  final codec = await ui.instantiateImageCodec(bytes);
+  final frame = await codec.getNextFrame();
+  try {
+    final image = frame.image;
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    return AlphaBounds.opaqueBounds(
+      data!.buffer.asUint8List(),
+      image.width,
+      image.height,
+      threshold: 128,
+    );
+  } finally {
+    frame.image.dispose();
+  }
+}
+
 void main() {
   group('CustomIconStore.cropToSquarePng', () {
     test('a wide image comes out exactly iconSize square', () async {
@@ -178,30 +198,28 @@ void main() {
       expect(cropped, isNull);
     });
 
-    test('a source that fills its own canvas comes out edge to edge, with '
-        'rounded rather than square corners', () async {
-      // A custom icon should fill the same button box a real app icon
-      // does, not sit inside it with room to spare — so a source that
-      // already fills its own canvas (a photo, or a logo drawn right to
-      // the edges of its SVG) is scaled to fill this one too. The one
-      // exception is the corners: real app icons are drawn as a rounded
-      // square, so this clips to the same shape rather than leaving a
-      // sharp right angle.
-      final png = await _solidPng(200, 200, Colors.orange);
+    test(
+      'an opaque picture becomes a plate the same size as a plated logo',
+      () async {
+        // An opaque source (a photo, a site's apple-touch-icon) is the plate
+        // itself rather than sitting on a white one, but either way it has
+        // to line up with real app icons — and so with each other.
+        final picture = await CustomIconStore.cropToSquarePng(
+          await _solidPng(200, 200, Colors.orange),
+        );
+        final logo = await CustomIconStore.cropToSquarePng(
+          await _logoPng(200, 200, const ui.Rect.fromLTRB(60, 60, 140, 140)),
+        );
 
-      final cropped = await CustomIconStore.cropToSquarePng(png);
-
-      // However big the rounding is, the farthest point of a square from
-      // an inscribed circle is always its corner, so this is transparent
-      // regardless of the exact radius.
-      expect(await _alphaAt(cropped!, 0.02, 0.02), 0);
-      // The centre, and a point right at the middle of an edge — away
-      // from every corner — are both inside the rounded rect's flat
-      // sides and therefore opaque: the source really does reach the
-      // edge, it is only the corners that are clipped.
-      expect(await _alphaAt(cropped, 0.5, 0.5), greaterThan(0));
-      expect(await _alphaAt(cropped, 0.03, 0.5), greaterThan(0));
-    });
+        expect(await _plateBounds(picture!), await _plateBounds(logo!));
+        // Rounded like an app icon: the canvas corner stays transparent,
+        // the middle is the picture itself.
+        expect(await _alphaAt(picture, 0.02, 0.02), 0);
+        final centre = await _colorAt(picture, 0.5, 0.5);
+        expect(centre.a, greaterThan(0.99));
+        expect(centre.b, lessThan(0.2));
+      },
+    );
 
     group('transparent-background logo', () {
       test('sits whole on a white plate, inset like a real app icon', () async {
@@ -231,23 +249,26 @@ void main() {
         }
       });
 
-      test('keeps its shadow below the plate after trimming, not above it', () async {
-        final png = await _logoPng(
-          100,
-          100,
-          const ui.Rect.fromLTRB(30, 30, 70, 70),
-        );
+      test(
+        'keeps its shadow below the plate after trimming, not above it',
+        () async {
+          final png = await _logoPng(
+            100,
+            100,
+            const ui.Rect.fromLTRB(30, 30, 70, 70),
+          );
 
-        final plated = await CustomIconStore.cropToSquarePng(png);
+          final plated = await CustomIconStore.cropToSquarePng(png);
 
-        // Trimmed down to the plate and its shadow, then inset a little,
-        // the plate's top and bottom edges sit several percent in from the
-        // canvas edges; just outside them is shadow or nothing.
-        final below = await _alphaAt(plated!, 0.5, 0.97);
-        final above = await _alphaAt(plated, 0.5, 0.03);
-        expect(below, greaterThan(0));
-        expect(below, greaterThan(above));
-      });
+          // Trimmed down to the plate and its shadow, then inset a little,
+          // the plate's top and bottom edges sit several percent in from the
+          // canvas edges; just outside them is shadow or nothing.
+          final below = await _alphaAt(plated!, 0.5, 0.97);
+          final above = await _alphaAt(plated, 0.5, 0.03);
+          expect(below, greaterThan(0));
+          expect(below, greaterThan(above));
+        },
+      );
     });
 
     group('SVG source', () {

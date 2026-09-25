@@ -12,6 +12,7 @@ import 'builtin_background_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
 import 'deck_icons.dart';
+import 'favicon_fetcher.dart';
 import 'layout_store.dart';
 import 'settings_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
@@ -2356,6 +2357,10 @@ class _UrlDialogState extends State<_UrlDialog> {
   late final _url = TextEditingController(text: widget.existing?.url ?? '');
   late final _label = TextEditingController(text: widget.existing?.label ?? '');
 
+  /// True while [_save] is fetching the site's favicon, so Add can't be
+  /// pressed twice and shows that something is happening.
+  bool _saving = false;
+
   @override
   void dispose() {
     _url.dispose();
@@ -2363,18 +2368,30 @@ class _UrlDialogState extends State<_UrlDialog> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_saving) return;
     final url = _url.text.trim();
     if (url.isEmpty) return;
     final label = _label.text.trim();
+    final emoji = widget.emoji ?? widget.existing?.emoji;
+    var customIconId = widget.customIconId ?? widget.existing?.customIconId;
+    // A button with no icon of its own gets the site's icon, so it shows
+    // the site's logo rather than the generic link glyph. One the user
+    // already chose — an emoji or a picked image — always wins.
+    if (emoji == null && customIconId == null) {
+      setState(() => _saving = true);
+      final png = await FaviconFetcher.fetchIconPng(url);
+      if (png != null) customIconId = await CustomIconStore.save(png);
+      if (!mounted) return;
+    }
     Navigator.of(context).pop(
       OpenUrlItem(
         url: url,
         // Falling back to the URL keeps the button identifiable when the
         // user cannot think of a name.
         label: label.isEmpty ? url : label,
-        emoji: widget.emoji ?? widget.existing?.emoji,
-        customIconId: widget.customIconId ?? widget.existing?.customIconId,
+        emoji: emoji,
+        customIconId: customIconId,
       ),
     );
   }
@@ -2411,7 +2428,8 @@ class _UrlDialogState extends State<_UrlDialog> {
             const SizedBox(height: 8),
             Text(
               'Opens in Chrome on this Mac, focusing an existing tab already '
-              'showing it rather than a duplicate.',
+              'showing it rather than a duplicate. Without an icon of its '
+              'own, the button uses the site\'s icon.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -2422,7 +2440,16 @@ class _UrlDialogState extends State<_UrlDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(onPressed: _save, child: const Text('Add')),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Add'),
+        ),
       ],
     );
   }
