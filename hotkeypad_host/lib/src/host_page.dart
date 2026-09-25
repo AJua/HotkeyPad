@@ -18,6 +18,7 @@ import 'command_runner.dart';
 import 'custom_icon_store.dart';
 import 'glyph_icon_store.dart';
 import 'host_identity.dart';
+import 'host_sound_player.dart';
 import 'layout_page.dart';
 import 'layout_store.dart';
 import 'locale_store.dart';
@@ -1091,12 +1092,14 @@ class _HostPageState extends State<HostPage> {
     ),
     ShortcutItem(:final name) => CommandRunner.shortcut(name),
     OpenUrlItem(:final url) => CommandRunner.openUrl(url),
-    // Played by the client itself, which never sends a press for one (see
-    // its Session.press) — reaching here means an older client, or a combo
-    // step, neither of which can play it.
-    PlaySoundItem() => Future.value((
+    PlaySoundItem(:final soundId, target: SoundTarget.host) =>
+      HostSoundPlayer.instance.play(soundId),
+    // A phone-side sound is played by the client itself, which never sends
+    // a press for one (see its Session.press) — reaching here means a
+    // client too old to play sounds.
+    PlaySoundItem(target: SoundTarget.client) => Future.value((
       ok: false,
-      message: 'Sounds play on the phone; update HotkeyPad there',
+      message: 'This sound plays on the phone; update HotkeyPad there',
     )),
     KeyComboItem() => CommandRunner.keyCombo(
       modifiers: item.modifiers,

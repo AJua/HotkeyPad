@@ -145,7 +145,10 @@ String? currentButtonSummary(String? stored) {
     KeyComboItem(:final combination) => 'Sends $combination',
     ShortcutItem(:final name) => 'Runs the "$name" Shortcut',
     OpenUrlItem(:final url) => 'Opens $url in Chrome',
-    PlaySoundItem(:final label) => 'Plays "$label" on the phone',
+    PlaySoundItem(:final label, :final target) => switch (target) {
+      SoundTarget.client => 'Plays "$label" on the phone',
+      SoundTarget.host => 'Plays "$label" on this Mac',
+    },
     ComboItem(:final steps) => 'Runs ${steps.length} steps',
     WidgetItem(:final kind, :final rowSpan, :final columnSpan) =>
       '${kind.label} widget (${rowSpan}x$columnSpan)',
@@ -202,9 +205,10 @@ DeckItem withIconOverride(
     emoji: emoji,
     customIconId: customIconId,
   ),
-  PlaySoundItem(:final soundId, :final label) => PlaySoundItem(
+  PlaySoundItem(:final soundId, :final label, :final target) => PlaySoundItem(
     soundId: soundId,
     label: label,
+    target: target,
     emoji: emoji,
     customIconId: customIconId,
   ),
@@ -1533,6 +1537,9 @@ class _PickerDialogState extends State<_PickerDialog> {
         existing: existing is PlaySoundItem ? existing : null,
         emoji: _emoji,
         customIconId: _customIconId,
+        // A combo runs its steps on this Mac, so a sound there has to play
+        // here too.
+        hostOnly: !widget.allowCombo,
       ),
     );
     if (item == null || !mounted) return;
@@ -1703,13 +1710,15 @@ class _PickerDialogState extends State<_PickerDialog> {
                       subtitle: const Text('Opens in Chrome on this Mac'),
                       onTap: _composeUrl,
                     ),
-                    // Not a combo step: a sound plays on the phone, and a
-                    // combo runs on this Mac.
-                    if (widget.allowCombo && SoundStore.supported)
+                    if (SoundStore.supported)
                       ListTile(
                         leading: const Icon(Icons.music_note),
                         title: const Text('Play sound...'),
-                        subtitle: const Text('Plays on the phone'),
+                        subtitle: Text(
+                          widget.allowCombo
+                              ? 'On this Mac or the phone'
+                              : 'Plays on this Mac',
+                        ),
                         onTap: _composeSound,
                       ),
                     if (widget.allowCombo)
@@ -2486,19 +2495,24 @@ class _UrlDialogState extends State<_UrlDialog> {
   }
 }
 
-/// Composes a "play sound" button: an audio file copied into [SoundStore]
-/// and what to call it, plus an optional emoji or custom image carried over
-/// from the picker.
+/// Composes a "play sound" button: an audio file copied into [SoundStore],
+/// what to call it and where it plays, plus an optional emoji or custom
+/// image carried over from the picker.
 class _SoundDialog extends StatefulWidget {
   const _SoundDialog({
     required this.existing,
     required this.emoji,
     required this.customIconId,
+    this.hostOnly = false,
   });
 
   final PlaySoundItem? existing;
   final String? emoji;
   final String? customIconId;
+
+  /// Fixes the target to [SoundTarget.host] — for a combo step, which runs
+  /// on this Mac and has no way to reach the phone's speaker.
+  final bool hostOnly;
 
   @override
   State<_SoundDialog> createState() => _SoundDialogState();
@@ -2510,6 +2524,12 @@ class _SoundDialogState extends State<_SoundDialog> {
   /// The sound the button will play: the existing one until a new file is
   /// picked.
   late String? _soundId = widget.existing?.soundId;
+
+  /// A new sound plays on this Mac unless the user picks the phone; an
+  /// existing one keeps whatever it was set to.
+  late SoundTarget _target = widget.hostOnly
+      ? SoundTarget.host
+      : widget.existing?.target ?? SoundTarget.host;
 
   /// The picked file's name, shown so the user can see what they chose.
   String? _fileName;
@@ -2573,6 +2593,7 @@ class _SoundDialogState extends State<_SoundDialog> {
       PlaySoundItem(
         soundId: soundId,
         label: label.isEmpty ? 'Sound' : label,
+        target: _target,
         emoji: widget.emoji ?? widget.existing?.emoji,
         customIconId: widget.customIconId ?? widget.existing?.customIconId,
       ),
@@ -2637,13 +2658,37 @@ class _SoundDialogState extends State<_SoundDialog> {
                   isDense: true,
                 ),
               ),
+              const SizedBox(height: 12),
+              if (!widget.hostOnly)
+                SegmentedButton<SoundTarget>(
+                  segments: const [
+                    ButtonSegment(
+                      value: SoundTarget.host,
+                      icon: Icon(Icons.laptop_mac),
+                      label: Text('This Mac'),
+                    ),
+                    ButtonSegment(
+                      value: SoundTarget.client,
+                      icon: Icon(Icons.smartphone),
+                      label: Text('Phone'),
+                    ),
+                  ],
+                  selected: {_target},
+                  onSelectionChanged: (selection) =>
+                      setState(() => _target = selection.single),
+                ),
               const SizedBox(height: 8),
-              Text(
-                'Plays on the phone\'s own speaker. The file is copied to this '
-                'Mac and sent to the phone once, then kept there; up to '
-                '${SoundStore.maxBytes ~/ (1024 * 1024)} MB.',
-                style: theme.textTheme.bodySmall,
-              ),
+              Text(switch (_target) {
+                SoundTarget.client =>
+                  'Plays on the phone\'s own speaker. The file is copied '
+                      'to this Mac and sent to the phone once, then kept '
+                      'there; up to '
+                      '${SoundStore.maxBytes ~/ (1024 * 1024)} MB.',
+                SoundTarget.host =>
+                  'Plays through this Mac\'s speakers. The file is copied '
+                      'into HotkeyPad\'s settings folder; up to '
+                      '${SoundStore.maxBytes ~/ (1024 * 1024)} MB.',
+              }, style: theme.textTheme.bodySmall),
             ],
           ),
         ),

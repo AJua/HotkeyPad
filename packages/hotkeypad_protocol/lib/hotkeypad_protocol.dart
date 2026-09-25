@@ -319,6 +319,7 @@ sealed class DeckItem {
         'snd' => PlaySoundItem(
           soundId: json['s'] as String,
           label: json['l'] as String? ?? '',
+          target: SoundTarget.fromWire(json['tg'] as String?),
           emoji: emoji,
           customIconId: customIconId,
         ),
@@ -462,6 +463,29 @@ enum ShellKind {
       if (kind.wire == wire) return kind;
     }
     return ShellKind.sh;
+  }
+}
+
+/// Where a [PlaySoundItem] plays.
+enum SoundTarget {
+  /// The phone's own speaker; the press never reaches the host.
+  client('c'),
+
+  /// The host's speakers, like any other host-side button.
+  host('h');
+
+  const SoundTarget(this.wire);
+
+  final String wire;
+
+  /// Falls back to [client] for a missing or unrecognised value — the only
+  /// target there was before this existed, so an older layout keeps
+  /// playing where it always did.
+  static SoundTarget fromWire(String? wire) {
+    for (final target in values) {
+      if (target.wire == wire) return target;
+    }
+    return SoundTarget.client;
   }
 }
 
@@ -644,7 +668,7 @@ final class OpenUrlItem extends DeckItem {
   });
 }
 
-/// Plays a sound on the client — the phone's own speaker, not the host's.
+/// Plays a sound, on the phone or on the host depending on [target].
 ///
 /// [soundId] names an audio file the host stored when the button was made,
 /// transferred and cached exactly like an icon (see [RequestIcon] and
@@ -652,17 +676,20 @@ final class OpenUrlItem extends DeckItem {
 /// file's extension (`snd_123.mp3`), which the client's player needs to
 /// know the format.
 ///
-/// Pressing one never reaches the host: the client plays its cached copy
-/// itself, so it works the same whichever host command it sits next to.
+/// With [SoundTarget.client], pressing one never reaches the host: the
+/// client plays its cached copy itself. With [SoundTarget.host] it is an
+/// ordinary press, and the host plays its own copy.
 final class PlaySoundItem extends DeckItem {
   const PlaySoundItem({
     required this.soundId,
     required this.label,
+    this.target = SoundTarget.client,
     this.emoji,
     this.customIconId,
   });
 
   final String soundId;
+  final SoundTarget target;
 
   @override
   final String label;
@@ -678,6 +705,9 @@ final class PlaySoundItem extends DeckItem {
     't': 'snd',
     's': soundId,
     'l': label,
+    // Omitted for the default, so a phone-side sound stores exactly as it
+    // did before hosts could play them too.
+    if (target != SoundTarget.client) 'tg': target.wire,
     if (emoji != null) 'e': emoji,
     if (customIconId != null) 'ci': customIconId,
   });

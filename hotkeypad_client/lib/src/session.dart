@@ -206,6 +206,10 @@ class HotkeyPadSession extends ChangeNotifier {
   /// at a time — true of a finger on a deck. A second press before the first
   /// answers simply takes over the slot.
   String? _pressing;
+
+  /// A press sent without the pressing overlay — a sound played on the host
+  /// (see [press]) — whose ack still flashes the button red if it fails.
+  String? _quietPress;
   String? _feedbackFor;
   bool? _feedbackOk;
   Timer? _feedbackTimer;
@@ -359,7 +363,18 @@ class HotkeyPadSession extends ChangeNotifier {
       case Ack(:final ok, :final message):
         _lastAck = message;
         _append('${ok ? 'ok' : 'error'}: $message', inbound: true);
-        _settlePress(ok);
+        final quiet = _quietPress;
+        _quietPress = null;
+        if (_pressing == null && quiet != null) {
+          // Nothing to settle on success; a failure still shows, the same
+          // way any other button's does.
+          if (!ok) {
+            _pressing = quiet;
+            _settlePress(false);
+          }
+        } else {
+          _settlePress(ok);
+        }
       case DebugText(:final text):
         _append(text, inbound: true);
       case LayoutStart(:final columns, :final rows, :final pages):
@@ -936,11 +951,20 @@ class HotkeyPadSession extends ChangeNotifier {
   /// layout, so a button holding a shell command cannot be conjured from
   /// this end of the link.
   ///
-  /// A [PlaySoundItem] is the exception: it plays here, on this phone, from
-  /// the copy the host sent over, and never reaches the host at all.
+  /// A [PlaySoundItem] is the exception. One that plays on the phone plays
+  /// here, from the copy the host sent over, and never reaches the host at
+  /// all; one that plays on the host is sent, but without the overlay.
   Future<void> press(int id, DeckItem item) async {
     if (item is PlaySoundItem) {
-      await _playSound(item);
+      if (item.target == SoundTarget.client) {
+        await _playSound(item);
+      } else {
+        // Played by the host, but tapped like a soundboard all the same:
+        // no overlay to cover the button between rapid presses.
+        _append(item.label, inbound: false);
+        _quietPress = item.stored;
+        await _send(PressSlot(id: id));
+      }
       return;
     }
 

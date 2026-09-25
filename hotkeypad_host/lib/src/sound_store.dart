@@ -102,6 +102,14 @@ abstract final class SoundStore {
     }
   }
 
+  /// Where [id]'s file lives on disk, for playing it here; null if [id]
+  /// is not one this store hands out.
+  static String? pathFor(String id) {
+    final directory = _directory;
+    if (directory == null || !isSoundId(id)) return null;
+    return '${directory.path}/$id';
+  }
+
   static Future<Uint8List?> read(String id) async {
     final directory = _directory;
     if (directory == null || !isSoundId(id)) return null;

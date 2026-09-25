@@ -250,6 +250,26 @@ void main() {
       expect(parsed.label, 'Applause');
     });
 
+    test('a sound plays on the phone unless told otherwise', () {
+      const phone = PlaySoundItem(soundId: 'snd_1.mp3', label: 'A');
+      const host = PlaySoundItem(
+        soundId: 'snd_1.mp3',
+        label: 'A',
+        target: SoundTarget.host,
+      );
+
+      expect(
+        (DeckItem.parse(phone.stored) as PlaySoundItem).target,
+        SoundTarget.client,
+      );
+      expect(
+        (DeckItem.parse(host.stored) as PlaySoundItem).target,
+        SoundTarget.host,
+      );
+      // The default stores exactly as it did before targets existed.
+      expect(phone.stored.contains('tg'), isFalse);
+    });
+
     test('an emoji survives on an app or an action', () {
       const app = AppItem('Safari', emoji: '🧭');
       const action = ActionItem(DeckAction.mute, emoji: '🔇');
