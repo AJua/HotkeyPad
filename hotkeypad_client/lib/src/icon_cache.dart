@@ -45,15 +45,20 @@ abstract final class IconCache {
   /// by app name alone, with no way to tell the old bytes are outdated.
   /// v2: the host trims macOS icons' transparent margin (see the host's
   /// IconTrim), so they fill the button.
+  /// A change of [HotkeyPad.iconSize] alone needs no bump — it is part of
+  /// the key already.
   static const _renderVersion = 2;
 
   static String _fileName(String appName) =>
       '${_safe(appName)}@${HotkeyPad.iconSize}v$_renderVersion';
 
-  /// Names earlier render versions used for [appName], discarded on a miss
-  /// the same way [_discardLegacyEntry] drops the older prefs copies.
+  /// Names earlier builds used for [appName] — older render versions and
+  /// the old 128px icon size — discarded on a miss the same way
+  /// [_discardLegacyEntry] drops the older prefs copies. Spelled out rather
+  /// than derived from the current constants, which no longer match them.
   static List<String> _staleFileNames(String appName) => [
-    '${_safe(appName)}@${HotkeyPad.iconSize}',
+    '${_safe(appName)}@128',
+    '${_safe(appName)}@128v2',
   ];
 
   static Future<Uint8List?> read(String hostId, String appName) async {

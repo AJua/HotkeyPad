@@ -134,12 +134,13 @@ abstract final class CustomIconStore {
   static const _shadowOffset = 10 / 1024;
   static const _shadowBlur = 10 / 1024;
 
-  /// Extra margin, in output pixels per side, after trimming. This plate's
+  /// Extra margin per side after trimming, in output pixels. This plate's
   /// shadow is shorter than the one baked into real macOS icons, so trimming
   /// it leaves a narrower margin and the plate came out wider than Chrome's
-  /// (~119px at 128). Tuned by eye on a real deck, to a 118px plate — a
-  /// touch smaller than Chrome's, which read as right next to it.
-  static const _plateTrimInset = 1.5;
+  /// (~119px at a 128px icon). Tuned by eye on a real deck to 1.5px at
+  /// 128 — a 118px plate, a touch smaller than Chrome's, which read as
+  /// right next to it — and scaled with the icon size from there.
+  static const _plateTrimInset = HotkeyPad.iconSize * 1.5 / 128;
 
   /// How much of the plate the logo's longer side may take. A real icon's
   /// artwork stops short of the plate's edge too (Chrome's circle does);

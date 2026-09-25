@@ -40,13 +40,14 @@ abstract final class HotkeyPad {
   /// Points square for a rendered app icon.
   ///
   /// Deck buttons fill their whole tappable area with the icon, so on a 3x
-  /// phone screen this is scaled to roughly 300 physical pixels; 64px was
-  /// visibly soft there. The cost is ~15KB per icon instead of ~5KB, paid
-  /// once because the client caches them.
+  /// phone screen this is scaled to roughly 300 physical pixels; 64px and
+  /// then 128px were both visibly soft there, a detailed custom picture
+  /// especially. The cost is a few times the bytes per icon, paid once
+  /// because the client caches them.
   ///
   /// The client's cache keys include this number, so changing it invalidates
   /// stored icons rather than leaving stale ones at the old resolution.
-  static const iconSize = 128;
+  static const iconSize = 256;
 
   /// The ice-blue from the app icon's own bolt (`#38BDF8`) — both apps'
   /// `ThemeData.colorSchemeSeed`, so the generated app bar/surface colors
