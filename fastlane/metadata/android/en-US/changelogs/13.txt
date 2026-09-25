@@ -1,0 +1,1 @@
+Button icons are sharper: they now come over at twice the resolution. Icons are downloaded again once after updating.
