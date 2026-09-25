@@ -1,0 +1,1 @@
+Sound buttons can now play on your computer as well as on the phone, depending on how they're set up on the host.
