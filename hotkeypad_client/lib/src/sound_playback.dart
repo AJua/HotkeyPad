@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -11,32 +12,47 @@ import 'package:path_provider/path_provider.dart';
 /// the sound id keeps its extension (`snd_123.mp3`), which the platform
 /// player relies on to recognise the format — and plays that file.
 ///
-/// Pressing a button whose sound is still playing stops it instead of
-/// starting a second copy on top: a long clip needs a way to be cut short,
-/// and the button that started it is the obvious one.
+/// Every press starts a fresh copy, overlapping whatever is already
+/// playing, so hammering a soundboard button stacks up the sound the way a
+/// physical one does. Each copy gets its own player, released when it
+/// finishes; past [maxConcurrent] the oldest still playing is cut off, so
+/// a burst of presses can't pile up players without bound.
 class SoundPlayback {
   SoundPlayback._();
 
   static final instance = SoundPlayback._();
 
-  final _players = <String, AudioPlayer>{};
+  static const maxConcurrent = 8;
 
-  /// Plays [soundId] from [bytes], or stops it if it is already playing.
-  /// Returns false only if playback could not start.
-  Future<bool> toggle(String soundId, Uint8List bytes) async {
-    final current = _players[soundId];
-    if (current != null && current.state == PlayerState.playing) {
-      await current.stop();
-      return true;
-    }
+  /// Players still sounding, oldest first.
+  final _active = <AudioPlayer>[];
+
+  /// Starts [soundId] from [bytes]. Returns false only if playback could
+  /// not start.
+  Future<bool> play(String soundId, Uint8List bytes) async {
+    final player = AudioPlayer();
     try {
       final file = await _fileFor(soundId, bytes);
-      final player = current ?? AudioPlayer();
-      _players[soundId] = player;
+      if (_active.length >= maxConcurrent) {
+        unawaited(_release(_active.first));
+      }
+      _active.add(player);
+      player.onPlayerComplete.first.then((_) => _release(player));
       await player.play(DeviceFileSource(file.path));
       return true;
     } catch (_) {
+      _active.remove(player);
+      unawaited(player.dispose());
       return false;
+    }
+  }
+
+  Future<void> _release(AudioPlayer player) async {
+    if (!_active.remove(player)) return;
+    try {
+      await player.dispose();
+    } catch (_) {
+      // Already torn down; nothing left to release.
     }
   }
 

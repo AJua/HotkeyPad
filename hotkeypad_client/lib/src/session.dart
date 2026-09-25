@@ -939,17 +939,17 @@ class HotkeyPadSession extends ChangeNotifier {
   /// A [PlaySoundItem] is the exception: it plays here, on this phone, from
   /// the copy the host sent over, and never reaches the host at all.
   Future<void> press(int id, DeckItem item) async {
+    if (item is PlaySoundItem) {
+      await _playSound(item);
+      return;
+    }
+
     _feedbackTimer?.cancel();
     _feedbackFor = null;
     _feedbackOk = null;
     _pressing = item.stored;
     _append(item.label, inbound: false);
     notifyListeners();
-
-    if (item is PlaySoundItem) {
-      await _playSound(item.soundId);
-      return;
-    }
 
     await _send(PressSlot(id: id));
 
@@ -959,21 +959,33 @@ class HotkeyPadSession extends ChangeNotifier {
     });
   }
 
-  Future<void> _playSound(String soundId) async {
+  /// Plays [item]'s sound, stacking on top of any copy already playing.
+  ///
+  /// Unlike every other press this shows nothing on the button when it
+  /// works: the sound itself is the feedback, and the pressing/tick overlay
+  /// would cover the button through exactly the rapid repeat taps a
+  /// soundboard gets. Only a failure is shown, the usual way.
+  Future<void> _playSound(PlaySoundItem item) async {
+    _append(item.label, inbound: false);
     // Normally already here: DeckPage fetches a sound as soon as its button
     // is on screen. This covers a press that beats the transfer.
-    await ensureIcon(soundId);
-    final bytes = _icons[soundId];
+    await ensureIcon(item.soundId);
+    final bytes = _icons[item.soundId];
+    final String? failure;
     if (bytes == null) {
-      _lastAck =
+      failure =
           'This sound is still arriving from the host — try again in '
           'a moment';
-      _settlePress(false);
-      return;
+    } else if (!await SoundPlayback.instance.play(item.soundId, bytes)) {
+      failure = 'Could not play this sound';
+    } else {
+      failure = null;
     }
-    final ok = await SoundPlayback.instance.toggle(soundId, bytes);
-    if (!ok) _lastAck = 'Could not play this sound';
-    _settlePress(ok);
+    if (failure == null) return;
+    _feedbackTimer?.cancel();
+    _lastAck = failure;
+    _pressing = item.stored;
+    _settlePress(false);
   }
 
   void _settlePress(bool ok) {
