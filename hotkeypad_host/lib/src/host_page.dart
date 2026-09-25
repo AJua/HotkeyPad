@@ -24,6 +24,7 @@ import 'locale_store.dart';
 import 'media_control.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'settings_store.dart';
+import 'sound_store.dart';
 import 'unsupported_page.dart';
 import 'update_checker.dart';
 import 'update_store.dart';
@@ -1090,6 +1091,13 @@ class _HostPageState extends State<HostPage> {
     ),
     ShortcutItem(:final name) => CommandRunner.shortcut(name),
     OpenUrlItem(:final url) => CommandRunner.openUrl(url),
+    // Played by the client itself, which never sends a press for one (see
+    // its Session.press) — reaching here means an older client, or a combo
+    // step, neither of which can play it.
+    PlaySoundItem() => Future.value((
+      ok: false,
+      message: 'Sounds play on the phone; update HotkeyPad there',
+    )),
     KeyComboItem() => CommandRunner.keyCombo(
       modifiers: item.modifiers,
       key: item.key,
@@ -1203,7 +1211,8 @@ class _HostPageState extends State<HostPage> {
         : await CustomIconStore.read(id) ??
               await BackgroundImageStore.read(id) ??
               await BuiltinBackgroundStore.render(id) ??
-              await GlyphIconStore.render(id);
+              await GlyphIconStore.render(id) ??
+              await SoundStore.read(id);
     if (png == null) {
       await _send(clientId, IconUnavailable(name: id));
       return;

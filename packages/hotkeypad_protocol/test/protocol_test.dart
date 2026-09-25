@@ -242,6 +242,14 @@ void main() {
       );
     });
 
+    test('round-trips a sound by its id and label', () {
+      const item = PlaySoundItem(soundId: 'snd_1.mp3', label: 'Applause');
+
+      final parsed = DeckItem.parse(item.stored) as PlaySoundItem;
+      expect(parsed.soundId, 'snd_1.mp3');
+      expect(parsed.label, 'Applause');
+    });
+
     test('an emoji survives on an app or an action', () {
       const app = AppItem('Safari', emoji: '🧭');
       const action = ActionItem(DeckAction.mute, emoji: '🔇');
@@ -263,6 +271,11 @@ void main() {
         ShellItem(command: 'say hi', label: 'Hi', customIconId: 'img_3'),
         ShortcutItem(name: 'Start focus', customIconId: 'img_4'),
         OpenUrlItem(url: 'https://example.com', customIconId: 'img_6'),
+        PlaySoundItem(
+          soundId: 'snd_1.mp3',
+          label: 'Applause',
+          customIconId: 'img_7',
+        ),
         KeyComboItem(
           modifiers: [],
           key: '4',

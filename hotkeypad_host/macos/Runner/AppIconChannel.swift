@@ -2,9 +2,9 @@ import AppKit
 import FlutterMacOS
 import UniformTypeIdentifiers
 
-/// Serves application icons, lets the user pick their own image, and backs
-/// the Save/Open panels behind exporting and importing a settings backup —
-/// all on the Dart side.
+/// Serves application icons, lets the user pick their own image or a sound
+/// file, and backs the Save/Open panels behind exporting and importing a
+/// settings backup — all on the Dart side.
 ///
 /// `NSWorkspace.icon(forFile:)` is used rather than reading `CFBundleIconFile`
 /// out of Info.plist: modern apps ship their icon inside `Assets.car`, where
@@ -28,6 +28,8 @@ enum AppIconChannel {
                 handlePickSaveLocation(call, result)
             case "pickOpenFile":
                 handlePickOpenFile(result)
+            case "pickAudio":
+                handlePickAudio(result)
             default:
                 result(FlutterMethodNotImplemented)
             }
@@ -123,6 +125,27 @@ enum AppIconChannel {
         panel.allowsMultipleSelection = false
         if #available(macOS 11.0, *) {
             panel.allowedContentTypes = [.json]
+        }
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else {
+                result(nil)
+                return
+            }
+            result(url.path)
+        }
+    }
+
+    /// Opens a native "Open" panel restricted to audio files, for a
+    /// play-sound button. Resolves to the chosen path, or null if the user
+    /// cancelled — the path, not the bytes, since the button plays the file
+    /// from where it is.
+    private static func handlePickAudio(_ result: @escaping FlutterResult) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if #available(macOS 11.0, *) {
+            panel.allowedContentTypes = [.audio]
         }
         panel.begin { response in
             guard response == .OK, let url = panel.url else {

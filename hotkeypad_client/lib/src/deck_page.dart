@@ -1272,6 +1272,11 @@ class _DeckPageState extends State<DeckPage> {
                       if (iconKey != null) {
                         unawaited(session.ensureIcon(iconKey));
                       }
+                      // Fetched ahead of the first press, the same way as
+                      // an icon, so the sound is ready when it is wanted.
+                      if (item case PlaySoundItem(:final soundId)) {
+                        unawaited(session.ensureIcon(soundId));
+                      }
                       return _DeckButton(
                         item: item,
                         icon: iconKey == null ? null : session.iconFor(iconKey),

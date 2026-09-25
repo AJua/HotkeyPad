@@ -15,6 +15,7 @@ import 'deck_icons.dart';
 import 'favicon_fetcher.dart';
 import 'layout_store.dart';
 import 'settings_store.dart';
+import 'sound_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
 /// Where the Settings dialog's "Report an issue" entry sends the user.
@@ -144,6 +145,7 @@ String? currentButtonSummary(String? stored) {
     KeyComboItem(:final combination) => 'Sends $combination',
     ShortcutItem(:final name) => 'Runs the "$name" Shortcut',
     OpenUrlItem(:final url) => 'Opens $url in Chrome',
+    PlaySoundItem(:final label) => 'Plays "$label" on the phone',
     ComboItem(:final steps) => 'Runs ${steps.length} steps',
     WidgetItem(:final kind, :final rowSpan, :final columnSpan) =>
       '${kind.label} widget (${rowSpan}x$columnSpan)',
@@ -197,6 +199,12 @@ DeckItem withIconOverride(
   OpenUrlItem(:final url) => OpenUrlItem(
     url: url,
     label: item.label,
+    emoji: emoji,
+    customIconId: customIconId,
+  ),
+  PlaySoundItem(:final soundId, :final label) => PlaySoundItem(
+    soundId: soundId,
+    label: label,
     emoji: emoji,
     customIconId: customIconId,
   ),
@@ -1517,6 +1525,20 @@ class _PickerDialogState extends State<_PickerDialog> {
     _choose(item);
   }
 
+  Future<void> _composeSound() async {
+    final existing = _existing;
+    final item = await showDialog<PlaySoundItem>(
+      context: context,
+      builder: (context) => _SoundDialog(
+        existing: existing is PlaySoundItem ? existing : null,
+        emoji: _emoji,
+        customIconId: _customIconId,
+      ),
+    );
+    if (item == null || !mounted) return;
+    _choose(item);
+  }
+
   Future<void> _composeCombo() async {
     final existing = _existing;
     final item = await showDialog<ComboItem>(
@@ -1681,6 +1703,15 @@ class _PickerDialogState extends State<_PickerDialog> {
                       subtitle: const Text('Opens in Chrome on this Mac'),
                       onTap: _composeUrl,
                     ),
+                    // Not a combo step: a sound plays on the phone, and a
+                    // combo runs on this Mac.
+                    if (widget.allowCombo && SoundStore.supported)
+                      ListTile(
+                        leading: const Icon(Icons.music_note),
+                        title: const Text('Play sound...'),
+                        subtitle: const Text('Plays on the phone'),
+                        onTap: _composeSound,
+                      ),
                     if (widget.allowCombo)
                       ListTile(
                         leading: const Icon(Icons.playlist_play),
@@ -2451,6 +2482,182 @@ class _UrlDialogState extends State<_UrlDialog> {
               : const Text('Add'),
         ),
       ],
+    );
+  }
+}
+
+/// Composes a "play sound" button: an audio file copied into [SoundStore]
+/// and what to call it, plus an optional emoji or custom image carried over
+/// from the picker.
+class _SoundDialog extends StatefulWidget {
+  const _SoundDialog({
+    required this.existing,
+    required this.emoji,
+    required this.customIconId,
+  });
+
+  final PlaySoundItem? existing;
+  final String? emoji;
+  final String? customIconId;
+
+  @override
+  State<_SoundDialog> createState() => _SoundDialogState();
+}
+
+class _SoundDialogState extends State<_SoundDialog> {
+  late final _label = TextEditingController(text: widget.existing?.label ?? '');
+
+  /// The sound the button will play: the existing one until a new file is
+  /// picked.
+  late String? _soundId = widget.existing?.soundId;
+
+  /// The picked file's name, shown so the user can see what they chose.
+  String? _fileName;
+  String? _error;
+  bool _importing = false;
+
+  @override
+  void dispose() {
+    _label.dispose();
+    super.dispose();
+  }
+
+  /// Whether [_soundId] was imported by this dialog, so is this dialog's to
+  /// clean up if it ends up unused.
+  bool get _ownsSound =>
+      _soundId != null && _soundId != widget.existing?.soundId;
+
+  Future<void> _pick() async {
+    final path = await SoundStore.pick();
+    if (path == null || !mounted) return;
+    setState(() {
+      _importing = true;
+      _error = null;
+    });
+    final result = await SoundStore.import(path);
+    if (!mounted) return;
+    final imported = result.id;
+    if (imported == null) {
+      setState(() {
+        _importing = false;
+        _error = result.error;
+      });
+      return;
+    }
+    if (_ownsSound) unawaited(SoundStore.delete(_soundId!));
+    setState(() {
+      _importing = false;
+      _soundId = imported;
+      _fileName = path.split('/').last;
+      if (_label.text.trim().isEmpty) _label.text = SoundStore.labelFor(path);
+    });
+  }
+
+  /// However the dialog closes without saving — Cancel, Escape, a tap
+  /// outside — a file imported here and never used is deleted.
+  void _onPopped(bool didPop, PlaySoundItem? saved) {
+    if (didPop && saved == null && _ownsSound) {
+      unawaited(SoundStore.delete(_soundId!));
+    }
+  }
+
+  void _save() {
+    final soundId = _soundId;
+    if (soundId == null) return;
+    final previous = widget.existing?.soundId;
+    if (previous != null && previous != soundId) {
+      unawaited(SoundStore.delete(previous));
+    }
+    final label = _label.text.trim();
+    Navigator.of(context).pop(
+      PlaySoundItem(
+        soundId: soundId,
+        label: label.isEmpty ? 'Sound' : label,
+        emoji: widget.emoji ?? widget.existing?.emoji,
+        customIconId: widget.customIconId ?? widget.existing?.customIconId,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final chosen = _fileName ?? (_soundId == null ? null : 'Current sound');
+    return PopScope<PlaySoundItem>(
+      onPopInvokedWithResult: _onPopped,
+      child: AlertDialog(
+        title: const Text('Play sound'),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _importing ? null : _pick,
+                    icon: _importing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.audio_file),
+                    label: Text(
+                      _soundId == null ? 'Choose file...' : 'Change...',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      chosen ?? 'No file chosen',
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _label,
+                onSubmitted: (_) => _save(),
+                decoration: const InputDecoration(
+                  labelText: 'Button label',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Plays on the phone\'s own speaker. The file is copied to this '
+                'Mac and sent to the phone once, then kept there; up to '
+                '${SoundStore.maxBytes ~/ (1024 * 1024)} MB.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _soundId == null || _importing ? null : _save,
+            child: Text(widget.existing == null ? 'Add' : 'Save'),
+          ),
+        ],
+      ),
     );
   }
 }

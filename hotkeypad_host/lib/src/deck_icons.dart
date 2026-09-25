@@ -21,6 +21,7 @@ IconData deckFallbackIcon(DeckItem item) => switch (item) {
   KeyComboItem() => Icons.keyboard,
   ShortcutItem() => Icons.bolt,
   OpenUrlItem() => Icons.open_in_browser,
+  PlaySoundItem() => Icons.music_note,
   ComboItem() => Icons.playlist_play,
   ActionItem(:final action) => switch (action) {
     DeckAction.playPause => Icons.play_arrow,

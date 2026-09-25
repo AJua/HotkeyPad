@@ -45,6 +45,7 @@ dependencies:
   hotkeypad_protocol:
     path: ../packages/hotkeypad_protocol
   flutter_zxing: ^3.0.1
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:

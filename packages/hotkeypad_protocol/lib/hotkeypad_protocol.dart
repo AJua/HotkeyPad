@@ -316,6 +316,12 @@ sealed class DeckItem {
           emoji: emoji,
           customIconId: customIconId,
         ),
+        'snd' => PlaySoundItem(
+          soundId: json['s'] as String,
+          label: json['l'] as String? ?? '',
+          emoji: emoji,
+          customIconId: customIconId,
+        ),
         'combo' => ComboItem.fromSteps(
           json['steps'] as List? ?? const [],
           label: json['l'] as String? ?? '',
@@ -633,6 +639,45 @@ final class OpenUrlItem extends DeckItem {
     't': 'url',
     'u': url,
     if (_label != null) 'l': _label,
+    if (emoji != null) 'e': emoji,
+    if (customIconId != null) 'ci': customIconId,
+  });
+}
+
+/// Plays a sound on the client — the phone's own speaker, not the host's.
+///
+/// [soundId] names an audio file the host stored when the button was made,
+/// transferred and cached exactly like an icon (see [RequestIcon] and
+/// [IconFrame]; an id is an opaque string to that transfer). It keeps the
+/// file's extension (`snd_123.mp3`), which the client's player needs to
+/// know the format.
+///
+/// Pressing one never reaches the host: the client plays its cached copy
+/// itself, so it works the same whichever host command it sits next to.
+final class PlaySoundItem extends DeckItem {
+  const PlaySoundItem({
+    required this.soundId,
+    required this.label,
+    this.emoji,
+    this.customIconId,
+  });
+
+  final String soundId;
+
+  @override
+  final String label;
+
+  @override
+  final String? emoji;
+
+  @override
+  final String? customIconId;
+
+  @override
+  String get stored => jsonEncode({
+    't': 'snd',
+    's': soundId,
+    'l': label,
     if (emoji != null) 'e': emoji,
     if (customIconId != null) 'ci': customIconId,
   });

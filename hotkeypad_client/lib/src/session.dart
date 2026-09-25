@@ -14,6 +14,7 @@ import 'device_info.dart';
 import 'host_history_store.dart';
 import 'icon_cache.dart';
 import 'link_target.dart';
+import 'sound_playback.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
 /// True for a [SocketException] from a DNS lookup that will never
@@ -934,6 +935,9 @@ class HotkeyPadSession extends ChangeNotifier {
   /// The id, not the contents: the host looks the slot up in its own
   /// layout, so a button holding a shell command cannot be conjured from
   /// this end of the link.
+  ///
+  /// A [PlaySoundItem] is the exception: it plays here, on this phone, from
+  /// the copy the host sent over, and never reaches the host at all.
   Future<void> press(int id, DeckItem item) async {
     _feedbackTimer?.cancel();
     _feedbackFor = null;
@@ -942,12 +946,34 @@ class HotkeyPadSession extends ChangeNotifier {
     _append(item.label, inbound: false);
     notifyListeners();
 
+    if (item is PlaySoundItem) {
+      await _playSound(item.soundId);
+      return;
+    }
+
     await _send(PressSlot(id: id));
 
     // A host that never answers must not leave the button spinning.
     _feedbackTimer = Timer(const Duration(seconds: 12), () {
       if (_pressing != null) _settlePress(false);
     });
+  }
+
+  Future<void> _playSound(String soundId) async {
+    // Normally already here: DeckPage fetches a sound as soon as its button
+    // is on screen. This covers a press that beats the transfer.
+    await ensureIcon(soundId);
+    final bytes = _icons[soundId];
+    if (bytes == null) {
+      _lastAck =
+          'This sound is still arriving from the host — try again in '
+          'a moment';
+      _settlePress(false);
+      return;
+    }
+    final ok = await SoundPlayback.instance.toggle(soundId, bytes);
+    if (!ok) _lastAck = 'Could not play this sound';
+    _settlePress(ok);
   }
 
   void _settlePress(bool ok) {
