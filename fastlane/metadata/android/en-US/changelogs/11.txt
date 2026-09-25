@@ -1,0 +1,1 @@
+Sound buttons can be tapped as fast as you like: each tap plays the sound again on top of the last.
