@@ -77,9 +77,16 @@ abstract final class CustomIconStore {
   ///   plate's shape — see [_drawPictureAsPlate]. A plain resize would
   ///   squash a non-square source rather than crop it.
   ///
+  /// [plateColor] is the plate a logo is placed on — white unless the caller
+  /// wants otherwise (see `saveEmojiIcon`). An opaque picture covers its
+  /// plate entirely, so it ignores this.
+  ///
   /// Public, not an implementation detail of [pickAndProcess], so it can be
   /// tested directly against synthetic images without a real file picker.
-  static Future<Uint8List?> cropToSquarePng(Uint8List bytes) async {
+  static Future<Uint8List?> cropToSquarePng(
+    Uint8List bytes, {
+    Color plateColor = const Color(0xFFFFFFFF),
+  }) async {
     final Image source;
     try {
       source = await ImageDecode.decodeAny(bytes);
@@ -103,7 +110,13 @@ abstract final class CustomIconStore {
       final recorder = PictureRecorder();
       final canvas = Canvas(recorder);
       if (logoBounds != null) {
-        _drawLogoOnPlate(canvas, source, logoBounds, canvasSize.toDouble());
+        _drawLogoOnPlate(
+          canvas,
+          source,
+          logoBounds,
+          canvasSize.toDouble(),
+          plateColor,
+        );
       } else {
         _drawPictureAsPlate(canvas, source, canvasSize.toDouble());
       }
@@ -173,7 +186,7 @@ abstract final class CustomIconStore {
     );
   }
 
-  /// Draws a white Big Sur-style plate with its drop shadow, then [source]'s
+  /// Draws a [plateColor] Big Sur-style plate with its drop shadow, then [source]'s
   /// [logoBounds] — the logo with its own transparent margin trimmed off —
   /// scaled to fit inside it without cropping, centred. A wide logo like
   /// Gmail's envelope keeps both of its sides this way, where
@@ -183,11 +196,12 @@ abstract final class CustomIconStore {
     Image source,
     Rect logoBounds,
     double size,
+    Color plateColor,
   ) {
     final plateShape = _plateShape(size);
     final plate = plateShape.outerRect;
     _drawPlateShadow(canvas, plateShape, size);
-    canvas.drawRRect(plateShape, Paint()..color = const Color(0xFFFFFFFF));
+    canvas.drawRRect(plateShape, Paint()..color = plateColor);
 
     final maxSide = plate.width * _logoFraction;
     final scale = logoBounds.width > logoBounds.height

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:hotkeypad_host/src/alpha_bounds.dart';
+import 'package:hotkeypad_host/src/custom_icon_store.dart';
 import 'package:hotkeypad_host/src/glyph_icon_store.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +22,20 @@ Future<({int width, int height})> _decodedSize(Uint8List bytes) async {
   } finally {
     frame.image.dispose();
   }
+}
+
+Future<Uint8List> _solidPng(int width, int height) async {
+  final recorder = ui.PictureRecorder();
+  ui.Canvas(recorder).drawRect(
+    ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+    ui.Paint()..color = const ui.Color(0xFF3366CC),
+  );
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(width, height);
+  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  picture.dispose();
+  return data!.buffer.asUint8List();
 }
 
 void main() {
@@ -45,6 +61,43 @@ void main() {
 
       expect(size.width, 64);
       expect(size.height, 64);
+    });
+
+    test('grows to hold text wider than the requested size', () async {
+      final png = await GlyphIconStore.renderEmojiPng('ABCDEF', size: 64);
+      final size = await _decodedSize(png);
+
+      expect(size.width, greaterThan(64));
+      expect(size.width, size.height);
+    });
+
+    test('on the plate, matches a picked picture in size and shape', () async {
+      Future<ui.Rect?> plateBounds(Uint8List png) async {
+        final codec = await ui.instantiateImageCodec(png);
+        final frame = await codec.getNextFrame();
+        try {
+          final rgba = await frame.image.toByteData(
+            format: ui.ImageByteFormat.rawRgba,
+          );
+          return AlphaBounds.opaqueBounds(
+            rgba!.buffer.asUint8List(),
+            frame.image.width,
+            frame.image.height,
+            threshold: 250,
+          );
+        } finally {
+          frame.image.dispose();
+        }
+      }
+
+      final emoji = await CustomIconStore.cropToSquarePng(
+        await GlyphIconStore.renderEmojiPng('ABCDEFGH', size: 128),
+      );
+      final picture = await CustomIconStore.cropToSquarePng(
+        await _solidPng(64, 64),
+      );
+
+      expect(await plateBounds(emoji!), await plateBounds(picture!));
     });
   });
 

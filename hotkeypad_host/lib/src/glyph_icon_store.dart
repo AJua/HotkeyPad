@@ -53,20 +53,16 @@ abstract final class GlyphIconStore {
     return _renderActionSvg(action, size: size);
   }
 
-  /// A fixed dark colour rather than something theme-aware: an emoji's own
-  /// colours are what it is drawn for, so this only ever paints the
-  /// invisible-until-something-goes-wrong fallback glyph a font substitutes
-  /// when it cannot render the requested emoji at all, plus the border —
-  /// [HotkeyPad.themeSeedColor] stays visible against either theme's
-  /// background, unlike a plain dark grey.
-  static const _emojiColor = HotkeyPad.themeSeedColor;
+  /// Colour for anything typed that is not a colour emoji — plain letters
+  /// or CJK text. An emoji's own colours are what it is drawn for; this
+  /// only paints the rest, which ends up on `CustomIconStore`'s white plate
+  /// (see `saveEmojiIcon`), so it is the same near-black a picked image of
+  /// text would typically use.
+  static const _emojiColor = Color(0xFF1C1C1E);
 
-  /// Border width and corner rounding as a fraction of `size`, matching
-  /// [CustomIconStore]'s `cornerRadius` convention (`size * 0.18`) so a
-  /// glyph icon reads as the same rounded-square shape as every other icon
-  /// on a deck — this is the one shape with no bitmap of its own to imply
-  /// that shape, so it is drawn explicitly. Shared between the emoji PNG
-  /// and the action SVG so the two look consistent next to each other.
+  /// Border width and corner rounding of an action's SVG glyph, as a
+  /// fraction of `size` — this is the one shape with no bitmap of its own
+  /// to imply a rounded square, so it is drawn explicitly.
   static const _borderWidthFraction = 0.0297; // 66% of the original 0.045
   static const _cornerRadiusFraction = 0.18;
 
@@ -75,8 +71,18 @@ abstract final class GlyphIconStore {
   /// the edge of whatever box eventually displays it.
   static const _marginPx = 3.0;
 
-  /// [emoji] drawn centred inside the same rounded border an action's
-  /// glyph gets, as a [size]-pixel square PNG.
+  /// [emoji] alone — no plate, no border — centred on a transparent
+  /// square PNG at least [size] pixels across, grown to hold all of it when
+  /// it is wider than that (a few letters, say) instead of cutting it off.
+  /// Nothing is shrunk here, so a long string keeps its full resolution;
+  /// fitting it to the icon is the plate step's job (see below), which
+  /// scales whatever was typed — one emoji or several words — to the same
+  /// share of the plate.
+  ///
+  /// Deliberately bare: `saveEmojiIcon` hands this to
+  /// `CustomIconStore.cropToSquarePng`, whose logo path trims the
+  /// transparent margin and places the glyph on the same Big Sur plate a
+  /// picked image gets, so both end up the same size and shape on a deck.
   static Future<Uint8List> renderEmojiPng(
     String emoji, {
     int size = HotkeyPad.iconSize,
@@ -92,26 +98,17 @@ abstract final class GlyphIconStore {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    final borderWidth = size * _borderWidthFraction;
-    final inset = _marginPx + borderWidth / 2;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(inset, inset, size - inset * 2, size - inset * 2),
-        Radius.circular(size * _cornerRadiusFraction),
-      ),
-      Paint()
-        ..color = _emojiColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = borderWidth,
-    );
-
+    final longest = painter.width > painter.height
+        ? painter.width
+        : painter.height;
+    final side = longest > size ? longest.ceil() : size;
     painter.paint(
       canvas,
-      Offset((size - painter.width) / 2, (size - painter.height) / 2),
+      Offset((side - painter.width) / 2, (side - painter.height) / 2),
     );
     final picture = recorder.endRecording();
     try {
-      final image = await picture.toImage(size, size);
+      final image = await picture.toImage(side, side);
       try {
         final data = await image.toByteData(format: ui.ImageByteFormat.png);
         return data!.buffer.asUint8List();
