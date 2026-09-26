@@ -1615,8 +1615,9 @@ class _DeckButton extends StatelessWidget {
                       clipBehavior: showIconBackground
                           ? Clip.antiAlias
                           : Clip.none,
-                      // Every icon — an app's, a custom image, an emoji, or
-                      // an action's built-in glyph — is rendered by the
+                      // Every icon — an app's, a custom image (an emoji
+                      // included), or an action's built-in glyph — is
+                      // rendered by the
                       // host (see iconKeyFor/GlyphIconStore), so this only
                       // ever has to decide between real bytes and a
                       // placeholder, never what kind of icon it is — with

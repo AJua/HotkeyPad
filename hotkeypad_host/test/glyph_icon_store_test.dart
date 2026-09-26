@@ -24,8 +24,8 @@ Future<({int width, int height})> _decodedSize(Uint8List bytes) async {
 
 void main() {
   group('GlyphIconStore.handles', () {
-    test('claims an emoji id', () {
-      expect(GlyphIconStore.handles('emoji:😀'), isTrue);
+    test('no longer claims an emoji id — emoji are saved as custom icons', () {
+      expect(GlyphIconStore.handles('emoji:😀'), isFalse);
     });
 
     test('claims an action id', () {
@@ -38,15 +38,17 @@ void main() {
     });
   });
 
-  group('GlyphIconStore.render', () {
+  group('GlyphIconStore.renderEmojiPng', () {
     test('renders an emoji at the requested square size', () async {
-      final png = await GlyphIconStore.render('emoji:😀', size: 64);
-      final size = await _decodedSize(png!);
+      final png = await GlyphIconStore.renderEmojiPng('😀', size: 64);
+      final size = await _decodedSize(png);
 
       expect(size.width, 64);
       expect(size.height, 64);
     });
+  });
 
+  group('GlyphIconStore.render', () {
     test('renders a known action as an SVG at the requested viewBox size, '
         'with colour placeholders for the client to fill in', () async {
       final bytes = await GlyphIconStore.render('action:mute', size: 64);

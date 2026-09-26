@@ -19,11 +19,12 @@ void main() {
       );
     });
 
-    test('an emoji wins over both a custom icon id and an app name', () {
+    test('a legacy emoji is ignored — the host sends it as an image', () {
       expect(
         iconKeyFor(const AppItem('Chrome', emoji: '🎉', customIconId: 'img_1')),
-        'emoji:🎉',
+        'img_1',
       );
+      expect(iconKeyFor(const AppItem('Chrome', emoji: '🎉')), 'Chrome');
     });
 
     test('an action with nothing custom is keyed by its own wire id, not '

@@ -7,34 +7,31 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   Widget harness({
-    required String? emoji,
     required String? customIconId,
-    required void Function(String? emoji, String? customIconId) onChanged,
+    required ValueChanged<String?> onChanged,
+    Future<String?> Function(String emoji)? saveEmoji,
   }) {
     return MaterialApp(
       home: Scaffold(
         body: IconPicker(
-          emoji: emoji,
           customIconId: customIconId,
           onChanged: onChanged,
+          saveEmoji: saveEmoji ?? (_) async => fail('saveEmoji not expected'),
         ),
       ),
     );
   }
 
+  Future<void> openTextDialog(WidgetTester tester) async {
+    await tester.tap(find.byType(IconPicker));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Type text...'));
+    await tester.pumpAndSettle();
+  }
+
   group('IconPicker preview', () {
-    testWidgets('shows the emoji when set', (tester) async {
-      await tester.pumpWidget(
-        harness(emoji: '🧭', customIconId: null, onChanged: (_, _) {}),
-      );
-
-      expect(find.text('🧭'), findsOneWidget);
-    });
-
     testWidgets('shows a placeholder when nothing is set', (tester) async {
-      await tester.pumpWidget(
-        harness(emoji: null, customIconId: null, onChanged: (_, _) {}),
-      );
+      await tester.pumpWidget(harness(customIconId: null, onChanged: (_) {}));
 
       expect(find.byIcon(Icons.add_photo_alternate_outlined), findsOneWidget);
     });
@@ -42,9 +39,7 @@ void main() {
 
   group('IconPicker menu', () {
     testWidgets('tapping offers a choice of image or text', (tester) async {
-      await tester.pumpWidget(
-        harness(emoji: null, customIconId: null, onChanged: (_, _) {}),
-      );
+      await tester.pumpWidget(harness(customIconId: null, onChanged: (_) {}));
 
       await tester.tap(find.byType(IconPicker));
       await tester.pumpAndSettle();
@@ -53,57 +48,62 @@ void main() {
       expect(find.text('Type text...'), findsOneWidget);
     });
 
-    testWidgets('typing text reports it and clears any image', (tester) async {
-      String? reportedEmoji;
-      String? reportedIconId;
+    testWidgets('typing an emoji saves it as an image and reports its id', (
+      tester,
+    ) async {
+      String? savedEmoji;
+      String? reported = 'unset';
       await tester.pumpWidget(
         harness(
-          emoji: null,
-          customIconId: 'img_old',
-          onChanged: (emoji, customIconId) {
-            reportedEmoji = emoji;
-            reportedIconId = customIconId;
+          customIconId: null,
+          onChanged: (id) => reported = id,
+          saveEmoji: (emoji) async {
+            savedEmoji = emoji;
+            return 'img_emoji';
           },
         ),
       );
 
-      await tester.tap(find.byType(IconPicker));
+      await openTextDialog(tester);
+      await tester.enterText(find.byType(TextField), ' 🚀 ');
+      await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Type text...'));
-      await tester.pumpAndSettle();
+
+      expect(savedEmoji, '🚀');
+      expect(reported, 'img_emoji');
+    });
+
+    testWidgets('an emoji that fails to save reports nothing', (tester) async {
+      var called = false;
+      await tester.pumpWidget(
+        harness(
+          customIconId: null,
+          onChanged: (_) => called = true,
+          saveEmoji: (_) async => null,
+        ),
+      );
+
+      await openTextDialog(tester);
       await tester.enterText(find.byType(TextField), '🚀');
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
 
-      expect(reportedEmoji, '🚀');
-      expect(reportedIconId, isNull);
+      expect(called, isFalse);
     });
 
-    testWidgets('Clear in the text dialog reports both as unset', (
+    testWidgets('Clear in the text dialog reports the override as unset', (
       tester,
     ) async {
-      String? reportedEmoji = 'unset';
-      String? reportedIconId = 'unset';
+      String? reported = 'unset';
       await tester.pumpWidget(
-        harness(
-          emoji: '🧭',
-          customIconId: null,
-          onChanged: (emoji, customIconId) {
-            reportedEmoji = emoji;
-            reportedIconId = customIconId;
-          },
-        ),
+        harness(customIconId: null, onChanged: (id) => reported = id),
       );
 
-      await tester.tap(find.byType(IconPicker));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Type text...'));
-      await tester.pumpAndSettle();
+      await openTextDialog(tester);
       await tester.tap(find.text('Clear'));
       await tester.pumpAndSettle();
 
-      expect(reportedEmoji, isNull);
-      expect(reportedIconId, isNull);
+      expect(reported, isNull);
     });
 
     testWidgets('Cancel in the text dialog reports nothing at all', (
@@ -111,23 +111,14 @@ void main() {
     ) async {
       var called = false;
       await tester.pumpWidget(
-        harness(
-          emoji: '🧭',
-          customIconId: null,
-          onChanged: (_, _) => called = true,
-        ),
+        harness(customIconId: null, onChanged: (_) => called = true),
       );
 
-      await tester.tap(find.byType(IconPicker));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Type text...'));
-      await tester.pumpAndSettle();
+      await openTextDialog(tester);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
 
       expect(called, isFalse);
-      // The original emoji is still showing, untouched.
-      expect(find.text('🧭'), findsOneWidget);
     });
 
     testWidgets(
@@ -150,11 +141,7 @@ void main() {
         });
         var called = false;
         await tester.pumpWidget(
-          harness(
-            emoji: null,
-            customIconId: null,
-            onChanged: (_, _) => called = true,
-          ),
+          harness(customIconId: null, onChanged: (_) => called = true),
         );
 
         await tester.tap(find.byType(IconPicker));

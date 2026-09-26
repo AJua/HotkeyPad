@@ -1,3 +1,4 @@
+import 'package:hotkeypad_host/src/deck_icons.dart';
 import 'package:hotkeypad_host/src/layout_page.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'package:flutter/material.dart';
@@ -465,7 +466,7 @@ void main() {
     test('replaces an app button\'s icon, keeping its name', () {
       const item = AppItem('Safari', emoji: '🧭');
 
-      final updated = withIconOverride(item, emoji: null, customIconId: 'img_1');
+      final updated = withIconOverride(item, customIconId: 'img_1');
 
       expect(updated, isA<AppItem>());
       expect((updated as AppItem).name, 'Safari');
@@ -481,25 +482,23 @@ void main() {
       );
 
       final updated =
-          withIconOverride(item, emoji: '👋', customIconId: null)
-              as ShellItem;
+          withIconOverride(item, customIconId: 'img_2') as ShellItem;
 
       expect(updated.command, 'say hi');
       expect(updated.label, 'Hi');
       expect(updated.shell, ShellKind.fish);
-      expect(updated.emoji, '👋');
+      expect(updated.customIconId, 'img_2');
     });
 
     test('replaces a URL button\'s icon, keeping its address', () {
       const item = OpenUrlItem(url: 'https://example.com', label: 'Example');
 
       final updated =
-          withIconOverride(item, emoji: '🔗', customIconId: null)
-              as OpenUrlItem;
+          withIconOverride(item, customIconId: 'img_3') as OpenUrlItem;
 
       expect(updated.url, 'https://example.com');
       expect(updated.label, 'Example');
-      expect(updated.emoji, '🔗');
+      expect(updated.customIconId, 'img_3');
     });
 
     test('leaves a widget button unchanged — it has no icon of its own', () {
@@ -509,7 +508,7 @@ void main() {
         columnSpan: 1,
       );
 
-      expect(withIconOverride(item, emoji: '🕐', customIconId: null), item);
+      expect(withIconOverride(item, customIconId: 'img_4'), item);
     });
   });
 
@@ -742,7 +741,6 @@ void main() {
                       apps: apps,
                       shortcuts: const [],
                       existing: existing,
-                      emoji: null,
                       customIconId: null,
                     ),
                   );

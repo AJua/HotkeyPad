@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
 import 'config_dir.dart';
+import 'emoji_icon.dart';
 
 /// Persists the deck layout on the host.
 ///
@@ -91,7 +92,31 @@ abstract final class LayoutStore {
     return File('$dir/layout.json');
   }
 
+  /// The one [migrateEmojiIcons] run in flight, shared by every [load]
+  /// that overlaps it — [load] runs on every button press, and two
+  /// concurrent migrations would each mint their own copy of every image.
+  static Future<DeckLayout>? _migrating;
+
+  /// Loads the layout, first turning any legacy emoji icons into custom
+  /// images (see [migrateEmojiIcons]) and saving the result, so nothing
+  /// past this point — the editor or the client — ever sees an emoji.
+  /// Checked on every load rather than once at startup, since restoring an
+  /// old backup can bring emoji back at any time.
   static Future<DeckLayout> load() async {
+    final layout = await _loadRaw();
+    if (!hasEmojiIcons(layout)) return layout;
+    return _migrating ??= () async {
+      try {
+        final migrated = await migrateEmojiIcons(layout);
+        await save(migrated);
+        return migrated;
+      } finally {
+        _migrating = null;
+      }
+    }();
+  }
+
+  static Future<DeckLayout> _loadRaw() async {
     final file = _file;
     if (file == null) return _inMemory ??= _defaultLayout;
     try {

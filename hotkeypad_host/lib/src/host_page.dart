@@ -1195,9 +1195,10 @@ class _HostPageState extends State<HostPage> {
 
   /// Renders an app's icon, reads back a user-picked custom icon, reads
   /// back a custom background image, renders a built-in background (see
-  /// [BuiltinBackgroundStore]), or renders an emoji or an action's
-  /// built-in glyph (see [GlyphIconStore]) — every icon a deck button can
-  /// show is one of these five, so the client never draws one itself —
+  /// [BuiltinBackgroundStore]), or renders an action's built-in glyph (see
+  /// [GlyphIconStore]) — every icon a deck button can show is one of
+  /// these, an emoji included (it is saved as a custom icon), so the
+  /// client never draws one itself —
   /// and streams it as binary frames sized to the client's own frame-size
   /// limit either way. The transfer itself does not care which [id]
   /// names, which store it came from, or which transport [clientId] is on.

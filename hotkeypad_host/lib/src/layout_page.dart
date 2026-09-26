@@ -12,6 +12,7 @@ import 'builtin_background_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
 import 'deck_icons.dart';
+import 'emoji_icon.dart';
 import 'favicon_fetcher.dart';
 import 'layout_store.dart';
 import 'settings_store.dart';
@@ -154,72 +155,6 @@ String? currentButtonSummary(String? stored) {
       '${kind.label} widget (${rowSpan}x$columnSpan)',
   };
 }
-
-/// [item] with its icon override replaced by [emoji]/[customIconId], every
-/// other field carried over unchanged.
-///
-/// What the picker's Save button applies: changing the icon in
-/// [IconPicker] alone, with no action re-chosen underneath it, otherwise
-/// has nothing to attach the new icon to and is silently lost — see
-/// [_PickerDialogState._saveIconOnly]. A [WidgetItem] has no icon of its
-/// own ([DeckItem.emoji] is always null there) and is returned unchanged.
-DeckItem withIconOverride(
-  DeckItem item, {
-  required String? emoji,
-  required String? customIconId,
-}) => switch (item) {
-  AppItem(:final name) => AppItem(
-    name,
-    emoji: emoji,
-    customIconId: customIconId,
-  ),
-  ActionItem(:final action) => ActionItem(
-    action,
-    emoji: emoji,
-    customIconId: customIconId,
-  ),
-  ShellItem(:final command, :final label, :final shell) => ShellItem(
-    command: command,
-    label: label,
-    shell: shell,
-    emoji: emoji,
-    customIconId: customIconId,
-  ),
-  KeyComboItem(:final modifiers, :final key, :final special) => KeyComboItem(
-    modifiers: modifiers,
-    key: key,
-    special: special,
-    label: item.label,
-    emoji: emoji,
-    customIconId: customIconId,
-  ),
-  ShortcutItem(:final name) => ShortcutItem(
-    name: name,
-    label: item.label,
-    emoji: emoji,
-    customIconId: customIconId,
-  ),
-  OpenUrlItem(:final url) => OpenUrlItem(
-    url: url,
-    label: item.label,
-    emoji: emoji,
-    customIconId: customIconId,
-  ),
-  PlaySoundItem(:final soundId, :final label, :final target) => PlaySoundItem(
-    soundId: soundId,
-    label: label,
-    target: target,
-    emoji: emoji,
-    customIconId: customIconId,
-  ),
-  ComboItem(:final steps, :final label) => ComboItem(
-    steps: steps,
-    label: label,
-    emoji: emoji,
-    customIconId: customIconId,
-  ),
-  WidgetItem() => item,
-};
 
 /// The largest row/column span a widget anchored at [index] could have
 /// without running off [layout]'s own edge from that position — what
@@ -1116,9 +1051,7 @@ class LayoutGrid extends StatelessWidget {
           cellBuilder: (context, index) {
             final stored = layout.slots[index]?.value;
             final item = stored == null ? null : DeckItem.parse(stored);
-            final iconKey = item == null || item.emoji != null
-                ? null
-                : iconKeyFor(item);
+            final iconKey = item == null ? null : iconKeyFor(item);
             return _Cell(
               index: index,
               item: item,
@@ -1199,7 +1132,7 @@ class _Cell extends StatelessWidget {
     // a filled neutral square behind it just showed through that padding as
     // a flat grey box.
     final hasRealIcon = filled && icon != null;
-    // Only a glyph/emoji/letter fallback gets a background square: it has
+    // Only a glyph/letter fallback gets a background square: it has
     // no colour of its own, unlike a real icon, and the square sits behind
     // just the icon rather than the whole cell so the label below it stays
     // on the plain cell background.
@@ -1266,21 +1199,7 @@ class _Cell extends StatelessWidget {
                         clipBehavior: showIconBackground
                             ? Clip.antiAlias
                             : Clip.none,
-                        child: item.emoji != null
-                            // Sized explicitly: an emoji's advance box is
-                            // wider than its glyph, so fitting the box
-                            // leaves it small and off centre.
-                            ? Center(
-                                child: Text(
-                                  item.emoji!,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: iconSize * 0.82,
-                                    height: 1,
-                                  ),
-                                ),
-                              )
-                            : icon != null
+                        child: icon != null
                             ? Image.memory(icon, fit: BoxFit.contain)
                             : FittedBox(
                                 child: item is AppItem
@@ -1418,9 +1337,8 @@ class _PickerDialogState extends State<_PickerDialog> {
   String _query = '';
 
   /// The override applied to whatever is picked below; null means "use the
-  /// app's own icon or the built-in glyph". Mutually exclusive by
-  /// construction of [IconPicker] — choosing one clears the other.
-  String? _emoji;
+  /// app's own icon or the built-in glyph". An emoji typed into
+  /// [IconPicker] is already an image by the time it lands here.
   String? _customIconId;
 
   @override
@@ -1429,7 +1347,6 @@ class _PickerDialogState extends State<_PickerDialog> {
     _search.addListener(() => setState(() => _query = _search.text.trim()));
     // Prefill with whatever this slot already shows, so reopening the picker
     // does not silently drop a custom icon.
-    _emoji = _existing?.emoji;
     _customIconId = _existing?.customIconId;
   }
 
@@ -1458,7 +1375,7 @@ class _PickerDialogState extends State<_PickerDialog> {
   void _choose(DeckItem item) =>
       Navigator.of(context).pop(DeckItemChoice(item.stored));
 
-  /// Applies whatever [_emoji]/[_customIconId] is currently showing to the
+  /// Applies whatever [_customIconId] is currently showing to the
   /// slot's existing action, without the user having to re-pick that
   /// action just to make an icon-only change stick — see
   /// [withIconOverride]. Only reachable when [_existing] is non-null (see
@@ -1467,9 +1384,7 @@ class _PickerDialogState extends State<_PickerDialog> {
   void _saveIconOnly() {
     final existing = _existing;
     if (existing == null) return;
-    _choose(
-      withIconOverride(existing, emoji: _emoji, customIconId: _customIconId),
-    );
+    _choose(withIconOverride(existing, customIconId: _customIconId));
   }
 
   /// Clears the slot instead of picking anything for it — the Delete
@@ -1493,7 +1408,6 @@ class _PickerDialogState extends State<_PickerDialog> {
       context: context,
       builder: (context) => _KeyComboDialog(
         existing: existing is KeyComboItem ? existing : null,
-        emoji: _emoji,
         customIconId: _customIconId,
       ),
     );
@@ -1507,7 +1421,6 @@ class _PickerDialogState extends State<_PickerDialog> {
       context: context,
       builder: (context) => _ShellDialog(
         existing: existing is ShellItem ? existing : null,
-        emoji: _emoji,
         customIconId: _customIconId,
       ),
     );
@@ -1521,7 +1434,6 @@ class _PickerDialogState extends State<_PickerDialog> {
       context: context,
       builder: (context) => _UrlDialog(
         existing: existing is OpenUrlItem ? existing : null,
-        emoji: _emoji,
         customIconId: _customIconId,
       ),
     );
@@ -1535,7 +1447,6 @@ class _PickerDialogState extends State<_PickerDialog> {
       context: context,
       builder: (context) => _SoundDialog(
         existing: existing is PlaySoundItem ? existing : null,
-        emoji: _emoji,
         customIconId: _customIconId,
         // A combo runs its steps on this Mac, so a sound there has to play
         // here too.
@@ -1554,7 +1465,6 @@ class _PickerDialogState extends State<_PickerDialog> {
         apps: widget.apps,
         shortcuts: widget.shortcuts,
         existing: existing is ComboItem ? existing : null,
-        emoji: _emoji,
         customIconId: _customIconId,
       ),
     );
@@ -1653,12 +1563,9 @@ class _PickerDialogState extends State<_PickerDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 IconPicker(
-                  emoji: _emoji,
                   customIconId: _customIconId,
-                  onChanged: (emoji, customIconId) => setState(() {
-                    _emoji = emoji;
-                    _customIconId = customIconId;
-                  }),
+                  onChanged: (customIconId) =>
+                      setState(() => _customIconId = customIconId),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1765,11 +1672,7 @@ class _PickerDialogState extends State<_PickerDialog> {
                         title: Text(action.label),
                         selected: widget.current == ActionItem(action).stored,
                         onTap: () => _choose(
-                          ActionItem(
-                            action,
-                            emoji: _emoji,
-                            customIconId: _customIconId,
-                          ),
+                          ActionItem(action, customIconId: _customIconId),
                         ),
                       ),
                   ],
@@ -1780,11 +1683,7 @@ class _PickerDialogState extends State<_PickerDialog> {
                         leading: const Icon(Icons.bolt),
                         title: Text(name),
                         onTap: () => _choose(
-                          ShortcutItem(
-                            name: name,
-                            emoji: _emoji,
-                            customIconId: _customIconId,
-                          ),
+                          ShortcutItem(name: name, customIconId: _customIconId),
                         ),
                       ),
                   ],
@@ -1796,11 +1695,7 @@ class _PickerDialogState extends State<_PickerDialog> {
                       subtitle: Text(app.category),
                       selected: widget.current == AppItem(app.name).stored,
                       onTap: () => _choose(
-                        AppItem(
-                          app.name,
-                          emoji: _emoji,
-                          customIconId: _customIconId,
-                        ),
+                        AppItem(app.name, customIconId: _customIconId),
                       ),
                     ),
                 ],
@@ -1838,8 +1733,13 @@ class _PickerDialogState extends State<_PickerDialog> {
   }
 }
 
-/// Preview of a button's overriding glyph — an emoji or a custom image —
-/// that opens a choice of how to change it when tapped.
+/// Preview of a button's overriding icon that opens a choice of how to
+/// change it when tapped: pick an image, or type an emoji.
+///
+/// Either way the result is a custom image saved in [CustomIconStore] — an
+/// emoji is rendered to a PNG right here on the host (see
+/// `saveEmojiIcon`) rather than sent as text, so the client
+/// only ever has an image to show and never has to render an emoji itself.
 ///
 /// Public, unlike the dialogs around it, so it can be pumped and tapped
 /// through in isolation the way `confirmResizeDrop` was extracted for the
@@ -1847,21 +1747,22 @@ class _PickerDialogState extends State<_PickerDialog> {
 class IconPicker extends StatefulWidget {
   const IconPicker({
     super.key,
-    required this.emoji,
     required this.customIconId,
     required this.onChanged,
+    this.saveEmoji = saveEmojiIcon,
   });
-
-  final String? emoji;
 
   /// The bytes behind this id live on this machine's own disk — the host is
   /// what saved them — so there is nothing to fetch over the link to show
   /// this preview.
   final String? customIconId;
 
-  /// Reports the new (emoji, customIconId) pair. Exactly one of the two is
-  /// ever non-null, or both are null to clear the override.
-  final void Function(String? emoji, String? customIconId) onChanged;
+  /// Reports the new custom icon id, or null to clear the override.
+  final ValueChanged<String?> onChanged;
+
+  /// Turns a typed emoji into a saved custom icon's id. Injectable so a
+  /// test can drive the text dialog without rendering or touching disk.
+  final Future<String?> Function(String emoji) saveEmoji;
 
   @override
   State<IconPicker> createState() => _IconPickerState();
@@ -1915,23 +1816,34 @@ class _IconPickerState extends State<IconPicker> {
     if (png == null || !mounted) return;
     final id = await CustomIconStore.save(png);
     if (id == null || !mounted) return;
-    final previous = widget.customIconId;
-    widget.onChanged(null, id);
-    if (previous != null && previous != id) {
-      unawaited(CustomIconStore.delete(previous));
-    }
+    _replaceWith(id);
   }
 
   Future<void> _typeText() async {
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => _EmojiDialog(initial: widget.emoji),
+      builder: (context) => const _EmojiDialog(),
     );
     if (result == null || !mounted) return;
     final text = result.trim();
+    if (text.isEmpty) {
+      _replaceWith(null);
+      return;
+    }
+    final id = await widget.saveEmoji(text);
+    if (id == null || !mounted) return;
+    _replaceWith(id);
+  }
+
+  /// Reports [id] as the new override and drops the image it replaces —
+  /// nothing else points at a custom icon file but the one button it was
+  /// made for.
+  void _replaceWith(String? id) {
     final previous = widget.customIconId;
-    widget.onChanged(text.isEmpty ? null : text, null);
-    if (previous != null) unawaited(CustomIconStore.delete(previous));
+    widget.onChanged(id);
+    if (previous != null && previous != id) {
+      unawaited(CustomIconStore.delete(previous));
+    }
   }
 
   Future<void> _choose() async {
@@ -1989,11 +1901,6 @@ class _IconPickerState extends State<IconPicker> {
   }
 
   Widget _preview(BuildContext context) {
-    if (widget.emoji != null) {
-      return Center(
-        child: Text(widget.emoji!, style: const TextStyle(fontSize: 28)),
-      );
-    }
     if (widget.customIconId != null) {
       if (_loading) {
         return const Center(
@@ -2210,21 +2117,22 @@ class _BackgroundPickerState extends State<BackgroundPicker> {
 
 /// Prompts for the emoji [IconPicker]'s "Type text..." option offers.
 ///
+/// Always starts empty: once saved, an emoji is just an image like any
+/// other custom icon, with no text left to prefill from.
+///
 /// A dialog of its own, rather than building the controller inline in
 /// [_IconPickerState], so its lifecycle is tied to this widget the normal
 /// way: disposing it right after `showDialog` returns raced the dialog's
 /// own close animation and crashed with "used after being disposed".
 class _EmojiDialog extends StatefulWidget {
-  const _EmojiDialog({required this.initial});
-
-  final String? initial;
+  const _EmojiDialog();
 
   @override
   State<_EmojiDialog> createState() => _EmojiDialogState();
 }
 
 class _EmojiDialogState extends State<_EmojiDialog> {
-  late final _controller = TextEditingController(text: widget.initial ?? '');
+  final _controller = TextEditingController();
 
   @override
   void dispose() {
@@ -2262,16 +2170,11 @@ class _EmojiDialogState extends State<_EmojiDialog> {
 }
 
 /// Composes a shell button: the command, what to call it, and an optional
-/// emoji or custom image carried over from the picker.
+/// custom icon carried over from the picker.
 class _ShellDialog extends StatefulWidget {
-  const _ShellDialog({
-    required this.existing,
-    required this.emoji,
-    required this.customIconId,
-  });
+  const _ShellDialog({required this.existing, required this.customIconId});
 
   final ShellItem? existing;
-  final String? emoji;
   final String? customIconId;
 
   @override
@@ -2303,7 +2206,6 @@ class _ShellDialogState extends State<_ShellDialog> {
         // the user cannot think of a name.
         label: label.isEmpty ? command : label,
         shell: _shell,
-        emoji: widget.emoji ?? widget.existing?.emoji,
         customIconId: widget.customIconId ?? widget.existing?.customIconId,
       ),
     );
@@ -2377,16 +2279,11 @@ class _ShellDialogState extends State<_ShellDialog> {
 }
 
 /// Composes an "open URL" button: the address, what to call it, and an
-/// optional emoji or custom image carried over from the picker.
+/// optional custom icon carried over from the picker.
 class _UrlDialog extends StatefulWidget {
-  const _UrlDialog({
-    required this.existing,
-    required this.emoji,
-    required this.customIconId,
-  });
+  const _UrlDialog({required this.existing, required this.customIconId});
 
   final OpenUrlItem? existing;
-  final String? emoji;
   final String? customIconId;
 
   @override
@@ -2413,12 +2310,11 @@ class _UrlDialogState extends State<_UrlDialog> {
     final url = _url.text.trim();
     if (url.isEmpty) return;
     final label = _label.text.trim();
-    final emoji = widget.emoji ?? widget.existing?.emoji;
     var customIconId = widget.customIconId ?? widget.existing?.customIconId;
     // A button with no icon of its own gets the site's icon, so it shows
     // the site's logo rather than the generic link glyph. One the user
     // already chose — an emoji or a picked image — always wins.
-    if (emoji == null && customIconId == null) {
+    if (customIconId == null) {
       setState(() => _saving = true);
       final png = await FaviconFetcher.fetchIconPng(url);
       if (png != null) customIconId = await CustomIconStore.save(png);
@@ -2430,7 +2326,6 @@ class _UrlDialogState extends State<_UrlDialog> {
         // Falling back to the URL keeps the button identifiable when the
         // user cannot think of a name.
         label: label.isEmpty ? url : label,
-        emoji: emoji,
         customIconId: customIconId,
       ),
     );
@@ -2496,18 +2391,16 @@ class _UrlDialogState extends State<_UrlDialog> {
 }
 
 /// Composes a "play sound" button: an audio file copied into [SoundStore],
-/// what to call it and where it plays, plus an optional emoji or custom
+/// what to call it and where it plays, plus an optional custom
 /// image carried over from the picker.
 class _SoundDialog extends StatefulWidget {
   const _SoundDialog({
     required this.existing,
-    required this.emoji,
     required this.customIconId,
     this.hostOnly = false,
   });
 
   final PlaySoundItem? existing;
-  final String? emoji;
   final String? customIconId;
 
   /// Fixes the target to [SoundTarget.host] — for a combo step, which runs
@@ -2594,7 +2487,6 @@ class _SoundDialogState extends State<_SoundDialog> {
         soundId: soundId,
         label: label.isEmpty ? 'Sound' : label,
         target: _target,
-        emoji: widget.emoji ?? widget.existing?.emoji,
         customIconId: widget.customIconId ?? widget.existing?.customIconId,
       ),
     );
@@ -2763,14 +2655,9 @@ class _PageTab extends StatelessWidget {
 
 /// Composes a keyboard combination: modifiers, a key, and what to call it.
 class _KeyComboDialog extends StatefulWidget {
-  const _KeyComboDialog({
-    required this.existing,
-    required this.emoji,
-    required this.customIconId,
-  });
+  const _KeyComboDialog({required this.existing, required this.customIconId});
 
   final KeyComboItem? existing;
-  final String? emoji;
   final String? customIconId;
 
   @override
@@ -2811,7 +2698,6 @@ class _KeyComboDialogState extends State<_KeyComboDialog> {
         key: _special == null ? _character.text.trim() : null,
         special: _special,
         label: label.isEmpty ? null : label,
-        emoji: widget.emoji ?? widget.existing?.emoji,
         customIconId: widget.customIconId ?? widget.existing?.customIconId,
       ),
     );
@@ -2940,14 +2826,12 @@ class ComboDialog extends StatefulWidget {
     required this.apps,
     required this.shortcuts,
     required this.existing,
-    required this.emoji,
     required this.customIconId,
   });
 
   final List<({String name, String category, String path})> apps;
   final List<String> shortcuts;
   final ComboItem? existing;
-  final String? emoji;
   final String? customIconId;
 
   @override
@@ -3014,7 +2898,6 @@ class _ComboDialogState extends State<ComboDialog> {
       ComboItem(
         steps: List.of(_steps),
         label: _label.text.trim(),
-        emoji: widget.emoji ?? widget.existing?.emoji,
         customIconId: widget.customIconId ?? widget.existing?.customIconId,
       ),
     );

@@ -7,19 +7,19 @@ import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 /// The key to fetch a rendered icon for, or null when there is nothing to
 /// show but a plain letter-avatar placeholder.
 ///
-/// Every case here — a custom image, an emoji, an app's own icon, or an
-/// action's built-in glyph — is rendered by the host and sent over the
-/// same [RequestIcon] transfer, so `_DeckButton` only ever has to decide
+/// Every case here — a custom image, an app's own icon, or an action's
+/// built-in glyph — is rendered by the host and sent over the same
+/// [RequestIcon] transfer, so `_DeckButton` only ever has to decide
 /// between "there are icon bytes" and "there are not"; it does not draw
-/// an emoji or a `DeckAction`'s glyph itself (though it does still decide
-/// *how* to recolor an action's glyph — see [looksLikeSvgIcon] and
-/// [glyphIconColors]). The `emoji:`/`action:` prefixes are this client's
-/// own invention, not part of the protocol (an id is just an opaque
-/// string to it) — see `hotkeypad_host`'s `GlyphIconStore`, the other end
-/// that parses them.
+/// a `DeckAction`'s glyph itself (though it does still decide *how* to
+/// recolor it — see [looksLikeSvgIcon] and [glyphIconColors]). An emoji
+/// the user picked on the host is not a case of its own: the host has
+/// already rendered it into a custom image, so it arrives here as a
+/// [DeckItem.customIconId] like any other. The `action:` prefix is this
+/// client's own invention, not part of the protocol (an id is just an
+/// opaque string to it) — see `hotkeypad_host`'s `GlyphIconStore`, the
+/// other end that parses it.
 String? iconKeyFor(DeckItem item) {
-  final emoji = item.emoji;
-  if (emoji != null) return 'emoji:$emoji';
   final customIconId = item.customIconId;
   if (customIconId != null) return customIconId;
   if (item is AppItem) return item.name;
@@ -29,8 +29,8 @@ String? iconKeyFor(DeckItem item) {
 
 /// True for icon bytes that are SVG markup rather than a raster image —
 /// see `GlyphIconStore` on the host: an action's glyph is sent this way
-/// so its colors can be adapted here, while an app icon, a custom image,
-/// and an emoji are still a plain image the host has already committed to
+/// so its colors can be adapted here, while an app icon and a custom image
+/// (an emoji included) are still a plain image the host has already committed to
 /// a fixed appearance for. Sniffed by content rather than a wire-level
 /// flag, since a [RequestIcon] id is an opaque string as far as the
 /// protocol is concerned — nothing else already tells the two apart.

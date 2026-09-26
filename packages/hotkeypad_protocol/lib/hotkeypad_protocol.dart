@@ -240,18 +240,20 @@ sealed class DeckItem {
   String get stored;
   String get label;
 
-  /// Shown instead of an app icon or a built-in glyph when set.
+  /// Legacy: an emoji shown instead of an app icon or a built-in glyph.
   ///
-  /// Mutually exclusive with [customIconId] by construction of the picker
-  /// UI that sets them — a button is either given a glyph or a picture, not
-  /// both. If somehow both are set, rendering prefers this one, matching
-  /// the priority that already existed before [customIconId] did.
+  /// Nothing writes this any more — the host now renders a picked emoji
+  /// into a PNG and stores it as a [customIconId], so a client only ever
+  /// has an image to show. Still parsed so the host can migrate a layout
+  /// (or a backup) written by an older build; see `hotkeypad_host`'s
+  /// `migrateEmojiIcons`.
   String? get emoji;
 
   /// An id naming an image the host rendered from a file the user picked,
   /// fetched and cached the same way an app's own icon is — see
   /// [RequestIcon] and [IconFrame]. Shown instead of an app icon or built-in
-  /// glyph when set, unless [emoji] is also set.
+  /// glyph when set. An emoji picked on the host ends up here too, as the
+  /// image the host rendered it into.
   String? get customIconId;
 
   /// Returns null for a stored value this build does not understand, so an

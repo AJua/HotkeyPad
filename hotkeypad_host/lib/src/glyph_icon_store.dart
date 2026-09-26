@@ -7,10 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
 /// Renders an emoji as a PNG, or a [DeckAction]'s own built-in glyph as an
-/// SVG — the client no longer draws either of these itself. See
-/// host_page.dart's `_sendIcon`, which tries the app/custom-icon/
-/// background stores first and only reaches this one once none of them
-/// claim the id.
+/// SVG — the client draws neither of these itself.
+///
+/// The two reach the client differently. An emoji is rendered once, when
+/// the user types it into `IconPicker`, and saved as an ordinary custom
+/// icon (see [renderEmojiPng] and `saveEmojiIcon`), so the client only
+/// ever sees an image id. An action's glyph is rendered on request, via
+/// host_page.dart's `_sendIcon`, which tries the app/custom-icon/background
+/// stores first and only reaches this one once none of them claim the id.
 ///
 /// The two formats aren't a historical accident: an emoji is already a
 /// multi-colour glyph with nothing sensible to recolour, so it stays a
@@ -22,14 +26,12 @@ import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 /// display time (see `hotkeypad_client`'s `recolorGlyphSvg`), rather than
 /// a colour baked in once here.
 abstract final class GlyphIconStore {
-  static const _emojiPrefix = 'emoji:';
   static const _actionPrefix = 'action:';
 
   /// True for an [id] shaped like something this store can render — see
   /// `hotkeypad_client`'s `iconKeyFor`, which is what builds ids in this
   /// shape in the first place.
-  static bool handles(String id) =>
-      id.startsWith(_emojiPrefix) || id.startsWith(_actionPrefix);
+  static bool handles(String id) => id.startsWith(_actionPrefix);
 
   /// Renders [id], or returns null if it is not one this store handles,
   /// or names a [DeckAction] this build does not recognise (an id from a
@@ -38,11 +40,6 @@ abstract final class GlyphIconStore {
     String id, {
     int size = HotkeyPad.iconSize,
   }) async {
-    final emoji = id.startsWith(_emojiPrefix)
-        ? id.substring(_emojiPrefix.length)
-        : null;
-    if (emoji != null) return _renderEmojiPng(emoji, size: size);
-
     if (!id.startsWith(_actionPrefix)) return null;
     final wire = id.substring(_actionPrefix.length);
     DeckAction? action;
@@ -78,9 +75,11 @@ abstract final class GlyphIconStore {
   /// the edge of whatever box eventually displays it.
   static const _marginPx = 3.0;
 
-  static Future<Uint8List> _renderEmojiPng(
+  /// [emoji] drawn centred inside the same rounded border an action's
+  /// glyph gets, as a [size]-pixel square PNG.
+  static Future<Uint8List> renderEmojiPng(
     String emoji, {
-    required int size,
+    int size = HotkeyPad.iconSize,
   }) async {
     final painter = TextPainter(
       textDirection: TextDirection.ltr,
