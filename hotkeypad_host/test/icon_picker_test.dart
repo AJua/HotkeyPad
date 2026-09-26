@@ -9,14 +9,16 @@ void main() {
   Widget harness({
     required String? customIconId,
     required ValueChanged<String?> onChanged,
-    Future<String?> Function(String emoji)? saveEmoji,
+    Future<String?> Function(String emoji)? saveDisplayText,
   }) {
     return MaterialApp(
       home: Scaffold(
         body: IconPicker(
           customIconId: customIconId,
           onChanged: onChanged,
-          saveEmoji: saveEmoji ?? (_) async => fail('saveEmoji not expected'),
+          saveDisplayText:
+              saveDisplayText ??
+              (_) async => fail('saveDisplayText not expected'),
         ),
       ),
     );
@@ -57,7 +59,7 @@ void main() {
         harness(
           customIconId: null,
           onChanged: (id) => reported = id,
-          saveEmoji: (emoji) async {
+          saveDisplayText: (emoji) async {
             savedEmoji = emoji;
             return 'img_emoji';
           },
@@ -73,13 +75,35 @@ void main() {
       expect(reported, 'img_emoji');
     });
 
+    testWidgets('keeps line breaks in multi-line display text', (tester) async {
+      String? savedText;
+      await tester.pumpWidget(
+        harness(
+          customIconId: null,
+          onChanged: (_) {},
+          saveDisplayText: (text) async {
+            savedText = text;
+            return 'img_text';
+          },
+        ),
+      );
+
+      await openTextDialog(tester);
+      expect(find.text('Display text'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'Answer\nme!');
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(savedText, 'Answer\nme!');
+    });
+
     testWidgets('an emoji that fails to save reports nothing', (tester) async {
       var called = false;
       await tester.pumpWidget(
         harness(
           customIconId: null,
           onChanged: (_) => called = true,
-          saveEmoji: (_) async => null,
+          saveDisplayText: (_) async => null,
         ),
       );
 

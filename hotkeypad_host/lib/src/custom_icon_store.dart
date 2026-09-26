@@ -78,7 +78,7 @@ abstract final class CustomIconStore {
   ///   squash a non-square source rather than crop it.
   ///
   /// [plateColor] is the plate a logo is placed on — white unless the caller
-  /// wants otherwise (see `saveEmojiIcon`). An opaque picture covers its
+  /// wants otherwise (see `saveDisplayTextIcon`). An opaque picture covers its
   /// plate entirely, so it ignores this.
   ///
   /// Public, not an implementation detail of [pickAndProcess], so it can be

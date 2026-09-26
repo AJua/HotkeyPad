@@ -6,17 +6,18 @@ import 'package:flutter/material.dart';
 
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
-/// Renders an emoji as a PNG, or a [DeckAction]'s own built-in glyph as an
-/// SVG — the client draws neither of these itself.
+/// Renders display text (an emoji, a word, several lines) as a PNG, or a
+/// [DeckAction]'s own built-in glyph as an SVG — the client draws neither of these itself.
 ///
-/// The two reach the client differently. An emoji is rendered once, when
+/// The two reach the client differently. Display text is rendered once, when
 /// the user types it into `IconPicker`, and saved as an ordinary custom
-/// icon (see [renderEmojiPng] and `saveEmojiIcon`), so the client only
+/// icon (see [renderDisplayTextPng] and `saveDisplayTextIcon`), so the client only
 /// ever sees an image id. An action's glyph is rendered on request, via
 /// host_page.dart's `_sendIcon`, which tries the app/custom-icon/background
 /// stores first and only reaches this one once none of them claim the id.
 ///
-/// The two formats aren't a historical accident: an emoji is already a
+/// The two formats aren't a historical accident: display text — an emoji
+/// especially — is already a
 /// multi-colour glyph with nothing sensible to recolour, so it stays a
 /// plain PNG rendered once. An action's glyph is a single flat shape whose
 /// border, fill, and background need to adapt to whatever theme or custom
@@ -56,9 +57,9 @@ abstract final class GlyphIconStore {
   /// Colour for anything typed that is not a colour emoji — plain letters
   /// or CJK text. An emoji's own colours are what it is drawn for; this
   /// only paints the rest, which ends up on `CustomIconStore`'s white plate
-  /// (see `saveEmojiIcon`), so it is the same near-black a picked image of
+  /// (see `saveDisplayTextIcon`), so it is the same near-black a picked image of
   /// text would typically use.
-  static const _emojiColor = Color(0xFF1C1C1E);
+  static const _displayTextColor = Color(0xFF1C1C1E);
 
   /// Border width and corner rounding of an action's SVG glyph, as a
   /// fraction of `size` — this is the one shape with no bitmap of its own
@@ -71,7 +72,7 @@ abstract final class GlyphIconStore {
   /// the edge of whatever box eventually displays it.
   static const _marginPx = 3.0;
 
-  /// [emoji] alone — no plate, no border — centred on a transparent
+  /// [text] alone — no plate, no border — centred on a transparent
   /// square PNG at least [size] pixels across, grown to hold all of it when
   /// it is wider than that (a few letters, say) instead of cutting it off.
   /// Nothing is shrunk here, so a long string keeps its full resolution;
@@ -79,19 +80,21 @@ abstract final class GlyphIconStore {
   /// scales whatever was typed — one emoji or several words — to the same
   /// share of the plate.
   ///
-  /// Deliberately bare: `saveEmojiIcon` hands this to
+  /// Deliberately bare: `saveDisplayTextIcon` hands this to
   /// `CustomIconStore.cropToSquarePng`, whose logo path trims the
   /// transparent margin and places the glyph on the same Big Sur plate a
   /// picked image gets, so both end up the same size and shape on a deck.
-  static Future<Uint8List> renderEmojiPng(
-    String emoji, {
+  static Future<Uint8List> renderDisplayTextPng(
+    String text, {
     int size = HotkeyPad.iconSize,
   }) async {
     final painter = TextPainter(
       textDirection: TextDirection.ltr,
+      // Each line centred under the one above, for multi-line text.
+      textAlign: TextAlign.center,
       text: TextSpan(
-        text: emoji,
-        style: TextStyle(fontSize: size * 0.7, color: _emojiColor),
+        text: text,
+        style: TextStyle(fontSize: size * 0.7, color: _displayTextColor),
       ),
     )..layout();
 
@@ -153,7 +156,7 @@ abstract final class GlyphIconStore {
     final cornerRadius = size * _cornerRadiusFraction;
 
     // The path data above is drawn on a 24x24 grid; scaled and centred to
-    // match the same size * 0.7 fill fraction the emoji PNG's font size
+    // match the same size * 0.7 fill fraction the display text PNG's font size
     // used, for a consistent glyph size between the two icon kinds.
     final iconScale = (size * 0.7) / 24;
     final iconOffset = (size - 24 * iconScale) / 2;

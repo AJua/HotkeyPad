@@ -12,7 +12,7 @@ import 'builtin_background_store.dart';
 import 'command_runner.dart';
 import 'custom_icon_store.dart';
 import 'deck_icons.dart';
-import 'emoji_icon.dart';
+import 'display_text_icon.dart';
 import 'favicon_fetcher.dart';
 import 'layout_store.dart';
 import 'settings_store.dart';
@@ -1243,7 +1243,8 @@ class _Cell extends StatelessWidget {
 /// delay. Buttons rather than a text field on purpose: a field needs a
 /// controller to keep in sync with a value that can also change from
 /// outside (a step being reordered, say), and that is exactly the kind of
-/// lifecycle bug a text field invites — see IconPicker's emoji dialog.
+/// lifecycle bug a text field invites — see IconPicker's display text
+/// dialog.
 class _NumberStepper extends StatelessWidget {
   const _NumberStepper({
     required this.label,
@@ -1337,7 +1338,7 @@ class _PickerDialogState extends State<_PickerDialog> {
   String _query = '';
 
   /// The override applied to whatever is picked below; null means "use the
-  /// app's own icon or the built-in glyph". An emoji typed into
+  /// app's own icon or the built-in glyph". Display text typed into
   /// [IconPicker] is already an image by the time it lands here.
   String? _customIconId;
 
@@ -1734,12 +1735,13 @@ class _PickerDialogState extends State<_PickerDialog> {
 }
 
 /// Preview of a button's overriding icon that opens a choice of how to
-/// change it when tapped: pick an image, or type an emoji.
+/// change it when tapped: pick an image, or type display text (an emoji,
+/// a word, or a few lines).
 ///
 /// Either way the result is a custom image saved in [CustomIconStore] — an
-/// emoji is rendered to a PNG right here on the host (see
-/// `saveEmojiIcon`) rather than sent as text, so the client
-/// only ever has an image to show and never has to render an emoji itself.
+/// display text is rendered to a PNG right here on the host (see
+/// `saveDisplayTextIcon`) rather than sent as text, so the client
+/// only ever has an image to show and never has to render text itself.
 ///
 /// Public, unlike the dialogs around it, so it can be pumped and tapped
 /// through in isolation the way `confirmResizeDrop` was extracted for the
@@ -1749,7 +1751,7 @@ class IconPicker extends StatefulWidget {
     super.key,
     required this.customIconId,
     required this.onChanged,
-    this.saveEmoji = saveEmojiIcon,
+    this.saveDisplayText = saveDisplayTextIcon,
   });
 
   /// The bytes behind this id live on this machine's own disk — the host is
@@ -1760,9 +1762,9 @@ class IconPicker extends StatefulWidget {
   /// Reports the new custom icon id, or null to clear the override.
   final ValueChanged<String?> onChanged;
 
-  /// Turns a typed emoji into a saved custom icon's id. Injectable so a
+  /// Turns typed display text into a saved custom icon's id. Injectable so a
   /// test can drive the text dialog without rendering or touching disk.
-  final Future<String?> Function(String emoji) saveEmoji;
+  final Future<String?> Function(String text) saveDisplayText;
 
   @override
   State<IconPicker> createState() => _IconPickerState();
@@ -1822,7 +1824,7 @@ class _IconPickerState extends State<IconPicker> {
   Future<void> _typeText() async {
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => const _EmojiDialog(),
+      builder: (context) => const _DisplayTextDialog(),
     );
     if (result == null || !mounted) return;
     final text = result.trim();
@@ -1830,7 +1832,7 @@ class _IconPickerState extends State<IconPicker> {
       _replaceWith(null);
       return;
     }
-    final id = await widget.saveEmoji(text);
+    final id = await widget.saveDisplayText(text);
     if (id == null || !mounted) return;
     _replaceWith(id);
   }
@@ -2115,23 +2117,24 @@ class _BackgroundPickerState extends State<BackgroundPicker> {
   }
 }
 
-/// Prompts for the emoji [IconPicker]'s "Type text..." option offers.
+/// Prompts for the display text [IconPicker]'s "Type text..." option
+/// offers — an emoji, a word, or several lines of either.
 ///
-/// Always starts empty: once saved, an emoji is just an image like any
+/// Always starts empty: once saved, display text is just an image like any
 /// other custom icon, with no text left to prefill from.
 ///
 /// A dialog of its own, rather than building the controller inline in
 /// [_IconPickerState], so its lifecycle is tied to this widget the normal
 /// way: disposing it right after `showDialog` returns raced the dialog's
 /// own close animation and crashed with "used after being disposed".
-class _EmojiDialog extends StatefulWidget {
-  const _EmojiDialog();
+class _DisplayTextDialog extends StatefulWidget {
+  const _DisplayTextDialog();
 
   @override
-  State<_EmojiDialog> createState() => _EmojiDialogState();
+  State<_DisplayTextDialog> createState() => _DisplayTextDialogState();
 }
 
-class _EmojiDialogState extends State<_EmojiDialog> {
+class _DisplayTextDialogState extends State<_DisplayTextDialog> {
   final _controller = TextEditingController();
 
   @override
@@ -2143,10 +2146,15 @@ class _EmojiDialogState extends State<_EmojiDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Emoji'),
+      title: const Text('Display text'),
       content: TextField(
         controller: _controller,
         autofocus: true,
+        // Return inserts a line break rather than submitting — OK below
+        // is what confirms, so a multi-line label can be typed as is.
+        keyboardType: TextInputType.multiline,
+        minLines: 1,
+        maxLines: 4,
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 22),
         decoration: const InputDecoration(hintText: '🙂'),
@@ -2313,7 +2321,7 @@ class _UrlDialogState extends State<_UrlDialog> {
     var customIconId = widget.customIconId ?? widget.existing?.customIconId;
     // A button with no icon of its own gets the site's icon, so it shows
     // the site's logo rather than the generic link glyph. One the user
-    // already chose — an emoji or a picked image — always wins.
+    // already chose — display text or a picked image — always wins.
     if (customIconId == null) {
       setState(() => _saving = true);
       final png = await FaviconFetcher.fetchIconPng(url);

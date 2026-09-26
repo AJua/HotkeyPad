@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 
 import 'config_dir.dart';
-import 'emoji_icon.dart';
+import 'display_text_icon.dart';
 
 /// Persists the deck layout on the host.
 ///

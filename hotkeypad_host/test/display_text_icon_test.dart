@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:hotkeypad_host/src/emoji_icon.dart';
+import 'package:hotkeypad_host/src/display_text_icon.dart';
 import 'package:hotkeypad_protocol/hotkeypad_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,10 +19,11 @@ DeckItem? _itemAt(DeckLayout layout, int index) {
 }
 
 void main() {
-  group('emojiPlateColor', () {
+  group('displayTextPlateColor', () {
     test('varies with the random source', () {
       final colors = {
-        for (var seed = 0; seed < 20; seed++) emojiPlateColor(Random(seed)),
+        for (var seed = 0; seed < 20; seed++)
+          displayTextPlateColor(Random(seed)),
       };
 
       expect(colors.length, greaterThan(1));
@@ -31,7 +32,7 @@ void main() {
     test('is always an opaque pastel light enough for dark text', () {
       final random = Random(42);
       for (var i = 0; i < 200; i++) {
-        final color = emojiPlateColor(random);
+        final color = displayTextPlateColor(random);
         expect(color.a, 1.0);
         expect(color.computeLuminance(), greaterThan(0.45));
       }
@@ -70,7 +71,7 @@ void main() {
 
       final migrated = await migrateEmojiIcons(
         layout,
-        saveEmoji: (emoji) async {
+        saveDisplayText: (emoji) async {
           saved.add(emoji);
           return 'img_${saved.length}';
         },
@@ -96,7 +97,7 @@ void main() {
 
       final migrated = await migrateEmojiIcons(
         layout,
-        saveEmoji: (_) async => 'img_new',
+        saveDisplayText: (_) async => 'img_new',
       );
 
       expect(_itemAt(migrated, 0)!.customIconId, 'img_new');
@@ -108,7 +109,7 @@ void main() {
 
       final migrated = await migrateEmojiIcons(
         layout,
-        saveEmoji: (_) async => null,
+        saveDisplayText: (_) async => null,
       );
 
       expect(_itemAt(migrated, 0)!.emoji, '🧭');

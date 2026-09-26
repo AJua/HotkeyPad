@@ -54,9 +54,9 @@ void main() {
     });
   });
 
-  group('GlyphIconStore.renderEmojiPng', () {
+  group('GlyphIconStore.renderDisplayTextPng', () {
     test('renders an emoji at the requested square size', () async {
-      final png = await GlyphIconStore.renderEmojiPng('😀', size: 64);
+      final png = await GlyphIconStore.renderDisplayTextPng('😀', size: 64);
       final size = await _decodedSize(png);
 
       expect(size.width, 64);
@@ -64,11 +64,22 @@ void main() {
     });
 
     test('grows to hold text wider than the requested size', () async {
-      final png = await GlyphIconStore.renderEmojiPng('ABCDEF', size: 64);
+      final png = await GlyphIconStore.renderDisplayTextPng('ABCDEF', size: 64);
       final size = await _decodedSize(png);
 
       expect(size.width, greaterThan(64));
       expect(size.width, size.height);
+    });
+
+    test('stacks multi-line text instead of one long line', () async {
+      final oneLine = await _decodedSize(
+        await GlyphIconStore.renderDisplayTextPng('ABCDEFGH', size: 64),
+      );
+      final twoLines = await _decodedSize(
+        await GlyphIconStore.renderDisplayTextPng('ABCD\nEFGH', size: 64),
+      );
+
+      expect(twoLines.width, lessThan(oneLine.width));
     });
 
     test('on the plate, matches a picked picture in size and shape', () async {
@@ -91,7 +102,7 @@ void main() {
       }
 
       final emoji = await CustomIconStore.cropToSquarePng(
-        await GlyphIconStore.renderEmojiPng('ABCDEFGH', size: 128),
+        await GlyphIconStore.renderDisplayTextPng('ABCDEFGH', size: 128),
       );
       final picture = await CustomIconStore.cropToSquarePng(
         await _solidPng(64, 64),
