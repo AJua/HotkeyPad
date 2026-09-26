@@ -1,0 +1,1 @@
+Emoji button icons are now drawn by the computer and sent as images, so they look the same on every phone.
