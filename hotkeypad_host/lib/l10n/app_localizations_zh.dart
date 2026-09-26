@@ -68,6 +68,17 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get updateNowAction => '更新';
+
+  @override
+  String updateDownloading(int percent) {
+    return '正在下載更新… $percent%';
+  }
+
+  @override
+  String get updateFailed => '無法自動更新，改為開啟發布頁面。';
+
+  @override
   String get viewAction => '查看';
 
   @override
@@ -268,6 +279,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String updateAvailable(String version) {
     return '有新版本 HotkeyPad Host $version 可以更新。';
   }
+
+  @override
+  String get updateNowAction => '更新';
+
+  @override
+  String updateDownloading(int percent) {
+    return '正在下載更新… $percent%';
+  }
+
+  @override
+  String get updateFailed => '無法自動更新，改為開啟發布頁面。';
 
   @override
   String get viewAction => '查看';

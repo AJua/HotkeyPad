@@ -203,6 +203,24 @@ abstract class AppLocalizations {
   /// **'HotkeyPad Host {version} is available.'**
   String updateAvailable(String version);
 
+  /// Update banner button that downloads and installs the new version, then restarts.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get updateNowAction;
+
+  /// Update banner text while an update downloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update… {percent}%'**
+  String updateDownloading(int percent);
+
+  /// Shown when the automatic update fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update automatically. Opening the release page instead.'**
+  String get updateFailed;
+
   /// Update banner button opening the release page.
   ///
   /// In en, this message translates to:

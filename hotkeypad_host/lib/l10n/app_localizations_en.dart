@@ -69,6 +69,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get updateNowAction => 'Update';
+
+  @override
+  String updateDownloading(int percent) {
+    return 'Downloading update… $percent%';
+  }
+
+  @override
+  String get updateFailed =>
+      'Could not update automatically. Opening the release page instead.';
+
+  @override
   String get viewAction => 'View';
 
   @override

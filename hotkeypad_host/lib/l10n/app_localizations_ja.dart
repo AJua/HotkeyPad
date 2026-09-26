@@ -69,6 +69,17 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get updateNowAction => 'アップデート';
+
+  @override
+  String updateDownloading(int percent) {
+    return 'アップデートをダウンロード中… $percent%';
+  }
+
+  @override
+  String get updateFailed => '自動アップデートできませんでした。リリースページを開きます。';
+
+  @override
   String get viewAction => '表示';
 
   @override

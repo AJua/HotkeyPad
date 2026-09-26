@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import 'app_launcher.dart';
@@ -28,6 +29,7 @@ import 'settings_store.dart';
 import 'sound_store.dart';
 import 'unsupported_page.dart';
 import 'update_checker.dart';
+import 'update_installer.dart';
 import 'update_store.dart';
 import 'wifi_server.dart';
 
@@ -336,6 +338,12 @@ class _HostPageState extends State<HostPage> {
   /// time, including while a check is still in flight.
   LatestRelease? _updateAvailable;
 
+  /// True while [_installUpdate] runs. [_updateProgress] is the download's
+  /// fraction done, or null when that is unknown or the download is over
+  /// and the new build is being staged.
+  bool _updating = false;
+  double? _updateProgress;
+
   /// App name -> bundle path, filled when the catalogue is built so an icon
   /// request does not have to rescan the disk.
   final _appPaths = <String, String>{};
@@ -406,6 +414,40 @@ class _HostPageState extends State<HostPage> {
     if (!isNewerVersion(current, latest.version)) return;
     if (!shouldShowBanner(state.dismissedVersion, latest.version)) return;
     if (mounted) setState(() => _updateAvailable = latest);
+  }
+
+  /// Downloads [release] and restarts into it — see [UpdateInstaller]. On
+  /// success this never returns: the app quits and the new build is
+  /// launched in its place. On failure the current build keeps running
+  /// and the release page is offered instead.
+  Future<void> _installUpdate(LatestRelease release) async {
+    if (_updating) return;
+    setState(() {
+      _updating = true;
+      _updateProgress = null;
+    });
+    try {
+      // The banner's release can come from UpdateStore's cache, which does
+      // not keep download links — ask GitHub again for current ones.
+      final fresh = await UpdateChecker.fetchLatest();
+      final target = fresh != null && fresh.version == release.version
+          ? fresh
+          : release;
+      await UpdateInstaller.install(
+        target,
+        onProgress: (progress) {
+          if (mounted) setState(() => _updateProgress = progress);
+        },
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _updating = false;
+        _addLog('update failed: $error');
+      });
+      _showMessage(AppLocalizations.of(context)!.updateFailed);
+      unawaited(launchUrl(Uri.parse(release.htmlUrl)));
+    }
   }
 
   Future<void> _dismissUpdate(LatestRelease release) async {
@@ -1632,19 +1674,39 @@ class _HostPageState extends State<HostPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  l10n.updateAvailable(release.version),
+                  _updating
+                      ? l10n.updateDownloading(
+                          ((_updateProgress ?? 0) * 100).round(),
+                        )
+                      : l10n.updateAvailable(release.version),
                   style: TextStyle(color: onContainer),
                 ),
               ),
-              TextButton(
-                onPressed: () => Process.run('open', [release.htmlUrl]),
-                child: Text(l10n.viewAction),
-              ),
-              IconButton(
-                tooltip: l10n.dismiss,
-                icon: Icon(Icons.close, color: onContainer),
-                onPressed: () => _dismissUpdate(release),
-              ),
+              if (_updating)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    value: _updateProgress,
+                  ),
+                )
+              else ...[
+                if (UpdateInstaller.supported)
+                  TextButton(
+                    onPressed: () => _installUpdate(release),
+                    child: Text(l10n.updateNowAction),
+                  ),
+                TextButton(
+                  onPressed: () => launchUrl(Uri.parse(release.htmlUrl)),
+                  child: Text(l10n.viewAction),
+                ),
+                IconButton(
+                  tooltip: l10n.dismiss,
+                  icon: Icon(Icons.close, color: onContainer),
+                  onPressed: () => _dismissUpdate(release),
+                ),
+              ],
             ],
           ),
         ),

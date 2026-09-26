@@ -64,6 +64,18 @@
     "placeholders": {"version": {"type": "String"}}
   },
 
+  "updateNowAction": "Update",
+  "@updateNowAction": {"description": "Update banner button that downloads and installs the new version, then restarts."},
+
+  "updateDownloading": "Downloading update… {percent}%",
+  "@updateDownloading": {
+    "description": "Update banner text while an update downloads.",
+    "placeholders": {"percent": {"type": "int"}}
+  },
+
+  "updateFailed": "Could not update automatically. Opening the release page instead.",
+  "@updateFailed": {"description": "Shown when the automatic update fails."},
+
   "viewAction": "View",
   "@viewAction": {"description": "Update banner button opening the release page."},
 
